@@ -1,0 +1,32 @@
+[Unit]
+# سرویس systemd برای اجرای خودکار Instagram Username Watcher بعد از هر ری‌استارت.
+Description=Instagram Username Watcher (notify-only)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+# --- این سه مقدار را مطابق سرور خودت ویرایش کن ---
+# کاربری که سرویس با آن اجرا می‌شود (نه root توصیه می‌شود):
+User=ubuntu
+# مسیر پوشه‌ی پروژه روی سرور:
+WorkingDirectory=/home/ubuntu/instagram-watcher
+# دستور اجرا (اگر venv داری، مسیر python داخل venv را بگذار):
+ExecStart=/usr/bin/python3 /home/ubuntu/instagram-watcher/instagram_watcher.py /home/ubuntu/instagram-watcher/usernames.txt --interval 600
+# -------------------------------------------------
+
+# اگر می‌خواهی اعلان تلگرام فعال شود، این دو خط را از حالت کامنت خارج کن و مقدار بده:
+# Environment=TELEGRAM_BOT_TOKEN=your_bot_token
+# Environment=TELEGRAM_CHAT_ID=your_chat_id
+
+# اگر کرش کرد، خودکار دوباره اجرا شود:
+Restart=on-failure
+RestartSec=30
+
+# خروجی در journald ثبت می‌شود؛ با journalctl می‌بینی‌اش.
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

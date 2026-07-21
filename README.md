@@ -69,6 +69,51 @@ nohup python instagram_watcher.py usernames.txt > watcher.log 2>&1 &
 */15 * * * * cd /path/to/repo && python instagram_watcher.py usernames.txt --once >> watcher.log 2>&1
 ```
 
+## اجرای خودکار بعد از هر ری‌استارت سرور (Ubuntu + systemd)
+
+فایل `instagram-watcher.service` آماده است. مراحل نصب روی سرور اوبونتو:
+
+```bash
+# ۱) پروژه را روی سرور بگذار (مثلاً در مسیر زیر) و وارد پوشه شو
+cd /home/ubuntu/instagram-watcher
+
+# ۲) وابستگی‌ها را نصب کن
+pip3 install -r requirements.txt
+
+# ۳) آیدی‌هایت را در usernames.txt بنویس
+nano usernames.txt
+
+# ۴) فایل سرویس را ویرایش کن: مقدار User, WorkingDirectory و ExecStart را
+#    مطابق مسیر و کاربر خودت درست کن
+nano instagram-watcher.service
+
+# ۵) فایل را در مسیر systemd کپی کن
+sudo cp instagram-watcher.service /etc/systemd/system/
+
+# ۶) سرویس را فعال و اجرا کن
+sudo systemctl daemon-reload
+sudo systemctl enable instagram-watcher.service   # اجرای خودکار بعد از هر ری‌استارت
+sudo systemctl start instagram-watcher.service
+```
+
+بررسی وضعیت و دیدن لاگ‌ها:
+
+```bash
+sudo systemctl status instagram-watcher.service     # وضعیت فعلی
+journalctl -u instagram-watcher.service -f          # لاگ زنده
+```
+
+دستورهای مفید:
+
+```bash
+sudo systemctl restart instagram-watcher.service    # ری‌استارت سرویس
+sudo systemctl stop instagram-watcher.service       # توقف
+sudo systemctl disable instagram-watcher.service    # غیرفعال کردن اجرای خودکار
+```
+
+بعد از `enable` کردن، سرویس **بعد از هر بار ری‌استارت شدن سرور به‌صورت خودکار اجرا می‌شود**.
+اگر آیدی‌ها را عوض کردی، فقط `usernames.txt` را ویرایش کن و سرویس را `restart` کن.
+
 ## چطور کار می‌کند؟
 
 - کد وضعیت `404` از صفحه‌ی پروفایل → آیدی احتمالاً **آزاد** است.
