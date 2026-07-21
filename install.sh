@@ -9,7 +9,10 @@
 #
 set -euo pipefail
 
-RUN_USER="ubuntu"
+# کاربری که سرویس با آن اجرا می‌شود = همان کاربری که این اسکریپت را اجرا می‌کند
+# (اگر با sudo اجرا شود، کاربر واقعی؛ وگرنه کاربر فعلی). این‌طور مشکل دسترسی
+# به مسیر پروژه پیش نمی‌آید.
+RUN_USER="${SUDO_USER:-$(whoami)}"
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 USERNAMES_FILE="$PROJECT_DIR/usernames.txt"
 SERVICE_NAME="instagram-watcher.service"
@@ -78,8 +81,19 @@ echo
 # ---------------------------------------------------------------------------
 # ۳) نصب وابستگی‌ها
 # ---------------------------------------------------------------------------
+echo "→ بررسی و نصب pip..."
+# اگر pip موجود نبود، آن را با apt نصب کن (مخصوص Ubuntu/Debian)
+if ! python3 -m pip --version >/dev/null 2>&1; then
+    echo "  pip پیدا نشد؛ در حال نصب python3-pip ..."
+    sudo apt-get update -y
+    sudo apt-get install -y python3-pip
+fi
+
 echo "→ نصب وابستگی‌ها..."
-pip3 install -r "$PROJECT_DIR/requirements.txt"
+# فقط requests روی سرور لازم است (plyer برای دسکتاپ است و روی سرور نادیده گرفته می‌شود).
+# --break-system-packages برای نسخه‌های جدید Ubuntu که pip سیستمی را قفل می‌کنند.
+python3 -m pip install requests --break-system-packages 2>/dev/null \
+    || python3 -m pip install requests
 echo
 
 # ---------------------------------------------------------------------------
