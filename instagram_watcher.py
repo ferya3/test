@@ -240,7 +240,22 @@ def main() -> int:
         action="store_true",
         help="فقط یک بار چک کن و خارج شو (برای اجرا با cron مناسب است).",
     )
+    parser.add_argument(
+        "--test-notify",
+        action="store_true",
+        help="فقط یک اعلان تستی بفرست (کنسول/دسکتاپ/تلگرام) و خارج شو.",
+    )
     args = parser.parse_args()
+
+    if args.test_notify:
+        log("→ ارسال اعلان تستی...")
+        notify_all("TEST_USERNAME")
+        tg_set = bool(os.environ.get("TELEGRAM_BOT_TOKEN") and os.environ.get("TELEGRAM_CHAT_ID"))
+        if tg_set:
+            log("متغیرهای تلگرام تنظیم شده‌اند — اگر پیام روی تلگرامت آمد، همه‌چی درست است.")
+        else:
+            log("⚠️  متغیرهای TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID تنظیم نشده‌اند؛ تلگرام رد شد.")
+        return 0
 
     usernames = load_usernames(args.usernames)
     if not usernames:
