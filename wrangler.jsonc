@@ -1,27 +1,18 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "coming-soon",
-  "main": "src/index.js",
+  "name": "vitaqueen-coming-soon",
+  "main": "worker.js",
   "compatibility_date": "2026-01-01",
   "observability": {
     "enabled": true
-  },
-
-  // محتوای صفحه — همه‌چیز از همین‌جا قابل تغییره، بدون دست‌زدن به کد.
-  "vars": {
-    "SITE_NAME": "نام سایت شما",
-    "TAGLINE": "به‌زودی",
-    "DESCRIPTION": "داریم روی چیز تازه‌ای کار می‌کنیم. خیلی زود اینجا می‌بینیمتون.",
-    // تاریخ راه‌اندازی به فرمت ISO 8601. خالی بگذارید تا شمارش معکوس نمایش داده نشود.
-    "LAUNCH_DATE": "",
-    // خالی بگذارید تا لینک تماس نمایش داده نشود.
-    "CONTACT_EMAIL": "",
-    // "rtl" یا "ltr"
-    "DIR": "rtl",
-    "LANG": "fa"
   }
 
-  // برای وصل‌کردن دامنه، بعد از اولین deploy این بخش را از کامنت خارج کنید:
+  // این فایل فقط برای deploy از طریق CLI لازم است.
+  // اگر کد را مستقیم در داشبورد کلادفلر paste می‌کنید، به آن نیازی ندارید.
+  //
+  // تنظیمات صفحه در بالای worker.js داخل CONFIG است.
+  //
+  // برای وصل‌کردن دامنه بعد از اولین deploy، این بخش را از کامنت خارج کنید:
   // "routes": [
   //   { "pattern": "example.com", "custom_domain": true },
   //   { "pattern": "www.example.com", "custom_domain": true }
