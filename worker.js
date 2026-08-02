@@ -16,21 +16,7 @@ const CONFIG = {
   // آدرس عکس بک‌گراند (باید https باشد). خالی بگذارید تا گرادیان پیش‌فرض استفاده شود.
   BG_URL: "",
 
-  // نسخه‌ی مخصوص موبایل (کراپ عمودی از همان عکس). خالی = همان عکس دسکتاپ استفاده می‌شود.
-  BG_URL_MOBILE: "",
-
-  // "cover" = تمام‌صفحه، لبه‌ها کراپ می‌شوند.
-  // "contain" = کل عکس دیده می‌شود و اطرافش با نسخه‌ی بلورشده‌ی همان عکس پر می‌شود.
-  BG_FIT: "cover",
-
-  // کدام قسمت عکس موقع کراپ حفظ شود: "center" | "top" | "left center" | "70% 40%" و ...
-  BG_POSITION: "center",
-
-  // نقطه‌ی کراپ روی موبایل. چون صفحه‌ی گوشی عمودی است و عکس افقی، معمولاً باید
-  // روی سوژه تنظیم شود؛ مثلاً "left center" تا بطری در کادر بماند. خالی = مثل دسکتاپ.
-  BG_POSITION_MOBILE: "",
-
-  // اگر خود عکس بک‌گراند لوگو و شعار دارد، این را false کنید تا تکراری نشود.
+  // اگر خود عکس لوگو و شعار دارد، این را false کنید تا تکراری نشود.
   SHOW_BRANDING: true,
 
   // لوگو به‌صورت تصویر. خالی بگذارید تا لوگوی متنی (تاج + vitaQueen) نمایش داده شود.
@@ -115,7 +101,7 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
-/** فقط آدرس‌های https مجازند تا url() در CSS قابل تزریق نباشد. */
+/** فقط آدرس‌های https مجازند. */
 function safeImageUrl(value) {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
@@ -127,12 +113,6 @@ function safeImageUrl(value) {
   }
 }
 
-/** object-position مستقیم داخل CSS می‌نشیند، پس فقط کاراکترهای بی‌خطر مجازند. */
-function safePosition(value) {
-  const raw = String(value ?? "").trim();
-  return /^[a-z0-9%.\s-]{1,40}$/i.test(raw) ? raw : "center";
-}
-
 function render(config, nonce, url) {
   const siteName = escapeHtml(config.SITE_NAME);
   const slogan = escapeHtml(config.SLOGAN);
@@ -142,13 +122,7 @@ function render(config, nonce, url) {
   const lang = escapeHtml(config.LANG || "fa");
 
   const background = safeImageUrl(config.BG_URL);
-  const backgroundMobile = safeImageUrl(config.BG_URL_MOBILE) || background;
   const logo = safeImageUrl(config.LOGO_URL);
-  const fit = config.BG_FIT === "contain" ? "contain" : "cover";
-  const position = safePosition(config.BG_POSITION);
-  const positionMobile = String(config.BG_POSITION_MOBILE ?? "").trim()
-    ? safePosition(config.BG_POSITION_MOBILE)
-    : position;
   // متغیر محیطی همیشه رشته است، پس "false" هم باید false معنی شود.
   const showBranding = String(config.SHOW_BRANDING) !== "false";
 
@@ -166,17 +140,12 @@ function render(config, nonce, url) {
 
   const branding = showBranding
     ? `${wordmark}
-  <p class="slogan">${slogan}</p>`
+    <p class="slogan">${slogan}</p>`
     : "";
 
-  // عکس به‌جای background-image به‌صورت <img> رندر می‌شود:
-  // background-attachment: fixed روی موبایل باگ دارد و عکس را بیش از حد بزرگ می‌کند.
   const backdrop = background
-    ? `<div class="bg ${fit}" aria-hidden="true">
-  <picture>
-    <source media="(max-width: 640px)" srcset="${escapeHtml(backgroundMobile)}">
-    <img src="${escapeHtml(background)}" alt="" fetchpriority="high" decoding="async">
-  </picture>
+    ? `<div class="bg">
+  <img src="${escapeHtml(background)}" alt="" fetchpriority="high">
 </div>`
     : "";
 
@@ -216,26 +185,30 @@ ${background ? `<meta property="og:image" content="${escapeHtml(background)}">` 
 :root {
   --gold: ${BRAND.gold};
   --blue: ${BRAND.blue};
-  --bg-pos: ${position};
+  --deep: #0a4a7d;
 }
 
 * { box-sizing: border-box; }
 
+html { -webkit-text-size-adjust: 100%; }
+
 body {
   margin: 0;
   min-height: 100svh;
-  display: grid;
-  place-items: center;
-  padding: max(2rem, env(safe-area-inset-top)) 1.25rem max(2rem, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
   color: #fff;
   font-family: Vazirmatn, ui-sans-serif, system-ui, "Segoe UI", Tahoma, sans-serif;
   text-align: center;
+  overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
-  /* اگر عکس ست نشده یا لود نشد، این گرادیان دیده می‌شود. */
-  background: linear-gradient(180deg, #4aa8e8 0%, #1f7fc4 45%, #0b5a96 72%, #0a4a7d 100%);
+  background: linear-gradient(180deg, #4aa8e8 0%, #1f7fc4 45%, #0b5a96 72%, var(--deep) 100%);
 }
 
-/* لایه‌ی عکس: fixed است ولی خودِ <img> اسکیل می‌شود، نه background. */
+/* ————— حالت افقی (دسکتاپ و تبلت خوابیده): عکس تمام‌صفحه، متن رویش ————— */
+
 .bg {
   position: fixed;
   inset: 0;
@@ -247,46 +220,66 @@ body {
   display: block;
   width: 100%;
   height: 100%;
-  object-position: var(--bg-pos);
+  object-fit: cover;
+  object-position: center;
 }
 
-.bg.cover img { object-fit: cover; }
-
-/* در حالت contain کل عکس دیده می‌شود و دو طرفش با نسخه‌ی بلورشده پر می‌شود. */
-.bg.contain img {
-  object-fit: contain;
-  position: relative;
-  z-index: 1;
-}
-
-.bg.contain::before {
+/* لایه‌ی تیره تا متن روی عکس خوانا بماند. */
+.bg::after {
   content: "";
   position: absolute;
-  inset: -6%;
-  background-image: inherit;
-  background-size: cover;
-  background-position: center;
-  filter: blur(36px) saturate(1.15) brightness(0.75);
-}
-
-/* لایه‌ی تیره تا متن روی هر عکسی خوانا بماند (بدون عکس، ملایم‌تر است). */
-.scrim {
-  position: fixed;
   inset: 0;
-  z-index: 1;
-  background: ${
-    background
-      ? `radial-gradient(ellipse at center, rgba(4, 22, 42, 0.32) 0%, rgba(4, 22, 42, 0.7) 100%),
-    linear-gradient(180deg, rgba(4, 22, 42, 0.28) 0%, rgba(4, 22, 42, 0.55) 100%)`
-      : `radial-gradient(ellipse at 50% 40%, rgba(4, 22, 42, 0) 0%, rgba(4, 22, 42, 0.35) 100%)`
-  };
+  background:
+    radial-gradient(ellipse at center, rgba(4, 22, 42, 0.3) 0%, rgba(4, 22, 42, 0.68) 100%),
+    linear-gradient(180deg, rgba(4, 22, 42, 0.25) 0%, rgba(4, 22, 42, 0.5) 100%);
 }
 
 main {
   position: relative;
-  z-index: 2;
-  width: min(720px, 100%);
+  z-index: 1;
+  width: 100%;
+  max-width: 720px;
+  padding: max(2rem, env(safe-area-inset-top)) 1.25rem max(2rem, env(safe-area-inset-bottom));
   animation: rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ————— حالت عمودی (گوشی): کل عکس بالای صفحه بدون هیچ کراپی، متن زیرش ————— */
+
+@media (max-aspect-ratio: 1/1) {
+  body { justify-content: flex-start; }
+
+  .bg {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    /* عکس در جریان صفحه می‌نشیند و متن زیرش می‌آید، پس چیزی روی هم نمی‌افتد. */
+    flex: none;
+  }
+
+  .bg img {
+    height: auto;
+    object-fit: fill;
+  }
+
+  /* به‌جای تیره‌کردن کل عکس، فقط پایینش را در گرادیان صفحه محو می‌کنیم. */
+  .bg::after {
+    top: auto;
+    height: 38%;
+    background: linear-gradient(180deg, rgba(31, 127, 196, 0) 0%, #1f7fc4 92%);
+  }
+
+  main {
+    /* حاشیه‌ی خودکار، متن را وسط فضای باقی‌مانده‌ی زیر عکس می‌نشاند.
+       اگر متن بلندتر از آن فضا باشد، حاشیه صفر می‌شود و چیزی بریده نمی‌شود. */
+    margin-block: auto;
+    padding-top: 1.5rem;
+    padding-bottom: max(2.5rem, env(safe-area-inset-bottom));
+  }
+
+  /* گرادیان بدنه از همان رنگی شروع می‌شود که محوشدگی عکس به آن می‌رسد. */
+  body:has(.bg) {
+    background: linear-gradient(180deg, #1f7fc4 0%, #0b5a96 40%, var(--deep) 100%);
+  }
 }
 
 @keyframes rise {
@@ -295,7 +288,7 @@ main {
 }
 
 .logo {
-  width: min(420px, 80%);
+  width: min(420px, 78%);
   height: auto;
   margin-inline: auto;
   filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.45));
@@ -304,14 +297,14 @@ main {
 .wordmark { display: grid; justify-items: center; gap: 0.35rem; }
 
 .crown {
-  width: clamp(46px, 9vw, 72px);
+  width: clamp(42px, 9vw, 72px);
   height: auto;
   filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.5));
 }
 
 h1 {
   margin: 0;
-  font-size: clamp(2.4rem, 10vw, 5.5rem);
+  font-size: clamp(2.2rem, 9vw, 5.5rem);
   font-weight: 300;
   line-height: 1;
   letter-spacing: -0.03em;
@@ -322,12 +315,12 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.9rem;
-  margin: 1.1rem 0 0;
+  gap: clamp(0.5rem, 3vw, 0.9rem);
+  margin: 1rem 0 0;
   color: rgba(255, 255, 255, 0.92);
-  font-size: clamp(0.7rem, 2.4vw, 0.95rem);
+  font-size: clamp(0.62rem, 2.6vw, 0.95rem);
   font-weight: 700;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   direction: ltr;
 }
@@ -335,7 +328,8 @@ h1 {
 .slogan::before,
 .slogan::after {
   content: "";
-  width: clamp(18px, 7vw, 54px);
+  flex: 0 0 auto;
+  width: clamp(16px, 6vw, 54px);
   height: 2px;
   background: var(--gold);
   border-radius: 2px;
@@ -345,7 +339,7 @@ h1 {
   display: inline-flex;
   align-items: center;
   gap: 0.55rem;
-  margin-top: 2rem;
+  margin-top: 1.75rem;
   padding: 0.45rem 1.1rem;
   border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 999px;
@@ -370,27 +364,26 @@ h1 {
 }
 
 p.lead {
-  margin: 1.25rem auto 0;
+  margin: 1.1rem auto 0;
   max-width: 44ch;
   color: rgba(255, 255, 255, 0.9);
-  font-size: clamp(0.95rem, 2.6vw, 1.1rem);
-  line-height: 1.9;
+  font-size: clamp(0.9rem, 3.4vw, 1.1rem);
+  line-height: 1.85;
   text-shadow: 0 2px 14px rgba(0, 20, 45, 0.5);
 }
 
 .countdown {
   display: flex;
-  flex-wrap: nowrap;
   justify-content: center;
   gap: clamp(0.4rem, 2.5vw, 1rem);
-  margin-top: 2.25rem;
+  margin-top: 1.75rem;
 }
 
 .unit {
   flex: 1 1 0;
   min-width: 0;
   max-width: 132px;
-  padding: clamp(0.7rem, 3vw, 1rem) 0.35rem;
+  padding: clamp(0.6rem, 3vw, 1rem) clamp(0.15rem, 1.5vw, 0.5rem);
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.14);
@@ -400,7 +393,7 @@ p.lead {
 
 .value {
   display: block;
-  font-size: clamp(1.35rem, 5.5vw, 2.3rem);
+  font-size: clamp(1.25rem, 6vw, 2.3rem);
   font-weight: 900;
   font-variant-numeric: tabular-nums;
   line-height: 1.15;
@@ -410,34 +403,40 @@ p.lead {
   display: block;
   margin-top: 0.3rem;
   color: rgba(255, 255, 255, 0.75);
-  font-size: clamp(0.68rem, 2.6vw, 0.78rem);
+  font-size: clamp(0.62rem, 2.8vw, 0.78rem);
 }
 
 .contact {
   display: inline-block;
-  margin-top: 2rem;
+  margin-top: 1.75rem;
   padding-bottom: 3px;
   border-bottom: 1px solid var(--gold);
   color: #fff;
-  font-size: 0.95rem;
+  font-size: clamp(0.85rem, 3.2vw, 0.95rem);
   text-decoration: none;
+  overflow-wrap: anywhere;
 }
 
 .contact:hover { color: var(--gold); }
 
 footer {
-  margin-top: 2.25rem;
+  margin-top: 1.75rem;
   color: rgba(255, 255, 255, 0.65);
-  font-size: 0.78rem;
+  font-size: 0.75rem;
 }
 
-@media (max-width: 640px) {
-  /* روی صفحه‌ی عمودی گوشی، یک عکس افقی شدید کراپ می‌شود؛ این نقطه تعیین می‌کند چه چیزی در کادر بماند. */
-  :root { --bg-pos: ${positionMobile}; }
-
-  /* در حالت contain عکس به بالای صفحه می‌رود و متن زیر آن می‌نشیند، تا روی هم نیفتند. */
-  .bg.contain img { object-position: top; }
-  body:has(.bg.contain) { align-items: end; }
+/* گوشیِ خوابیده و پنجره‌های کوتاه: فاصله‌ها جمع می‌شوند تا صفحه اسکرول نخورد. */
+@media (min-aspect-ratio: 1/1) and (max-height: 520px) {
+  main { padding-block: 1.25rem; }
+  h1 { font-size: clamp(1.8rem, 7vh, 3rem); }
+  .crown { width: clamp(32px, 5vh, 48px); }
+  .slogan { margin-top: 0.6rem; }
+  .badge { margin-top: 1rem; }
+  p.lead { margin-top: 0.7rem; line-height: 1.6; }
+  .countdown { margin-top: 1rem; }
+  .unit { padding-block: 0.5rem; }
+  .contact { margin-top: 1rem; }
+  footer { margin-top: 1rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -450,7 +449,6 @@ footer {
 </head>
 <body>
 ${backdrop}
-<div class="scrim" aria-hidden="true"></div>
 <main>
   ${branding}
   <span class="badge"><span class="dot"></span>${badge}</span>
@@ -459,7 +457,6 @@ ${backdrop}
   ${contact}
   <footer>&copy; ${new Date().getUTCFullYear()} ${siteName}</footer>
 </main>
-${fit === "contain" && background ? blurBackdropScript(nonce) : ""}
 ${hasCountdown ? countdownScript(nonce) : ""}
 </body>
 </html>`;
@@ -475,28 +472,6 @@ function countdownLabel(unit, dir) {
   const fa = { days: "روز", hours: "ساعت", minutes: "دقیقه", seconds: "ثانیه" };
   const en = { days: "days", hours: "hours", minutes: "minutes", seconds: "seconds" };
   return (dir === "rtl" ? fa : en)[unit];
-}
-
-/**
- * در حالت contain، پس‌زمینه‌ی بلور از همان عکسی ساخته می‌شود که <picture>
- * انتخاب کرده (دسکتاپ یا موبایل)، پس آدرسش از currentSrc خوانده می‌شود.
- */
-function blurBackdropScript(nonce) {
-  return `<script nonce="${nonce}">
-(function () {
-  var layer = document.querySelector(".bg.contain");
-  var img = layer && layer.querySelector("img");
-  if (!img) return;
-
-  function sync() {
-    layer.style.backgroundImage = 'url("' + (img.currentSrc || img.src) + '")';
-  }
-
-  if (img.complete) sync();
-  img.addEventListener("load", sync);
-  addEventListener("resize", sync);
-})();
-</script>`;
 }
 
 function countdownScript(nonce) {
