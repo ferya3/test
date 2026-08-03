@@ -174,6 +174,10 @@ ${background ? `<meta property="og:image" content="${escapeHtml(background)}">` 
   --gold: ${BRAND.gold};
   --blue: ${BRAND.blue};
   --deep: ${BRAND.deep};
+
+  /* فاصله‌ی تیتر از بالای صفحه — یعنی تیتر زیر لوگوی داخل عکس بنشیند.
+     اگر روی لوگو افتاد این را بیشتر کنید، اگر خیلی پایین بود کمترش کنید. */
+  --top-space: 22svh;
 }
 
 * { box-sizing: border-box; }
@@ -212,22 +216,34 @@ body {
   object-position: center;
 }
 
-/* لایه‌ی تیره تا متن روی عکس خوانا بماند. */
+/* فقط بالا و پایین — جایی که متن می‌نشیند — کمی تیره می‌شود؛
+   وسط عکس تقریباً دست‌نخورده می‌ماند تا خودِ تصویر دیده شود. */
 .bg::after {
   content: "";
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(ellipse at center, rgba(4, 22, 42, 0.34) 0%, rgba(4, 22, 42, 0.74) 100%),
-    linear-gradient(180deg, rgba(4, 22, 42, 0.3) 0%, rgba(4, 22, 42, 0.6) 100%);
+  background: linear-gradient(
+    180deg,
+    rgba(4, 22, 42, 0.5) 0%,
+    rgba(4, 22, 42, 0.12) 26%,
+    rgba(4, 22, 42, 0.08) 55%,
+    rgba(4, 22, 42, 0.58) 100%
+  );
 }
 
+/* تیتر بالای صفحه، بخش تماس پایین صفحه، عکس بینشان. */
 main {
   position: relative;
   z-index: 1;
   width: 100%;
   max-width: 640px;
-  padding: max(2rem, env(safe-area-inset-top)) 1.25rem max(2rem, env(safe-area-inset-bottom));
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: max(var(--top-space), env(safe-area-inset-top)) 1.25rem
+    max(2rem, env(safe-area-inset-bottom));
   animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
@@ -238,28 +254,30 @@ main {
 
 h1 {
   margin: 0;
-  font-size: clamp(1.45rem, 5.4vw, 2.6rem);
+  font-size: clamp(1.35rem, 5vw, 2.4rem);
   font-weight: 900;
   line-height: 1.5;
-  text-shadow: 0 6px 26px rgba(0, 20, 45, 0.55);
+  /* کاور سبک است، پس خوانایی از سایه‌ی متن می‌آید. */
+  text-shadow: 0 2px 6px rgba(0, 16, 36, 0.85), 0 8px 30px rgba(0, 16, 36, 0.6);
 }
 
 .rule {
   width: clamp(60px, 22vw, 120px);
   height: 3px;
-  margin: 1.5rem auto;
+  margin: 1.1rem auto 0;
   border: 0;
   border-radius: 3px;
   background: var(--gold);
+  box-shadow: 0 2px 10px rgba(0, 16, 36, 0.5);
 }
 
 p.lead {
   margin: 0 auto;
   max-width: 46ch;
-  color: rgba(255, 255, 255, 0.94);
+  color: #fff;
   font-size: clamp(0.95rem, 3.6vw, 1.2rem);
   line-height: 1.9;
-  text-shadow: 0 2px 14px rgba(0, 20, 45, 0.5);
+  text-shadow: 0 2px 6px rgba(0, 16, 36, 0.85), 0 6px 24px rgba(0, 16, 36, 0.6);
 }
 
 /* دکمه‌ی تماس: با یک لمس شماره‌گیری می‌شود. */
@@ -310,11 +328,11 @@ p.lead {
 
 /* گوشیِ خوابیده و پنجره‌های کوتاه: فاصله‌ها جمع می‌شوند تا صفحه اسکرول نخورد. */
 @media (min-aspect-ratio: 1/1) and (max-height: 520px) {
-  main { padding-block: 1.25rem; }
-  h1 { font-size: clamp(1.2rem, 5vh, 1.9rem); line-height: 1.4; }
-  .rule { margin-block: 0.9rem; }
+  main { --top-space: 1rem; padding-bottom: 1rem; gap: 0.75rem; }
+  h1 { font-size: clamp(1.1rem, 5vh, 1.7rem); line-height: 1.4; }
+  .rule { margin-top: 0.7rem; }
   p.lead { font-size: clamp(0.85rem, 3.6vh, 1.05rem); line-height: 1.6; }
-  .call { margin-top: 1rem; min-height: 52px; }
+  .call { margin-top: 0.9rem; min-height: 52px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -328,10 +346,14 @@ p.lead {
 <body>
 ${backdrop}
 <main>
-  <h1>${headline}</h1>
-  <hr class="rule">
-  <p class="lead">${contactText}</p>
-  ${call}
+  <div class="top">
+    <h1>${headline}</h1>
+    <hr class="rule">
+  </div>
+  <div class="bottom">
+    <p class="lead">${contactText}</p>
+    ${call}
+  </div>
 </main>
 </body>
 </html>`;
