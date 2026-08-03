@@ -1,5 +1,5 @@
 /**
- * vitaQueen — coming soon
+ * vitaQueen — سایت در حال بروزرسانی
  *
  * تک‌فایل. کل این فایل را کپی کنید و در ادیتور Cloudflare Workers
  * (Workers & Pages → Create → Start with Hello World → Edit code) جای‌گذاری و Deploy کنید.
@@ -9,24 +9,19 @@
 
 const CONFIG = {
   SITE_NAME: "vitaQueen",
-  SLOGAN: "PURE LIFE, NATURAL CHOICE",
-  BADGE: "به‌زودی",
-  DESCRIPTION: "آب معدنی طبیعی، از دل کوهستان. وب‌سایت ما به‌زودی در دسترس خواهد بود.",
 
-  // آدرس عکس بک‌گراند (باید https باشد). خالی بگذارید تا گرادیان پیش‌فرض استفاده شود.
+  HEADLINE: "سایت در حال بروزرسانی می‌باشد",
+  CONTACT_TEXT: "جهت تماس با مدیر فروش با این شماره تماس بگیرید",
+
+  // شماره‌ای که روی صفحه نمایش داده می‌شود. با یک لمس، تماس گرفته می‌شود.
+  PHONE: "09149677100",
+  // پیش‌شماره‌ی کشور برای لینک تماس. صفرِ اول شماره با این جایگزین می‌شود.
+  COUNTRY_CODE: "+98",
+
+  // عکس بک‌گراند دسکتاپ (افقی). باید https باشد. خالی = گرادیان آبی پیش‌فرض.
   BG_URL: "",
-
-  // اگر خود عکس لوگو و شعار دارد، این را false کنید تا تکراری نشود.
-  SHOW_BRANDING: true,
-
-  // لوگو به‌صورت تصویر. خالی بگذارید تا لوگوی متنی (تاج + vitaQueen) نمایش داده شود.
-  LOGO_URL: "",
-
-  // تاریخ راه‌اندازی به فرمت ISO مثل "2026-12-01T09:00:00Z". خالی = بدون شمارش معکوس.
-  LAUNCH_DATE: "",
-
-  // خالی = بدون لینک تماس.
-  CONTACT_EMAIL: "",
+  // عکس بک‌گراند موبایل (ترجیحاً عمودی). خالی = همان عکس دسکتاپ استفاده می‌شود.
+  BG_URL_MOBILE: "",
 
   DIR: "rtl", // "rtl" یا "ltr"
   LANG: "fa",
@@ -35,6 +30,7 @@ const CONFIG = {
 const BRAND = {
   blue: "#0b63b0",
   gold: "#f5b200",
+  deep: "#0a4a7d",
 };
 
 const FAVICON =
@@ -72,7 +68,6 @@ export default {
         "content-security-policy": [
           "default-src 'none'",
           `style-src 'nonce-${nonce}' https://fonts.googleapis.com`,
-          `script-src 'nonce-${nonce}'`,
           "font-src https://fonts.gstatic.com",
           "img-src https: data:",
           "base-uri 'none'",
@@ -113,53 +108,45 @@ function safeImageUrl(value) {
   }
 }
 
+/** شماره را به شکل بین‌المللی درمی‌آورد: 09149677100 → +989149677100 */
+function telHref(phone, countryCode) {
+  const digits = String(phone ?? "").replace(/[^\d+]/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("+")) return digits;
+  if (digits.startsWith("00")) return "+" + digits.slice(2);
+
+  const code = String(countryCode ?? "").replace(/[^\d+]/g, "");
+  if (digits.startsWith("0") && code) return code + digits.slice(1);
+  return digits;
+}
+
 function render(config, nonce, url) {
   const siteName = escapeHtml(config.SITE_NAME);
-  const slogan = escapeHtml(config.SLOGAN);
-  const badge = escapeHtml(config.BADGE);
-  const description = escapeHtml(config.DESCRIPTION);
+  const headline = escapeHtml(config.HEADLINE);
+  const contactText = escapeHtml(config.CONTACT_TEXT);
+  const phone = escapeHtml(String(config.PHONE ?? "").trim());
+  const tel = escapeHtml(telHref(config.PHONE, config.COUNTRY_CODE));
   const dir = config.DIR === "ltr" ? "ltr" : "rtl";
   const lang = escapeHtml(config.LANG || "fa");
 
   const background = safeImageUrl(config.BG_URL);
-  const logo = safeImageUrl(config.LOGO_URL);
-  // متغیر محیطی همیشه رشته است، پس "false" هم باید false معنی شود.
-  const showBranding = String(config.SHOW_BRANDING) !== "false";
+  const backgroundMobile = safeImageUrl(config.BG_URL_MOBILE) || background;
 
-  const launchTimestamp = Date.parse(config.LAUNCH_DATE);
-  const hasCountdown = Number.isFinite(launchTimestamp) && launchTimestamp > Date.now();
-
-  const email = String(config.CONTACT_EMAIL ?? "").trim();
-  const contact = email
-    ? `<a class="contact" href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a>`
-    : "";
-
-  const wordmark = logo
-    ? `<img class="logo" src="${escapeHtml(logo)}" alt="${siteName}">`
-    : `<div class="wordmark">${crownSvg()}<h1>${siteName}</h1></div>`;
-
-  const branding = showBranding
-    ? `${wordmark}
-    <p class="slogan">${slogan}</p>`
-    : "";
-
+  // عکس با <picture> عوض می‌شود؛ همان شرطی که چیدمان با آن تغییر می‌کند.
   const backdrop = background
     ? `<div class="bg">
-  <img src="${escapeHtml(background)}" alt="" fetchpriority="high">
+  <picture>
+    <source media="(max-aspect-ratio: 1/1)" srcset="${escapeHtml(backgroundMobile)}">
+    <img src="${escapeHtml(background)}" alt="" fetchpriority="high">
+  </picture>
 </div>`
     : "";
 
-  const countdown = hasCountdown
-    ? `<div class="countdown" id="countdown" data-deadline="${launchTimestamp}" aria-live="polite">
-      ${["days", "hours", "minutes", "seconds"]
-        .map(
-          (unit) => `<div class="unit">
-        <span class="value" id="${unit}">--</span>
-        <span class="label">${countdownLabel(unit, dir)}</span>
-      </div>`,
-        )
-        .join("")}
-    </div>`
+  const call = tel
+    ? `<a class="call" href="tel:${tel}" aria-label="تماس با ${phone}">
+    ${phoneSvg()}
+    <span class="num">${phone}</span>
+  </a>`
     : "";
 
   return `<!doctype html>
@@ -167,12 +154,13 @@ function render(config, nonce, url) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${siteName} — ${badge}</title>
-<meta name="description" content="${description}">
+<meta name="format-detection" content="telephone=no">
+<title>${siteName} — ${headline}</title>
+<meta name="description" content="${headline} ${contactText} ${phone}">
 <meta name="theme-color" content="${BRAND.blue}">
 <meta property="og:type" content="website">
-<meta property="og:title" content="${siteName} — ${badge}">
-<meta property="og:description" content="${description}">
+<meta property="og:title" content="${siteName} — ${headline}">
+<meta property="og:description" content="${contactText} ${phone}">
 <meta property="og:url" content="${escapeHtml(url.origin)}">
 ${background ? `<meta property="og:image" content="${escapeHtml(background)}">` : ""}
 <meta name="twitter:card" content="summary_large_image">
@@ -180,12 +168,12 @@ ${background ? `<meta property="og:image" content="${escapeHtml(background)}">` 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <style nonce="${nonce}">
-@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700;900&display=swap');
 
 :root {
   --gold: ${BRAND.gold};
   --blue: ${BRAND.blue};
-  --deep: #0a4a7d;
+  --deep: ${BRAND.deep};
 }
 
 * { box-sizing: border-box; }
@@ -207,7 +195,7 @@ body {
   background: linear-gradient(180deg, #4aa8e8 0%, #1f7fc4 45%, #0b5a96 72%, var(--deep) 100%);
 }
 
-/* ————— حالت افقی (دسکتاپ و تبلت خوابیده): عکس تمام‌صفحه، متن رویش ————— */
+/* ————— صفحه‌ی افقی (دسکتاپ): عکس تمام‌صفحه، متن رویش ————— */
 
 .bg {
   position: fixed;
@@ -230,20 +218,20 @@ body {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse at center, rgba(4, 22, 42, 0.3) 0%, rgba(4, 22, 42, 0.68) 100%),
-    linear-gradient(180deg, rgba(4, 22, 42, 0.25) 0%, rgba(4, 22, 42, 0.5) 100%);
+    radial-gradient(ellipse at center, rgba(4, 22, 42, 0.32) 0%, rgba(4, 22, 42, 0.7) 100%),
+    linear-gradient(180deg, rgba(4, 22, 42, 0.25) 0%, rgba(4, 22, 42, 0.55) 100%);
 }
 
 main {
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 720px;
+  max-width: 640px;
   padding: max(2rem, env(safe-area-inset-top)) 1.25rem max(2rem, env(safe-area-inset-bottom));
-  animation: rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* ————— حالت عمودی (گوشی): کل عکس بالای صفحه بدون هیچ کراپی، متن زیرش ————— */
+/* ————— صفحه‌ی عمودی (گوشی): کل عکس بالای صفحه بدون کراپ، متن زیرش ————— */
 
 @media (max-aspect-ratio: 1/1) {
   body { justify-content: flex-start; }
@@ -252,191 +240,125 @@ main {
     position: relative;
     inset: auto;
     width: 100%;
-    /* عکس در جریان صفحه می‌نشیند و متن زیرش می‌آید، پس چیزی روی هم نمی‌افتد. */
     flex: none;
   }
 
+  /* ارتفاع طبیعی عکس، ولی حداکثر تا نیمه‌ی صفحه تا شماره‌ی تماس همیشه بدون اسکرول دیده شود.
+     اگر محدود شد، از بالای عکس نگه داشته می‌شود؛ پایینش زیر محوشدگی می‌رود. */
   .bg img {
     height: auto;
-    object-fit: fill;
+    max-height: 56svh;
+    object-position: top;
   }
 
-  /* به‌جای تیره‌کردن کل عکس، فقط پایینش را در گرادیان صفحه محو می‌کنیم. */
+  /* به‌جای تیره‌کردن کل عکس، فقط پایینش در گرادیان صفحه محو می‌شود. */
   .bg::after {
     top: auto;
-    height: 38%;
+    height: 34%;
     background: linear-gradient(180deg, rgba(31, 127, 196, 0) 0%, #1f7fc4 92%);
   }
 
   main {
-    /* حاشیه‌ی خودکار، متن را وسط فضای باقی‌مانده‌ی زیر عکس می‌نشاند.
-       اگر متن بلندتر از آن فضا باشد، حاشیه صفر می‌شود و چیزی بریده نمی‌شود. */
     margin-block: auto;
-    padding-top: 1.5rem;
+    padding-top: 1.75rem;
     padding-bottom: max(2.5rem, env(safe-area-inset-bottom));
   }
 
-  /* گرادیان بدنه از همان رنگی شروع می‌شود که محوشدگی عکس به آن می‌رسد. */
   body:has(.bg) {
     background: linear-gradient(180deg, #1f7fc4 0%, #0b5a96 40%, var(--deep) 100%);
   }
 }
 
+/* گوشی‌های کوچک: سهم عکس کمتر می‌شود تا متن و دکمه جا شوند. */
+@media (max-aspect-ratio: 1/1) and (max-height: 680px) {
+  .bg img { max-height: 40svh; }
+  main { padding-top: 1.25rem; }
+}
+
 @keyframes rise {
-  from { opacity: 0; transform: translateY(20px); }
+  from { opacity: 0; transform: translateY(18px); }
   to   { opacity: 1; transform: none; }
-}
-
-.logo {
-  width: min(420px, 78%);
-  height: auto;
-  margin-inline: auto;
-  filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.45));
-}
-
-.wordmark { display: grid; justify-items: center; gap: 0.35rem; }
-
-.crown {
-  width: clamp(42px, 9vw, 72px);
-  height: auto;
-  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.5));
 }
 
 h1 {
   margin: 0;
-  font-size: clamp(2.2rem, 9vw, 5.5rem);
-  font-weight: 300;
-  line-height: 1;
-  letter-spacing: -0.03em;
-  text-shadow: 0 8px 34px rgba(0, 20, 45, 0.55);
+  font-size: clamp(1.45rem, 5.4vw, 2.6rem);
+  font-weight: 900;
+  line-height: 1.5;
+  text-shadow: 0 6px 26px rgba(0, 20, 45, 0.55);
 }
 
-.slogan {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: clamp(0.5rem, 3vw, 0.9rem);
-  margin: 1rem 0 0;
-  color: rgba(255, 255, 255, 0.92);
-  font-size: clamp(0.62rem, 2.6vw, 0.95rem);
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  direction: ltr;
-}
-
-.slogan::before,
-.slogan::after {
-  content: "";
-  flex: 0 0 auto;
-  width: clamp(16px, 6vw, 54px);
-  height: 2px;
+.rule {
+  width: clamp(60px, 22vw, 120px);
+  height: 3px;
+  margin: 1.5rem auto;
+  border: 0;
+  border-radius: 3px;
   background: var(--gold);
-  border-radius: 2px;
-}
-
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-  margin-top: 1.75rem;
-  padding: 0.45rem 1.1rem;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  font-size: 0.85rem;
-  font-weight: 700;
-}
-
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--gold);
-  animation: pulse 2s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%      { opacity: 0.3; transform: scale(0.7); }
 }
 
 p.lead {
-  margin: 1.1rem auto 0;
-  max-width: 44ch;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: clamp(0.9rem, 3.4vw, 1.1rem);
-  line-height: 1.85;
+  margin: 0 auto;
+  max-width: 46ch;
+  color: rgba(255, 255, 255, 0.94);
+  font-size: clamp(0.95rem, 3.6vw, 1.2rem);
+  line-height: 1.9;
   text-shadow: 0 2px 14px rgba(0, 20, 45, 0.5);
 }
 
-.countdown {
-  display: flex;
+/* دکمه‌ی تماس: با یک لمس شماره‌گیری می‌شود. */
+.call {
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
-  gap: clamp(0.4rem, 2.5vw, 1rem);
+  gap: 0.7rem;
   margin-top: 1.75rem;
+  min-height: 60px;
+  padding: 0.75rem clamp(1.25rem, 5vw, 2rem);
+  border-radius: 999px;
+  background: var(--gold);
+  color: #10233a;
+  text-decoration: none;
+  box-shadow: 0 14px 34px rgba(0, 20, 45, 0.4);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.unit {
-  flex: 1 1 0;
-  min-width: 0;
-  max-width: 132px;
-  padding: clamp(0.6rem, 3vw, 1rem) clamp(0.15rem, 1.5vw, 0.5rem);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.14);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+.call:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 40px rgba(0, 20, 45, 0.5);
 }
 
-.value {
-  display: block;
-  font-size: clamp(1.25rem, 6vw, 2.3rem);
+.call:active { transform: translateY(1px); }
+
+.call:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+
+.call svg {
+  flex: 0 0 auto;
+  width: clamp(20px, 5vw, 26px);
+  height: auto;
+}
+
+.num {
+  font-size: clamp(1.35rem, 6.4vw, 2.1rem);
   font-weight: 900;
   font-variant-numeric: tabular-nums;
-  line-height: 1.15;
-}
-
-.label {
-  display: block;
-  margin-top: 0.3rem;
-  color: rgba(255, 255, 255, 0.75);
-  font-size: clamp(0.62rem, 2.8vw, 0.78rem);
-}
-
-.contact {
-  display: inline-block;
-  margin-top: 1.75rem;
-  padding-bottom: 3px;
-  border-bottom: 1px solid var(--gold);
-  color: #fff;
-  font-size: clamp(0.85rem, 3.2vw, 0.95rem);
-  text-decoration: none;
-  overflow-wrap: anywhere;
-}
-
-.contact:hover { color: var(--gold); }
-
-footer {
-  margin-top: 1.75rem;
-  color: rgba(255, 255, 255, 0.65);
-  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  /* شماره در متن راست‌به‌چپ هم باید چپ‌به‌راست خوانده شود. */
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 /* گوشیِ خوابیده و پنجره‌های کوتاه: فاصله‌ها جمع می‌شوند تا صفحه اسکرول نخورد. */
 @media (min-aspect-ratio: 1/1) and (max-height: 520px) {
   main { padding-block: 1.25rem; }
-  h1 { font-size: clamp(1.8rem, 7vh, 3rem); }
-  .crown { width: clamp(32px, 5vh, 48px); }
-  .slogan { margin-top: 0.6rem; }
-  .badge { margin-top: 1rem; }
-  p.lead { margin-top: 0.7rem; line-height: 1.6; }
-  .countdown { margin-top: 1rem; }
-  .unit { padding-block: 0.5rem; }
-  .contact { margin-top: 1rem; }
-  footer { margin-top: 1rem; }
+  h1 { font-size: clamp(1.2rem, 5vh, 1.9rem); line-height: 1.4; }
+  .rule { margin-block: 0.9rem; }
+  p.lead { font-size: clamp(0.85rem, 3.6vh, 1.05rem); line-height: 1.6; }
+  .call { margin-top: 1rem; min-height: 52px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -450,60 +372,17 @@ footer {
 <body>
 ${backdrop}
 <main>
-  ${branding}
-  <span class="badge"><span class="dot"></span>${badge}</span>
-  <p class="lead">${description}</p>
-  ${countdown}
-  ${contact}
-  <footer>&copy; ${new Date().getUTCFullYear()} ${siteName}</footer>
+  <h1>${headline}</h1>
+  <hr class="rule">
+  <p class="lead">${contactText}</p>
+  ${call}
 </main>
-${hasCountdown ? countdownScript(nonce) : ""}
 </body>
 </html>`;
 }
 
-function crownSvg() {
-  return `<svg class="crown" viewBox="0 0 100 60" fill="none" aria-hidden="true">
-    <path d="M8 52 L2 14 L26 30 L50 4 L74 30 L98 14 L92 52 Z" fill="${BRAND.gold}"/>
-  </svg>`;
-}
-
-function countdownLabel(unit, dir) {
-  const fa = { days: "روز", hours: "ساعت", minutes: "دقیقه", seconds: "ثانیه" };
-  const en = { days: "days", hours: "hours", minutes: "minutes", seconds: "seconds" };
-  return (dir === "rtl" ? fa : en)[unit];
-}
-
-function countdownScript(nonce) {
-  return `<script nonce="${nonce}">
-(function () {
-  var root = document.getElementById("countdown");
-  var deadline = Number(root.dataset.deadline);
-  var fields = ["days", "hours", "minutes", "seconds"].map(function (id) {
-    return document.getElementById(id);
-  });
-
-  function pad(n) {
-    return String(n).padStart(2, "0");
-  }
-
-  function tick() {
-    var left = Math.max(0, deadline - Date.now());
-    var seconds = Math.floor(left / 1000);
-    var parts = [
-      Math.floor(seconds / 86400),
-      Math.floor(seconds / 3600) % 24,
-      Math.floor(seconds / 60) % 60,
-      seconds % 60,
-    ];
-    parts.forEach(function (value, i) {
-      fields[i].textContent = i === 0 ? String(value) : pad(value);
-    });
-    if (left === 0) clearInterval(timer);
-  }
-
-  tick();
-  var timer = setInterval(tick, 1000);
-})();
-</script>`;
+function phoneSvg() {
+  return `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.4.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.4 0 .8-.2 1l-2.3 2.2z"/>
+    </svg>`;
 }
