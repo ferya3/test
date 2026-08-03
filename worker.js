@@ -195,8 +195,8 @@ body {
   background: linear-gradient(180deg, #4aa8e8 0%, #1f7fc4 45%, #0b5a96 72%, var(--deep) 100%);
 }
 
-/* ————— صفحه‌ی افقی (دسکتاپ): عکس تمام‌صفحه، متن رویش ————— */
-
+/* عکس تمام‌صفحه در هر اندازه‌ای؛ متن رویش می‌نشیند.
+   نسخه‌ی افقی یا عمودی عکس را <picture> بر اساس شکل صفحه انتخاب می‌کند. */
 .bg {
   position: fixed;
   inset: 0;
@@ -218,8 +218,8 @@ body {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse at center, rgba(4, 22, 42, 0.32) 0%, rgba(4, 22, 42, 0.7) 100%),
-    linear-gradient(180deg, rgba(4, 22, 42, 0.25) 0%, rgba(4, 22, 42, 0.55) 100%);
+    radial-gradient(ellipse at center, rgba(4, 22, 42, 0.34) 0%, rgba(4, 22, 42, 0.74) 100%),
+    linear-gradient(180deg, rgba(4, 22, 42, 0.3) 0%, rgba(4, 22, 42, 0.6) 100%);
 }
 
 main {
@@ -229,50 +229,6 @@ main {
   max-width: 640px;
   padding: max(2rem, env(safe-area-inset-top)) 1.25rem max(2rem, env(safe-area-inset-bottom));
   animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-/* ————— صفحه‌ی عمودی (گوشی): کل عکس بالای صفحه بدون کراپ، متن زیرش ————— */
-
-@media (max-aspect-ratio: 1/1) {
-  body { justify-content: flex-start; }
-
-  .bg {
-    position: relative;
-    inset: auto;
-    width: 100%;
-    flex: none;
-  }
-
-  /* ارتفاع طبیعی عکس، ولی حداکثر تا نیمه‌ی صفحه تا شماره‌ی تماس همیشه بدون اسکرول دیده شود.
-     اگر محدود شد، از بالای عکس نگه داشته می‌شود؛ پایینش زیر محوشدگی می‌رود. */
-  .bg img {
-    height: auto;
-    max-height: 56svh;
-    object-position: top;
-  }
-
-  /* به‌جای تیره‌کردن کل عکس، فقط پایینش در گرادیان صفحه محو می‌شود. */
-  .bg::after {
-    top: auto;
-    height: 34%;
-    background: linear-gradient(180deg, rgba(31, 127, 196, 0) 0%, #1f7fc4 92%);
-  }
-
-  main {
-    margin-block: auto;
-    padding-top: 1.75rem;
-    padding-bottom: max(2.5rem, env(safe-area-inset-bottom));
-  }
-
-  body:has(.bg) {
-    background: linear-gradient(180deg, #1f7fc4 0%, #0b5a96 40%, var(--deep) 100%);
-  }
-}
-
-/* گوشی‌های کوچک: سهم عکس کمتر می‌شود تا متن و دکمه جا شوند. */
-@media (max-aspect-ratio: 1/1) and (max-height: 680px) {
-  .bg img { max-height: 40svh; }
-  main { padding-top: 1.25rem; }
 }
 
 @keyframes rise {
