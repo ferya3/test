@@ -52,21 +52,22 @@ The interface is in English throughout.
 
 ## Getting started
 
-```bash
-npm install                   # also generates the Prisma client
-cp .env.example .env          # then fill in the two keys below
-npx prisma db push            # create the schema
-npm run db:seed               # optional demo data
-npm run dev                   # http://localhost:3000
-npm run watcher               # in a second terminal: chain watcher + timers
-```
-
-Generate the two secrets with `openssl rand -hex 32`:
+Node.js 22 or newer. These four commands are identical on Windows (cmd or PowerShell), macOS and
+Linux:
 
 ```
-SESSION_SECRET=…
-CREDENTIAL_MASTER_KEY=…       # losing this makes every stored credential unrecoverable
+npm install          installs dependencies and generates the Prisma client
+npm run setup        writes .env and generates the two secrets
+npx prisma db push   creates the database
+npm run dev          http://localhost:3000
 ```
+
+Optional: `npm run db:seed` for demo data, and `npm run watcher` in a second terminal for the chain
+watcher and the expiry / auto-release timers.
+
+`npm run setup` fills in the two secrets for you and is safe to re-run — it never overwrites a value
+that is already set. **Back up `CREDENTIAL_MASTER_KEY`**: lose it and every stored credential becomes
+permanently unreadable.
 
 The **first account to register becomes the administrator**. After that, everyone signs up as a
 regular user who can both buy and sell.
@@ -96,6 +97,7 @@ operator records the transaction hash after broadcasting it from the offline wal
 
 | Command             | What it does                                              |
 | ------------------- | --------------------------------------------------------- |
+| `npm run setup`     | Create `.env` and generate the secrets (cross-platform)   |
 | `npm run dev`       | Development server                                        |
 | `npm run build`     | Generate the Prisma client and build for production       |
 | `npm run watcher`   | Poll deposit addresses, expire unpaid deals, auto-release |
