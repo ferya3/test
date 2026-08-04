@@ -53,7 +53,7 @@ The interface is in English throughout.
 ## Getting started
 
 ```bash
-npm install
+npm install                   # also generates the Prisma client
 cp .env.example .env          # then fill in the two keys below
 npx prisma db push            # create the schema
 npm run db:seed               # optional demo data
