@@ -78,12 +78,16 @@ Linux:
 ```
 npm install          installs dependencies and generates the Prisma client
 npm run setup        writes .env and generates the two secrets
-npx prisma db push   creates the database
+npm run db:push      creates the database and regenerates the client
 npm run dev          http://localhost:3000
 ```
 
 Optional: `npm run db:seed` for demo data, and `npm run watcher` in a second terminal for the chain
 watcher and the expiry / auto-release timers.
+
+**After pulling a change that touches `prisma/schema.prisma`, re-run `npm run db:push`.** Prisma 7
+does not regenerate its client as a side effect of applying the schema, and a stale client reports
+newly added fields as unknown.
 
 `npm run setup` fills in the two secrets for you and is safe to re-run — it never overwrites a value
 that is already set. **Back up `CREDENTIAL_MASTER_KEY`**: lose it and every stored credential becomes
@@ -121,7 +125,7 @@ records the transaction hash after broadcasting it from the offline wallet.
 | `npm run dev`       | Development server                                        |
 | `npm run build`     | Generate the Prisma client and build for production       |
 | `npm run watcher`   | Poll deposit addresses, expire unpaid deals, auto-release |
-| `npm run db:push`   | Apply the schema                                          |
+| `npm run db:push`   | Apply the schema and regenerate the Prisma client         |
 | `npm run db:seed`   | Load demo users, listings and deals                       |
 | `npm test`          | Unit and ledger tests (money, encryption, balances)       |
 | `npm run test:e2e`  | Playwright walk-through of the full escrow lifecycle      |

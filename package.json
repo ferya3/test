@@ -10,7 +10,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "db:push": "prisma db push",
+    "db:push": "prisma db push && prisma generate",
     "db:seed": "tsx --conditions=react-server --env-file=.env prisma/seed.ts",
     "watcher": "tsx --conditions=react-server --env-file=.env scripts/watcher.ts",
     "test": "node --test --conditions=react-server --env-file=.env.test --import tsx tests/*.test.ts",
