@@ -6,8 +6,16 @@ import { sha256 as nobleSha256 } from "@noble/hashes/sha2.js";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { createHash } from "node:crypto";
 import { env } from "./env";
+import { isEvmNetwork, type Network } from "./networks";
 
-export type Network = "TRON" | "ETHEREUM";
+export {
+  NETWORKS,
+  NETWORK_VALUES,
+  networkLabel,
+  networkShort,
+  isEvmNetwork,
+  type Network,
+} from "./networks";
 
 /**
  * Deposit addresses are derived from a *watch-only* account xpub. No private
@@ -15,8 +23,7 @@ export type Network = "TRON" | "ETHEREUM";
  * treasury operation, so a full compromise of this box cannot move money.
  */
 export interface WalletProvider {
-  readonly network: Network;
-  deriveDepositAddress(index: number): string;
+  deriveDepositAddress(index: number, network: Network): string;
 }
 
 const b58check = base58check(nobleSha256);
@@ -47,12 +54,26 @@ export function isValidEvmAddress(address: string): boolean {
   return /^0x[0-9a-fA-F]{40}$/.test(address);
 }
 
-export function isValidAddress(address: string, network: Network): boolean {
-  return network === "TRON" ? isValidTronAddress(address) : isValidEvmAddress(address);
+/** EVM address = 0x ‖ last-20-bytes(keccak256(uncompressed pubkey[1:])). */
+export function evmAddressFromPublicKey(publicKey: Uint8Array): string {
+  if (publicKey.length !== 65 || publicKey[0] !== 0x04) {
+    throw new Error("Expected a 65-byte uncompressed secp256k1 public key");
+  }
+  const hash = keccak_256(publicKey.slice(1));
+  return `0x${Buffer.from(hash.slice(-20)).toString("hex")}`;
 }
 
-class TronXpubWallet implements WalletProvider {
-  readonly network = "TRON" as const;
+export function isValidAddress(address: string, network: Network): boolean {
+  return isEvmNetwork(network) ? isValidEvmAddress(address) : isValidTronAddress(address);
+}
+
+export function addressHint(network: Network): string {
+  return isEvmNetwork(network)
+    ? "That is not a valid address for this network (it should start with 0x)."
+    : "That is not a valid TRC-20 address (it should start with T).";
+}
+
+class XpubWallet implements WalletProvider {
   private readonly account: HDKey;
 
   constructor(xpub: string) {
@@ -62,11 +83,13 @@ class TronXpubWallet implements WalletProvider {
     }
   }
 
-  deriveDepositAddress(index: number): string {
-    // BIP-44 receive chain: m/44'/195'/0'/0/<index>, relative to the account xpub.
+  deriveDepositAddress(index: number, network: Network): string {
+    // BIP-44 receive chain, relative to the account xpub: .../0/<index>.
     const child = this.account.deriveChild(0).deriveChild(index);
     if (!child.publicKey) throw new Error("Failed to derive deposit key");
-    return tronAddressFromPublicKey(uncompress(child.publicKey));
+    const publicKey = uncompress(child.publicKey);
+    // The same key yields both formats; only the encoding differs per chain.
+    return isEvmNetwork(network) ? evmAddressFromPublicKey(publicKey) : tronAddressFromPublicKey(publicKey);
   }
 }
 
@@ -81,10 +104,11 @@ function uncompress(compressed: Uint8Array): Uint8Array {
  * received from the admin console instead of by the chain watcher.
  */
 class MockWallet implements WalletProvider {
-  readonly network = "TRON" as const;
-
-  deriveDepositAddress(index: number): string {
-    const digest = createHash("sha256").update(`escrowbridge-mock-${index}`).digest();
+  deriveDepositAddress(index: number, network: Network): string {
+    const digest = createHash("sha256").update(`escrowbridge-mock-${network}-${index}`).digest();
+    if (isEvmNetwork(network)) {
+      return `0x${digest.subarray(0, 20).toString("hex")}`;
+    }
     const payload = new Uint8Array(21);
     payload[0] = 0x41;
     payload.set(digest.subarray(0, 20), 1);
@@ -100,7 +124,7 @@ export function getWallet(): WalletProvider {
     if (!env.tronAccountXpub) {
       throw new Error("WALLET_PROVIDER=tron requires TRON_ACCOUNT_XPUB");
     }
-    cached = new TronXpubWallet(env.tronAccountXpub);
+    cached = new XpubWallet(env.tronAccountXpub);
   } else {
     if (env.isProduction) {
       throw new Error("WALLET_PROVIDER=mock must never be used in production");
@@ -110,14 +134,16 @@ export function getWallet(): WalletProvider {
   return cached;
 }
 
+const EXPLORERS: Record<Network, { tx: string; address: string }> = {
+  TRON: { tx: "https://tronscan.org/#/transaction/", address: "https://tronscan.org/#/address/" },
+  BSC: { tx: "https://bscscan.com/tx/", address: "https://bscscan.com/address/" },
+  ETHEREUM: { tx: "https://etherscan.io/tx/", address: "https://etherscan.io/address/" },
+};
+
 export function explorerTxUrl(network: Network, txHash: string): string {
-  return network === "TRON"
-    ? `https://tronscan.org/#/transaction/${txHash}`
-    : `https://etherscan.io/tx/${txHash}`;
+  return `${(EXPLORERS[network] ?? EXPLORERS.TRON).tx}${txHash}`;
 }
 
 export function explorerAddressUrl(network: Network, address: string): string {
-  return network === "TRON"
-    ? `https://tronscan.org/#/address/${address}`
-    : `https://etherscan.io/address/${address}`;
+  return `${(EXPLORERS[network] ?? EXPLORERS.TRON).address}${address}`;
 }

@@ -14,6 +14,9 @@ import { postEntry } from "../src/lib/ledger";
 const PASSWORD = "escrow-demo-1";
 // Override to seed the demo thread against a different account.
 const DEMO_BUYER_EMAIL = process.env.DEMO_BUYER_EMAIL ?? "saeed.raminfar@gmail.com";
+// Placeholder addresses for the demo. Replace them in Admin → Settings.
+const TREASURY_BSC_ADDRESS = "0x9f1a4C7b3E5d8A2f6B0c1D4e7F8a9B0c1D2e3F44";
+const BUYER_BSC_ADDRESS = "0x3Ab5C7d9E1f2A4b6C8d0E2f4A6b8C0d2E4f6A8b0";
 
 async function main(): Promise<void> {
   const passwordHash = await bcrypt.hash(PASSWORD, 10);
@@ -21,14 +24,25 @@ async function main(): Promise<void> {
 
   const settings = await prisma.settings.upsert({
     where: { id: "singleton" },
-    create: { id: "singleton" },
-    update: {},
+    create: { id: "singleton", feeBasisPoints: 500 },
+    // The demo runs at 5%, so bring an older database along with it.
+    update: { feeBasisPoints: 500 },
+  });
+
+  await prisma.treasuryWallet.upsert({
+    where: { network: "BSC" },
+    create: {
+      network: "BSC",
+      address: TREASURY_BSC_ADDRESS,
+      note: "Platform hot wallet — BEP-20 deposits",
+    },
+    update: { address: TREASURY_BSC_ADDRESS, note: "Platform hot wallet — BEP-20 deposits" },
   });
 
   const [admin, seller, buyer] = await Promise.all([
     upsertUser("admin@escrowbridge.test", "Platform Admin", passwordHash, "ADMIN", null),
-    upsertUser("seller@escrowbridge.test", "Nadia Sells", passwordHash, "USER", wallet.deriveDepositAddress(9001)),
-    upsertUser("buyer@escrowbridge.test", "Omar Buys", passwordHash, "USER", wallet.deriveDepositAddress(9002)),
+    upsertUser("seller@escrowbridge.test", "Nadia Sells", passwordHash, "USER", wallet.deriveDepositAddress(9001, "TRON")),
+    upsertUser("buyer@escrowbridge.test", "Omar Buys", passwordHash, "USER", wallet.deriveDepositAddress(9002, "TRON")),
   ]);
 
   await prisma.listing.deleteMany({ where: { sellerId: seller.id } });
@@ -192,7 +206,7 @@ async function seedNamedBuyerThread(context: {
     "Saeed Raminfar",
     await bcrypt.hash(PASSWORD, 10),
     "USER",
-    getWallet().deriveDepositAddress(9003),
+    getWallet().deriveDepositAddress(9003, "BSC"),
   );
 
   await prisma.deal.deleteMany({ where: { buyerId: buyer.id } });
@@ -219,6 +233,8 @@ async function seedNamedBuyerThread(context: {
     index: 1004,
     feeBasisPoints: context.feeBasisPoints,
     status: "DELIVERED",
+    network: "BSC",
+    refundAddress: BUYER_BSC_ADDRESS,
     createdAt: yesterdayAt(20, 40),
     fundedAt: yesterdayAt(20, 55),
     deliveredAt: yesterdayAt(22, 40),
@@ -231,8 +247,8 @@ async function seedNamedBuyerThread(context: {
     userId: buyer.id,
     amountMicro: deal.amountMicro,
     kind: "MANUAL_CREDIT",
-    note: "USDT received at the treasury wallet, credited to the buyer",
-    reference: "seed-demo",
+    note: `USDT received at the treasury wallet, credited to the buyer — via BEP-20 from ${BUYER_BSC_ADDRESS}`,
+    reference: "0x7c4d1f9a2b8e0c3d5f7a9b1c3d5e7f9a0b2c4d6e8f0a2b4c6d8e0f2a4b6c8d0e",
     actorId: context.admin.id,
   });
   const funding = await postEntry({
@@ -310,6 +326,7 @@ async function seedNamedBuyerThread(context: {
 
   await prisma.credential.deleteMany({ where: { dealId: deal.id } });
   for (const item of vault) {
+    const failing = item.label.startsWith("artavil-hayat.com");
     await prisma.credential.create({
       data: {
         dealId: deal.id,
@@ -317,6 +334,11 @@ async function seedNamedBuyerThread(context: {
         kind: item.kind,
         ciphertext: encryptSecret(deal.id, item.value),
         createdAt: item.at,
+        confirmedAt: failing ? null : item.at,
+        rejectedAt: failing ? todayAt(12, 46) : null,
+        rejectedNote: failing
+          ? "The registrar rejects this EPP code and WHOIS still shows the domain as locked."
+          : null,
       },
     });
   }
@@ -326,17 +348,17 @@ async function seedNamedBuyerThread(context: {
       at: yesterdayAt(21, 0),
       from: "BUYER",
       body:
-        "I have topped my wallet up with 9,450 USDT and funded this deal — 9,000 for the five assets plus the " +
-        "5% platform fee. To be clear about what that means: the money is held by you, not by the seller. I will " +
-        "confirm the release only once I have every username and password and I have checked all five myself.",
+        "I have topped my wallet up with 9,450 USDT over BEP-20 and funded this deal — 9,000 for the five assets " +
+        "plus the 5% platform fee. To be clear about what that means: the money is held by you, not by the seller. " +
+        "I will confirm the release only once I have every username and password and I have checked all five myself.",
     },
     {
       at: yesterdayAt(21, 8),
       from: "STAFF",
       body:
-        "That is exactly right, Saeed. The 9,450 USDT is in escrow with us. The seller can see the deal is funded " +
-        "but cannot touch a single dollar of it until you release. I have asked them to start with the three " +
-        "Instagram handles.",
+        "That is exactly right, Saeed. Your BEP-20 transfer landed and the 9,450 USDT is in escrow with us. The " +
+        "seller can see the deal is funded but cannot touch a single dollar of it until you release. I have asked " +
+        "them to start with the three Instagram handles.",
     },
     {
       at: yesterdayAt(22, 40),
@@ -377,8 +399,8 @@ async function seedNamedBuyerThread(context: {
       from: "BUYER",
       body:
         "artavil-hayat.com will not transfer though. The registrar rejects the EPP code and the domain still " +
-        "shows as locked on the WHOIS. Please ask the seller to unlock it and issue a fresh code. I am not " +
-        "releasing the funds while one of the five is outstanding.",
+        "shows as locked on the WHOIS. I have marked that item as not working in the vault. Please ask the seller " +
+        "to unlock it and issue a fresh code — I am not releasing while one of the five is outstanding.",
     },
     {
       at: todayAt(12, 58),
@@ -430,6 +452,8 @@ async function createDeal(input: {
   index: number;
   feeBasisPoints: number;
   status: string;
+  network?: string;
+  refundAddress?: string;
   createdAt?: Date;
   fundedAt?: Date;
   deliveredAt?: Date;
@@ -439,6 +463,7 @@ async function createDeal(input: {
   const priceMicro = parseUsdt(input.amount);
   const feeMicro = (priceMicro * BigInt(input.feeBasisPoints)) / 10_000n;
   const amountMicro = priceMicro + feeMicro;
+  const network = (input.network ?? "TRON") as "TRON" | "BSC" | "ETHEREUM";
   const now = new Date();
   const funded = input.status !== "AWAITING_PAYMENT";
   const delivered = input.status === "DELIVERED";
@@ -458,10 +483,11 @@ async function createDeal(input: {
       amountMicro,
       feeMicro,
       payoutMicro: priceMicro,
-      depositAddress: getWallet().deriveDepositAddress(input.index),
+      network,
+      depositAddress: getWallet().deriveDepositAddress(input.index, network),
       depositDerivation: input.index,
       inspectionHours: 48,
-      buyerRefundAddress: getWallet().deriveDepositAddress(9002),
+      buyerRefundAddress: input.refundAddress ?? getWallet().deriveDepositAddress(9002, "TRON"),
       createdAt,
       expiresAt: new Date(now.getTime() + 2 * 60 * 60 * 1000),
       fundedAt: funded ? fundedAt : null,

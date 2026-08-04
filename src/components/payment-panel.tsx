@@ -2,18 +2,23 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Network } from "@/lib/wallet";
+import { networkLabel, networkShort, type Network } from "@/lib/networks";
 import { Card } from "./ui";
 
 export function PaymentPanel({
   amount,
   address,
+  shared,
+  reference,
   network,
   expiresAt,
   isBuyer,
 }: {
   amount: string;
   address: string;
+  /** True when this is the platform's shared address rather than a per-deal one. */
+  shared: boolean;
+  reference: string;
   network: Network;
   expiresAt: string;
   isBuyer: boolean;
@@ -64,7 +69,7 @@ export function PaymentPanel({
 
         <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
           <p className="text-xs uppercase tracking-wide text-slate-500">
-            Deposit address · {network === "TRON" ? "TRC-20" : "ERC-20"}
+            Deposit address · {networkShort(network)}
           </p>
           <p className="mt-1 break-all font-mono text-sm text-slate-200">{address}</p>
           <button type="button" className="btn btn-ghost mt-3" onClick={() => copy(address, "address")}>
@@ -73,13 +78,24 @@ export function PaymentPanel({
         </div>
       </div>
 
+      {shared && (
+        <div className="mt-4 rounded-xl border border-sky-500/40 bg-sky-500/10 p-4 text-sm text-sky-100">
+          <p className="font-semibold">This is the platform's shared address, so tell us once you have sent.</p>
+          <p className="mt-1 text-sky-200/80">
+            Several deals receive on this address, which means a transfer cannot be matched to yours automatically.
+            Message the operator on this deal with your transaction hash and quote{" "}
+            <span className="font-mono">{reference}</span>. They will credit it and the escrow will move on.
+          </p>
+        </div>
+      )}
+
       <div className="mt-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-100">
         <p className="font-semibold">
           {remaining > 0 ? `Payment window closes in ${formatRemaining(remaining)}` : "The payment window has closed."}
         </p>
         <p className="mt-1 text-amber-200/80">
-          Send only USDT on the {network === "TRON" ? "TRON (TRC-20)" : "Ethereum (ERC-20)"} network. Any other token or
-          network will not be credited and cannot be recovered.
+          Send only USDT on the {networkLabel(network)} network. Any other token or network will not be credited and
+          cannot be recovered.
         </p>
       </div>
     </Card>

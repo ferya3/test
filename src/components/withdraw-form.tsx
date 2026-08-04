@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { requestWithdrawalAction } from "@/app/actions/deals";
 import type { FormState } from "@/app/actions/auth";
+import { NETWORKS } from "@/lib/networks";
 import { Alert, Field } from "./ui";
 import { SubmitButton } from "./submit-button";
 
@@ -35,8 +36,11 @@ export function WithdrawForm({
 
       <Field label="Network" htmlFor="network">
         <select id="network" name="network" className="select" defaultValue={defaultNetwork}>
-          <option value="TRON">TRON (TRC-20)</option>
-          <option value="ETHEREUM">Ethereum (ERC-20)</option>
+          {NETWORKS.map((network) => (
+            <option key={network.value} value={network.value}>
+              {network.label}
+            </option>
+          ))}
         </select>
       </Field>
 

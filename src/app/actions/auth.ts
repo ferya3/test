@@ -15,7 +15,7 @@ import {
 import { rateLimit } from "@/lib/rate-limit";
 import { env } from "@/lib/env";
 import { fieldErrors, loginSchema, payoutAddressSchema, registerSchema } from "@/lib/validation";
-import { isValidAddress, type Network } from "@/lib/wallet";
+import { addressHint, isValidAddress, type Network } from "@/lib/wallet";
 
 export type FormState = { errors?: Record<string, string>; message?: string; ok?: boolean };
 
@@ -105,14 +105,7 @@ export async function savePayoutAddressAction(_prev: FormState, formData: FormDa
 
   const network = parsed.data.payoutNetwork as Network;
   if (!isValidAddress(parsed.data.payoutAddress, network)) {
-    return {
-      errors: {
-        payoutAddress:
-          network === "TRON"
-            ? "That is not a valid TRC-20 address (it should start with T)."
-            : "That is not a valid ERC-20 address (it should start with 0x).",
-      },
-    };
+    return { errors: { payoutAddress: addressHint(network) } };
   }
 
   await prisma.user.update({

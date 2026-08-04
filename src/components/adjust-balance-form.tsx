@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { adjustBalanceAction } from "@/app/actions/admin";
 import type { FormState } from "@/app/actions/auth";
+import { NETWORKS } from "@/lib/networks";
 import { Alert, Field } from "./ui";
 import { SubmitButton } from "./submit-button";
 
@@ -62,11 +63,43 @@ export function AdjustBalanceForm({
         />
       </Field>
 
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field
+          label="Network it arrived on (optional)"
+          htmlFor="network"
+          error={state.errors?.network}
+        >
+          <select id="network" name="network" className="select" defaultValue="">
+            <option value="">Not on-chain</option>
+            {NETWORKS.map((network) => (
+              <option key={network.value} value={network.value}>
+                {network.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <Field
+          label="Sent from address (optional)"
+          htmlFor="fromAddress"
+          error={state.errors?.fromAddress}
+          hint="The address the user paid from."
+        >
+          <input
+            id="fromAddress"
+            name="fromAddress"
+            className="input font-mono"
+            maxLength={80}
+            spellCheck={false}
+          />
+        </Field>
+      </div>
+
       <Field
-        label="Reference (optional)"
+        label="Transaction hash (optional)"
         htmlFor="reference"
         error={state.errors?.reference}
-        hint="Transaction hash, support ticket, anything that lets you find this again."
+        hint="Anything that lets you find this deposit again on the explorer."
       >
         <input id="reference" name="reference" className="input font-mono" maxLength={120} spellCheck={false} />
       </Field>

@@ -3,7 +3,13 @@ import { test } from "node:test";
 
 import { formatUsdt, parseUsdt, feeFor } from "../src/lib/money";
 import { encryptSecret, decryptSecret, referenceCode } from "../src/lib/crypto";
-import { tronAddressFromPublicKey, isValidTronAddress, isValidEvmAddress } from "../src/lib/wallet";
+import {
+  tronAddressFromPublicKey,
+  evmAddressFromPublicKey,
+  isValidTronAddress,
+  isValidEvmAddress,
+} from "../src/lib/wallet";
+import { isEvmNetwork, networkShort } from "../src/lib/networks";
 
 test("parseUsdt converts decimal strings to micro-USDT", () => {
   assert.equal(parseUsdt("1"), 1_000_000n);
@@ -75,6 +81,26 @@ test("tron addresses derive and validate", () => {
   const address = tronAddressFromPublicKey(publicKey);
   assert.match(address, /^T[1-9A-HJ-NP-Za-km-z]{33}$/);
   assert.ok(isValidTronAddress(address));
+});
+
+test("the same key yields both an EVM and a TRON address", () => {
+  const publicKey = Buffer.from(
+    "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798" +
+      "483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+    "hex",
+  );
+  const evm = evmAddressFromPublicKey(publicKey);
+  assert.ok(isValidEvmAddress(evm), `${evm} should be a valid EVM address`);
+  assert.ok(!isValidTronAddress(evm));
+  assert.notEqual(evm, tronAddressFromPublicKey(publicKey));
+});
+
+test("BEP-20 is treated as an EVM chain, TRON is not", () => {
+  assert.ok(isEvmNetwork("BSC"));
+  assert.ok(isEvmNetwork("ETHEREUM"));
+  assert.ok(!isEvmNetwork("TRON"));
+  assert.equal(networkShort("BSC"), "BEP-20");
+  assert.equal(networkShort("TRON"), "TRC-20");
 });
 
 test("address validation rejects the wrong chain and bad checksums", () => {

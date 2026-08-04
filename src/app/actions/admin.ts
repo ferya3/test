@@ -7,6 +7,8 @@ import { parseUsdt } from "@/lib/money";
 import { purgedEnvelope } from "@/lib/crypto";
 import { refundBuyer, releaseToSeller } from "@/lib/deals";
 import { LedgerError, postEntry } from "@/lib/ledger";
+import { setTreasuryWallet, TreasuryError } from "@/lib/treasury";
+import { networkShort, type Network } from "@/lib/wallet";
 import {
   approveWithdrawal,
   markWithdrawalSent,
@@ -16,6 +18,7 @@ import {
 import {
   adjustBalanceSchema,
   fieldErrors,
+  treasuryWalletSchema,
   rejectWithdrawalSchema,
   resolveDisputeSchema,
   settingsSchema,
@@ -77,6 +80,8 @@ export async function adjustBalanceAction(_prev: FormState, formData: FormData):
     amount: formData.get("amount"),
     reason: formData.get("reason"),
     reference: formData.get("reference") || undefined,
+    network: formData.get("network") || undefined,
+    fromAddress: formData.get("fromAddress") || undefined,
   });
   if (!parsed.success) return { errors: fieldErrors(parsed.error) };
 
@@ -86,12 +91,22 @@ export async function adjustBalanceAction(_prev: FormState, formData: FormData):
   const magnitude = parseUsdt(parsed.data.amount);
   const signed = parsed.data.direction === "CREDIT" ? magnitude : -magnitude;
 
+  // Where the money came from belongs on the entry itself, so the ledger alone
+  // is enough to trace a deposit back to the chain without a separate note.
+  const provenance = [
+    parsed.data.network ? `via ${networkShort(parsed.data.network)}` : null,
+    parsed.data.fromAddress ? `from ${parsed.data.fromAddress}` : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const note = provenance ? `${parsed.data.reason} — ${provenance}` : parsed.data.reason;
+
   try {
     await postEntry({
       userId: target.id,
       amountMicro: signed,
       kind: parsed.data.direction === "CREDIT" ? "MANUAL_CREDIT" : "MANUAL_DEBIT",
-      note: parsed.data.reason,
+      note,
       reference: parsed.data.reference ?? null,
       actorId: admin.id,
     });
@@ -104,6 +119,8 @@ export async function adjustBalanceAction(_prev: FormState, formData: FormData):
     amountMicro: signed.toString(),
     reason: parsed.data.reason,
     reference: parsed.data.reference ?? null,
+    network: parsed.data.network ?? null,
+    fromAddress: parsed.data.fromAddress ?? null,
   });
 
   revalidatePath(`/admin/users/${target.id}`);
@@ -111,6 +128,35 @@ export async function adjustBalanceAction(_prev: FormState, formData: FormData):
   return {
     ok: true,
     message: `${parsed.data.direction === "CREDIT" ? "Credited" : "Debited"} ${parsed.data.amount} USDT.`,
+  };
+}
+
+/** Edits the platform's own receiving address for one network. */
+export async function setTreasuryWalletAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const admin = await requireAdmin();
+  const parsed = treasuryWalletSchema.safeParse({
+    network: formData.get("network"),
+    address: formData.get("address"),
+    note: formData.get("note") || undefined,
+  });
+  if (!parsed.success) return { errors: fieldErrors(parsed.error) };
+
+  try {
+    await setTreasuryWallet(parsed.data.network as Network, parsed.data.address, parsed.data.note ?? null);
+  } catch (error) {
+    if (error instanceof TreasuryError) return { errors: { address: error.message } };
+    throw error;
+  }
+  await audit("treasury.wallet_set", "TreasuryWallet", parsed.data.network, admin.id, {
+    address: parsed.data.address || null,
+  });
+
+  revalidatePath("/admin/settings");
+  return {
+    ok: true,
+    message: parsed.data.address.trim()
+      ? `${networkShort(parsed.data.network)} address saved.`
+      : `${networkShort(parsed.data.network)} address cleared.`,
   };
 }
 

@@ -4,7 +4,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { formatUsdt } from "@/lib/money";
 import { isParticipant, buyerMayReveal, mayCancel, mayDispute, mayRelease, sellerMayDeliver } from "@/lib/deals";
-import { explorerAddressUrl, explorerTxUrl, type Network } from "@/lib/wallet";
+import { getTreasuryAddress } from "@/lib/treasury";
+import { explorerAddressUrl, explorerTxUrl, networkLabel, type Network } from "@/lib/wallet";
 import { Alert, Card, PageHeader, StatusBadge, formatDate } from "@/components/ui";
 import { LEDGER_LABELS, type LedgerKind } from "@/lib/ledger";
 import { FundFromBalance } from "@/components/fund-from-balance";
@@ -38,10 +39,16 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
 
   if (!deal || !isParticipant(deal, user)) notFound();
 
+  // When the operator has published an address for this network, that is where
+  // buyers send; the derived per-deal address is the fallback.
+  const treasuryAddress = await getTreasuryAddress(deal.network as Network);
+
   const isBuyer = deal.buyerId === user.id;
   const isSeller = deal.sellerId === user.id;
   const network = deal.network as Network;
   const canReveal = buyerMayReveal(deal, user.id);
+  const rejectedCount = deal.credentials.filter((item) => item.rejectedAt).length;
+  const outstanding = deal.credentials.filter((item) => !item.confirmedAt).length;
 
   return (
     <div className="space-y-6">
@@ -80,7 +87,9 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
           {deal.status === "AWAITING_PAYMENT" && (
             <PaymentPanel
               amount={formatUsdt(deal.amountMicro)}
-              address={deal.depositAddress}
+              address={treasuryAddress ?? deal.depositAddress}
+              shared={Boolean(treasuryAddress)}
+              reference={deal.reference}
               network={network}
               expiresAt={deal.expiresAt.toISOString()}
               isBuyer={isBuyer}
@@ -116,8 +125,12 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
                 kind: credential.kind,
                 revealCount: credential.revealCount,
                 purged: Boolean(credential.purgedAt),
+                confirmed: Boolean(credential.confirmedAt),
+                rejected: Boolean(credential.rejectedAt),
+                rejectedNote: credential.rejectedNote,
               }))}
               canReveal={canReveal}
+              canConfirm={isBuyer && ["DELIVERED", "DISPUTED"].includes(deal.status)}
               lockedReason={
                 isSeller
                   ? "You submitted these. For safety they are write-only — only the buyer can read them back."
@@ -131,11 +144,24 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
               title="Finished checking?"
               description={`Releasing credits ${formatUsdt(deal.payoutMicro)} USDT to the seller's balance. This cannot be undone.`}
             >
+              {outstanding > 0 && (
+                <div className="mb-4">
+                  <Alert tone="warn">
+                    {outstanding} of {deal.credentials.length} items in the vault are still unconfirmed
+                    {rejectedCount > 0 && `, and ${rejectedCount} you marked as not working`}. Releasing now pays the
+                    seller in full for everything, including whatever has not arrived.
+                  </Alert>
+                </div>
+              )}
               <form action={releaseAction} className="flex flex-wrap gap-3">
                 <input type="hidden" name="dealId" value={deal.id} />
                 <SubmitButton
                   pendingLabel="Releasing…"
-                  confirm="Release the escrowed funds to the seller? This cannot be undone."
+                  confirm={
+                    outstanding > 0
+                      ? `${outstanding} item(s) are still unconfirmed. Release the full amount to the seller anyway?`
+                      : "Release the escrowed funds to the seller? This cannot be undone."
+                  }
                 >
                   Release funds to seller
                 </SubmitButton>
@@ -186,17 +212,17 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
               <Row label="Platform fee" value={`+ ${formatUsdt(deal.feeMicro)} USDT`} />
               <Row label="Buyer funds" value={`${formatUsdt(deal.amountMicro)} USDT`} strong />
               <Row label="Seller receives" value={`${formatUsdt(deal.payoutMicro)} USDT`} strong />
-              <Row label="Network" value={network === "TRON" ? "TRC-20 (TRON)" : "ERC-20 (Ethereum)"} />
+              <Row label="Network" value={networkLabel(network)} />
             </dl>
             <div className="mt-4 border-t border-slate-800 pt-4 text-xs text-slate-500">
               <p className="mb-1">Deposit address</p>
               <a
                 className="break-all font-mono text-[11px] text-slate-300 hover:text-emerald-300"
-                href={explorerAddressUrl(network, deal.depositAddress)}
+                href={explorerAddressUrl(network, treasuryAddress ?? deal.depositAddress)}
                 target="_blank"
                 rel="noreferrer noopener"
               >
-                {deal.depositAddress}
+                {treasuryAddress ?? deal.depositAddress}
               </a>
             </div>
           </Card>

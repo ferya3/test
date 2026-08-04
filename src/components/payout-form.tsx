@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { savePayoutAddressAction } from "@/app/actions/auth";
 import type { FormState } from "@/app/actions/auth";
+import { NETWORKS } from "@/lib/networks";
 import { Alert, Field } from "./ui";
 import { SubmitButton } from "./submit-button";
 
@@ -22,8 +23,11 @@ export function PayoutAddressForm({
 
       <Field label="Network" htmlFor="payoutNetwork">
         <select id="payoutNetwork" name="payoutNetwork" className="select" defaultValue={defaultNetwork}>
-          <option value="TRON">TRON (TRC-20)</option>
-          <option value="ETHEREUM">Ethereum (ERC-20)</option>
+          {NETWORKS.map((network) => (
+            <option key={network.value} value={network.value}>
+              {network.label}
+            </option>
+          ))}
         </select>
       </Field>
 

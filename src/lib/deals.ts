@@ -25,7 +25,7 @@ export async function getSettings() {
  * bumped inside a transaction so two concurrent deals can never share an
  * address — which would make it impossible to tell whose money arrived.
  */
-async function reserveDepositAddress(): Promise<{ index: number; address: string }> {
+async function reserveDepositAddress(network: Network): Promise<{ index: number; address: string }> {
   const wallet = getWallet();
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const settings = await getSettings();
@@ -35,7 +35,7 @@ async function reserveDepositAddress(): Promise<{ index: number; address: string
       data: { nextDerivationIndex: index + 1 },
     });
     if (updated.count === 1) {
-      return { index, address: wallet.deriveDepositAddress(index) };
+      return { index, address: wallet.deriveDepositAddress(index, network) };
     }
   }
   throw new Error("Could not reserve a deposit address, please retry");
@@ -68,8 +68,9 @@ export async function createDeal(input: CreateDealInput) {
     throw new DealError("You cannot open a deal with yourself.");
   }
 
+  const network = input.network ?? "TRON";
   const fee = feeFor(input.priceMicro, settings.feeBasisPoints);
-  const { index, address } = await reserveDepositAddress();
+  const { index, address } = await reserveDepositAddress(network);
 
   return prisma.deal.create({
     data: {
@@ -82,7 +83,7 @@ export async function createDeal(input: CreateDealInput) {
       amountMicro: input.priceMicro + fee,
       feeMicro: fee,
       payoutMicro: input.priceMicro,
-      network: input.network ?? "TRON",
+      network,
       depositAddress: address,
       depositDerivation: index,
       inspectionHours: input.inspectionHours,

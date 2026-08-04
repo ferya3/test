@@ -34,6 +34,7 @@ The interface is in English throughout.
 ```
 
 * **A balance per user**, moved only through an append-only ledger that is reconciled on every visit to the treasury page.
+* **The buyer ticks off each vault item**, so a part-delivered lot shows exactly which asset is missing.
 * **One deposit address per deal**, derived from a watch-only extended public key.
 * **Credentials encrypted at rest** with AES-256-GCM under a key derived per deal.
 * **The vault stays sealed** until the escrow is funded and the seller has delivered.
@@ -41,6 +42,28 @@ The interface is in English throughout.
 * **The fee is added on top** of the sale price, so a seller receives exactly what they asked for.
 * **Disputes** freeze the deal for a moderator to release or refund.
 * **Append-only audit trail** for every payment, reveal, release and admin action.
+
+## Receiving addresses
+
+Each deal is opened on one network — TRC-20, BEP-20 or ERC-20 — and every address on it is validated
+for that chain.
+
+There are two ways to take deposits, and the platform supports both:
+
+* **Per-deal derived addresses.** Set a watch-only xpub and each deal gets its own address, derived
+  for the right chain (base58 for TRON, `0x…` for the EVM chains). Payments match themselves and the
+  watcher funds the deal automatically.
+* **One shared address per network.** Set an address under Admin → Settings → Receiving wallets and
+  buyers send there. A shared address cannot be matched to a deal on its own, so the buyer tells the
+  operator and the operator credits it from the user's page. The deposit panel says so plainly rather
+  than pretending the match is automatic.
+
+## Item-by-item confirmation
+
+A lot of five assets does not arrive all at once. The buyer marks each vault item as working or
+reports a problem against it, and the deal shows a running count. Releasing while items are still
+outstanding is possible — sometimes that is the right call — but the buyer is told exactly what they
+are paying for first.
 
 ## Balances and the ledger
 
@@ -72,7 +95,7 @@ cover, so only credit what you have actually received.
 | Language  | TypeScript                                           |
 | Styling   | Tailwind CSS 4                                       |
 | Database  | Prisma 7 + SQLite (swap the datasource for Postgres) |
-| Chain     | TRON / TRC-20 USDT via TronGrid                      |
+| Chains    | USDT on TRON (TRC-20), BNB Smart Chain (BEP-20), Ethereum (ERC-20) |
 
 ## Getting started
 

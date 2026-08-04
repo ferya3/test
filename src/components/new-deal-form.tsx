@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { createDealAction } from "@/app/actions/deals";
 import type { FormState } from "@/app/actions/auth";
+import { NETWORKS, type Network } from "@/lib/networks";
 import { Alert, Field } from "./ui";
 import { SubmitButton } from "./submit-button";
 
@@ -29,6 +30,7 @@ export function NewDealForm({
 }) {
   const [state, action] = useActionState<FormState, FormData>(createDealAction, {});
   const [amount, setAmount] = useState(prefill?.amount ?? "");
+  const [network, setNetwork] = useState<Network>("TRON");
 
   // The fee sits on top of the price, so the buyer funds price + fee.
   const parsed = Number(amount.replace(/,/g, ""));
@@ -96,6 +98,22 @@ export function NewDealForm({
           />
         </Field>
 
+        <Field label="Network" htmlFor="network" error={state.errors?.network}>
+          <select
+            id="network"
+            name="network"
+            className="select"
+            value={network}
+            onChange={(event) => setNetwork(event.target.value as Network)}
+          >
+            {NETWORKS.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+
         <Field
           label="Inspection window"
           htmlFor="inspectionHours"
@@ -113,17 +131,19 @@ export function NewDealForm({
       </div>
 
       <Field
-        label="Your refund address (TRC-20)"
+        label="Your refund address"
         htmlFor="refundAddress"
         error={state.errors?.refundAddress}
-        hint="Where the USDT goes if the deal is refunded. Must be a TRON address you control."
+        hint={`Where the USDT goes if the deal is refunded. Must be an address you control on ${
+          NETWORKS.find((item) => item.value === network)?.label ?? network
+        }.`}
       >
         <input
           id="refundAddress"
           name="refundAddress"
           className="input font-mono"
           defaultValue={defaultRefundAddress}
-          placeholder="T…"
+          placeholder={network === "TRON" ? "T…" : "0x…"}
           spellCheck={false}
           required
         />

@@ -1,4 +1,6 @@
 import { getSettings } from "@/lib/deals";
+import { listTreasuryWallets } from "@/lib/treasury";
+import { TreasuryWalletsForm } from "@/components/treasury-wallets-form";
 import { formatUsdt } from "@/lib/money";
 import { PlatformSettingsForm } from "@/components/platform-settings-form";
 import { Card, PageHeader } from "@/components/ui";
@@ -9,6 +11,7 @@ export const metadata = { title: "Platform settings" };
 
 export default async function AdminSettingsPage() {
   const settings = await getSettings();
+  const wallets = await listTreasuryWallets();
   const auditLogs = await prisma.auditLog.findMany({
     orderBy: { createdAt: "desc" },
     take: 40,
@@ -28,6 +31,24 @@ export default async function AdminSettingsPage() {
           paymentWindowMins={settings.paymentWindowMins}
           requiredConfirmations={settings.requiredConfirmations}
         />
+      </Card>
+
+      <Card
+        title="Receiving wallets"
+        description="Where buyers send their USDT. Set an address for a network to accept deposits on it; clear it to fall back to per-deal derived addresses."
+      >
+        <TreasuryWalletsForm
+          wallets={wallets.map((wallet) => ({
+            network: wallet.network,
+            label: wallet.label,
+            address: wallet.address,
+            note: wallet.note,
+          }))}
+        />
+        <p className="mt-4 text-xs text-slate-500">
+          A shared address cannot be matched to a deal automatically — every buyer sends to the same place. Deposits
+          against these addresses are credited by hand from the user&apos;s page.
+        </p>
       </Card>
 
       <Card title="Audit trail" description="Most recent 40 entries.">

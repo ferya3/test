@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { NETWORK_VALUES } from "./networks";
 
 export const CATEGORIES = [
   "GAMING",
@@ -47,6 +48,7 @@ export const listingSchema = z.object({
 
 export const dealSchema = z.object({
   listingId: z.string().trim().optional(),
+  network: z.enum(NETWORK_VALUES),
   sellerEmail: z.string().trim().toLowerCase().email("Enter the seller's account email"),
   title: z.string().trim().min(6, "Title is too short").max(120),
   description: z.string().trim().min(20, "Describe the agreement (20+ characters)").max(4000),
@@ -71,7 +73,7 @@ export const disputeSchema = z.object({
 
 export const payoutAddressSchema = z.object({
   payoutAddress: z.string().trim().min(20, "Enter a valid USDT address").max(80),
-  payoutNetwork: z.enum(["TRON", "ETHEREUM"]),
+  payoutNetwork: z.enum(NETWORK_VALUES),
 });
 
 export const resolveDisputeSchema = z.object({
@@ -98,12 +100,29 @@ export const adjustBalanceSchema = z.object({
   amount: usdtAmount.refine((v) => Number(v) > 0, "Enter an amount above zero"),
   reason: z.string().trim().min(6, "Say why you are changing this balance").max(500),
   reference: z.string().trim().max(120).optional(),
+  /** Which chain the money arrived on, when it arrived on one. */
+  network: z.enum(NETWORK_VALUES).optional(),
+  /** The address the user sent from, for matching against the explorer. */
+  fromAddress: z.string().trim().max(80).optional(),
+});
+
+export const treasuryWalletSchema = z.object({
+  network: z.enum(NETWORK_VALUES),
+  address: z.string().trim().max(80),
+  note: z.string().trim().max(200).optional(),
+});
+
+/** Buyer's verdict on one item in the vault. */
+export const confirmItemSchema = z.object({
+  credentialId: z.string().trim().min(1),
+  verdict: z.enum(["CONFIRM", "REJECT", "RESET"]),
+  note: z.string().trim().max(500).optional(),
 });
 
 export const withdrawalSchema = z.object({
   amount: usdtAmount,
   toAddress: z.string().trim().min(20, "Enter a valid USDT address").max(80),
-  network: z.enum(["TRON", "ETHEREUM"]),
+  network: z.enum(NETWORK_VALUES),
 });
 
 export const rejectWithdrawalSchema = z.object({

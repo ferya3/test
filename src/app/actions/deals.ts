@@ -7,7 +7,7 @@ import { audit, requireUser } from "@/lib/auth";
 import { encryptSecret } from "@/lib/crypto";
 import { parseUsdt } from "@/lib/money";
 import { rateLimit } from "@/lib/rate-limit";
-import { isValidAddress, type Network } from "@/lib/wallet";
+import { addressHint, isValidAddress, type Network } from "@/lib/wallet";
 import {
   createDeal,
   DealError,
@@ -30,6 +30,7 @@ import {
   listingSchema,
   messageSchema,
   withdrawalSchema,
+  confirmItemSchema,
 } from "@/lib/validation";
 import { LedgerError } from "@/lib/ledger";
 import { requestWithdrawal, WithdrawalError } from "@/lib/withdrawals";
@@ -93,6 +94,7 @@ export async function createDealAction(_prev: FormState, formData: FormData): Pr
 
   const parsed = dealSchema.safeParse({
     listingId: formData.get("listingId") || undefined,
+    network: formData.get("network"),
     sellerEmail: formData.get("sellerEmail"),
     title: formData.get("title"),
     description: formData.get("description"),
@@ -109,9 +111,9 @@ export async function createDealAction(_prev: FormState, formData: FormData): Pr
   if (seller.id === user.id) return { errors: { sellerEmail: "You cannot open a deal with yourself." } };
   if (seller.isBlocked) return { errors: { sellerEmail: "That seller cannot accept deals right now." } };
 
-  const network: Network = "TRON";
+  const network = parsed.data.network as Network;
   if (!isValidAddress(parsed.data.refundAddress, network)) {
-    return { errors: { refundAddress: "Enter a valid TRC-20 (TRON) USDT address." } };
+    return { errors: { refundAddress: addressHint(network) } };
   }
 
   let dealId: string;
@@ -138,6 +140,52 @@ export async function createDealAction(_prev: FormState, formData: FormData): Pr
   }
 
   redirect(`/deals/${dealId}`);
+}
+
+/**
+ * The buyer's verdict on a single vault item. Ticking items off one at a time
+ * is what makes a part-delivered deal legible: everyone can see that four of
+ * five assets arrived and exactly which one did not.
+ */
+export async function confirmItemAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const parsed = confirmItemSchema.safeParse({
+    credentialId: formData.get("credentialId"),
+    verdict: formData.get("verdict"),
+    note: formData.get("note") || undefined,
+  });
+  if (!parsed.success) return { errors: fieldErrors(parsed.error) };
+
+  const user = await requireUser();
+  const credential = await prisma.credential.findUnique({
+    where: { id: parsed.data.credentialId },
+    include: { deal: true },
+  });
+  if (!credential) return { errors: { form: "Not found." } };
+  if (credential.deal.buyerId !== user.id) {
+    return { errors: { form: "Only the buyer can check items off." } };
+  }
+  if (!["DELIVERED", "DISPUTED"].includes(credential.deal.status)) {
+    return { errors: { form: "This deal is not open for inspection." } };
+  }
+  if (parsed.data.verdict === "REJECT" && !parsed.data.note) {
+    return { errors: { note: "Say what is wrong with this item." } };
+  }
+
+  const now = new Date();
+  await prisma.credential.update({
+    where: { id: credential.id },
+    data: {
+      confirmedAt: parsed.data.verdict === "CONFIRM" ? now : null,
+      rejectedAt: parsed.data.verdict === "REJECT" ? now : null,
+      rejectedNote: parsed.data.verdict === "REJECT" ? (parsed.data.note ?? null) : null,
+    },
+  });
+  await audit(`credential.${parsed.data.verdict.toLowerCase()}`, "Credential", credential.id, user.id, {
+    dealId: credential.dealId,
+  });
+
+  revalidatePath(`/deals/${credential.dealId}`);
+  return { ok: true };
 }
 
 /** Buyer pays for the deal out of their platform balance instead of on-chain. */

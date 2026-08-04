@@ -99,7 +99,7 @@ model Deal {
   amountMicro   BigInt // what the buyer funds: payoutMicro + feeMicro
   feeMicro      BigInt // platform fee, charged on top of the sale price
   payoutMicro   BigInt // the sale price, which is what the seller receives
-  network       String @default("TRON") // TRON (TRC-20) | ETHEREUM (ERC-20)
+  network       String @default("TRON") // TRON (TRC-20) | BSC (BEP-20) | ETHEREUM (ERC-20)
 
   depositAddress    String  @unique
   depositDerivation Int     @unique // HD index used to derive depositAddress
@@ -146,6 +146,13 @@ model Credential {
   firstRevealedAt DateTime?
   revealCount     Int      @default(0)
   purgedAt        DateTime?
+
+  /// The buyer ticks each item off as they verify it works. A deal is only
+  /// safe to release once every item is confirmed.
+  confirmedAt   DateTime?
+  /// Set when the buyer marks an item as *not* working, with their reason.
+  rejectedAt    DateTime?
+  rejectedNote  String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -271,6 +278,20 @@ model AuditLog {
 
   @@index([entity, entityId])
   @@index([createdAt])
+}
+
+/// The platform's own receiving address for one network. Buyers send here when
+/// no watch-only xpub is configured, so the operator can run the platform from
+/// an ordinary wallet and credit deposits by hand.
+model TreasuryWallet {
+  id      String @id @default(cuid())
+  network String @unique // TRON | BSC | ETHEREUM
+  address String
+  /// Free-text note shown to buyers, e.g. which exchange it is held at.
+  note    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 /// Single-row table holding operator-tunable settings.

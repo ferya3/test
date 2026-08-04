@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "./db";
 import { postEntry, LedgerError } from "./ledger";
-import { isValidAddress, type Network } from "./wallet";
+import { addressHint, isValidAddress, type Network } from "./wallet";
 
 export class WithdrawalError extends Error {}
 
@@ -30,11 +30,7 @@ export async function requestWithdrawal(input: {
     throw new WithdrawalError("That is below the minimum withdrawal amount.");
   }
   if (!isValidAddress(input.toAddress, input.network)) {
-    throw new WithdrawalError(
-      input.network === "TRON"
-        ? "That is not a valid TRC-20 address (it should start with T)."
-        : "That is not a valid ERC-20 address (it should start with 0x).",
-    );
+    throw new WithdrawalError(addressHint(input.network));
   }
 
   const pending = await prisma.withdrawal.count({
