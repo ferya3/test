@@ -122,7 +122,7 @@ export async function createDealAction(_prev: FormState, formData: FormData): Pr
       listingId: parsed.data.listingId ?? null,
       title: parsed.data.title,
       description: parsed.data.description,
-      amountMicro: parseUsdt(parsed.data.amount),
+      priceMicro: parseUsdt(parsed.data.amount),
       inspectionHours: parsed.data.inspectionHours,
       refundAddress: parsed.data.refundAddress,
       network,

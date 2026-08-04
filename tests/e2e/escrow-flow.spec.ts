@@ -67,10 +67,11 @@ test("a deal runs from funding through delivery to payout", async ({ page }) => 
   await expect(page).toHaveURL(/\/deals\/(?!new$)[a-z0-9]{16,}$/);
   const dealUrl = page.url();
 
-  // The buyer sees a deposit address and the escrow breakdown (3% platform fee).
+  // The buyer sees a deposit address and the escrow breakdown: a 250 sale
+  // price plus the 5% fee is 262.50 funded, with the seller still getting 250.
   await expect(page.getByText("Awaiting payment")).toBeVisible();
-  await expect(page.getByText("250 USDT").first()).toBeVisible();
-  await expect(page.getByText("242.5 USDT")).toBeVisible();
+  await expect(page.getByText("262.5 USDT").first()).toBeVisible();
+  await expect(page.getByText("12.5 USDT")).toBeVisible();
   await expect(page.locator("text=/^T[1-9A-HJ-NP-Za-km-z]{33}$/").first()).toBeVisible();
 
   // The vault must not exist yet — nothing has been delivered.
@@ -128,7 +129,7 @@ test("a deal runs from funding through delivery to payout", async ({ page }) => 
   // --- the payout landed on the seller's balance -----------------------------
   await signIn(page, SELLER.email, SELLER.password);
   await page.goto("/dashboard/wallet");
-  await expect(page.getByText("242.5 USDT").first()).toBeVisible();
+  await expect(page.getByText("250 USDT").first()).toBeVisible();
   await expect(page.getByText("Deal payout").first()).toBeVisible();
 
   // --- and the seller can withdraw it ----------------------------------------
@@ -138,7 +139,7 @@ test("a deal runs from funding through delivery to payout", async ({ page }) => 
   await page.click('button:has-text("Request withdrawal")');
   await expect(page.getByText("Withdrawal requested.")).toBeVisible();
   // The balance drops immediately, so the same funds cannot be requested twice.
-  await expect(page.getByText("142.5 USDT").first()).toBeVisible();
+  await expect(page.getByText("150 USDT").first()).toBeVisible();
   await signOut(page);
 
   // --- the request shows up in the treasury queue ----------------------------
@@ -194,9 +195,9 @@ test("an operator can credit a balance by hand and the buyer can spend it", asyn
   await page.click('button:has-text("Fund from balance")');
   await expect(page.getByText("Funds in escrow")).toBeVisible();
 
-  // 300 credited − 120 spent leaves 180 on the balance.
+  // 300 credited − 126 spent (120 price + 5% fee) leaves 174 on the balance.
   await page.goto("/dashboard/wallet");
-  await expect(page.getByText("180 USDT").first()).toBeVisible();
+  await expect(page.getByText("174 USDT").first()).toBeVisible();
   await expect(page.getByText("Deal funded").first()).toBeVisible();
 });
 

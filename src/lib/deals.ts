@@ -47,23 +47,28 @@ export type CreateDealInput = {
   listingId?: string | null;
   title: string;
   description: string;
-  amountMicro: bigint;
+  /** What the seller is asking for the goods, before the platform fee. */
+  priceMicro: bigint;
   inspectionHours: number;
   refundAddress: string;
   network?: Network;
 };
 
+/**
+ * The platform fee is charged *on top* of the sale price: the buyer funds
+ * price + fee, and the seller receives the full price they asked for.
+ */
 export async function createDeal(input: CreateDealInput) {
   const settings = await getSettings();
 
-  if (input.amountMicro < settings.minDealMicro || input.amountMicro > settings.maxDealMicro) {
+  if (input.priceMicro < settings.minDealMicro || input.priceMicro > settings.maxDealMicro) {
     throw new DealError("That amount is outside the limits allowed for escrow deals.");
   }
   if (input.buyerId === input.sellerId) {
     throw new DealError("You cannot open a deal with yourself.");
   }
 
-  const fee = feeFor(input.amountMicro, settings.feeBasisPoints);
+  const fee = feeFor(input.priceMicro, settings.feeBasisPoints);
   const { index, address } = await reserveDepositAddress();
 
   return prisma.deal.create({
@@ -74,9 +79,9 @@ export async function createDeal(input: CreateDealInput) {
       listingId: input.listingId ?? null,
       title: input.title,
       description: input.description,
-      amountMicro: input.amountMicro,
+      amountMicro: input.priceMicro + fee,
       feeMicro: fee,
-      payoutMicro: input.amountMicro - fee,
+      payoutMicro: input.priceMicro,
       network: input.network ?? "TRON",
       depositAddress: address,
       depositDerivation: index,

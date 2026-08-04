@@ -30,8 +30,10 @@ export function NewDealForm({
   const [state, action] = useActionState<FormState, FormData>(createDealAction, {});
   const [amount, setAmount] = useState(prefill?.amount ?? "");
 
+  // The fee sits on top of the price, so the buyer funds price + fee.
   const parsed = Number(amount.replace(/,/g, ""));
-  const fee = Number.isFinite(parsed) && parsed > 0 ? (parsed * feePercent) / 100 : 0;
+  const price = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+  const fee = (price * feePercent) / 100;
 
   return (
     <form action={action} className="space-y-4">
@@ -77,10 +79,10 @@ export function NewDealForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field
-          label="Amount (USDT)"
+          label="Sale price (USDT)"
           htmlFor="amount"
           error={state.errors?.amount}
-          hint={`Between ${minAmount} and ${maxAmount} USDT.`}
+          hint={`What the seller receives. Between ${minAmount} and ${maxAmount} USDT.`}
         >
           <input
             id="amount"
@@ -129,12 +131,16 @@ export function NewDealForm({
 
       <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4 text-sm">
         <div className="flex justify-between text-slate-400">
-          <span>You pay into escrow</span>
-          <span className="font-semibold text-slate-100">{amount || "0"} USDT</span>
+          <span>Seller receives</span>
+          <span>{price > 0 ? price.toFixed(2) : "0.00"} USDT</span>
         </div>
         <div className="mt-1 flex justify-between text-slate-500">
-          <span>Platform fee ({feePercent.toFixed(2)}%, paid by the seller)</span>
-          <span>{fee.toFixed(2)} USDT</span>
+          <span>Platform fee ({feePercent.toFixed(2)}%)</span>
+          <span>+ {fee.toFixed(2)} USDT</span>
+        </div>
+        <div className="mt-2 flex justify-between border-t border-slate-800 pt-2 text-slate-300">
+          <span className="font-medium">You fund into escrow</span>
+          <span className="font-semibold text-slate-100">{(price + fee).toFixed(2)} USDT</span>
         </div>
       </div>
 

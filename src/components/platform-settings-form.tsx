@@ -26,7 +26,7 @@ export function PlatformSettingsForm(props: {
           label="Escrow fee (basis points)"
           htmlFor="feeBasisPoints"
           error={state.errors?.feeBasisPoints}
-          hint="300 = 3.00%, charged to the seller."
+          hint="500 = 5.00%, added on top of the sale price and paid by the buyer."
         >
           <input
             id="feeBasisPoints"

@@ -96,9 +96,9 @@ model Deal {
   //                  \-> CANCELLED | EXPIRED
   status String @default("AWAITING_PAYMENT")
 
-  amountMicro   BigInt // what the buyer pays into escrow
-  feeMicro      BigInt // platform fee, deducted from the seller's payout
-  payoutMicro   BigInt // amountMicro - feeMicro
+  amountMicro   BigInt // what the buyer funds: payoutMicro + feeMicro
+  feeMicro      BigInt // platform fee, charged on top of the sale price
+  payoutMicro   BigInt // the sale price, which is what the seller receives
   network       String @default("TRON") // TRON (TRC-20) | ETHEREUM (ERC-20)
 
   depositAddress    String  @unique
@@ -276,7 +276,7 @@ model AuditLog {
 /// Single-row table holding operator-tunable settings.
 model Settings {
   id                String @id @default("singleton")
-  feeBasisPoints    Int    @default(300) // 3.00%
+  feeBasisPoints    Int    @default(500) // 5.00%, charged on top of the sale price
   minDealMicro      BigInt @default(5000000)   // 5 USDT
   maxDealMicro      BigInt @default(50000000000) // 50,000 USDT
   minWithdrawalMicro BigInt @default(10000000)  // 10 USDT

@@ -182,8 +182,9 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
         <div className="space-y-6">
           <Card title="Escrow">
             <dl className="space-y-3 text-sm">
-              <Row label="Buyer pays" value={`${formatUsdt(deal.amountMicro)} USDT`} strong />
-              <Row label="Platform fee" value={`− ${formatUsdt(deal.feeMicro)} USDT`} />
+              <Row label="Sale price" value={`${formatUsdt(deal.payoutMicro)} USDT`} />
+              <Row label="Platform fee" value={`+ ${formatUsdt(deal.feeMicro)} USDT`} />
+              <Row label="Buyer funds" value={`${formatUsdt(deal.amountMicro)} USDT`} strong />
               <Row label="Seller receives" value={`${formatUsdt(deal.payoutMicro)} USDT`} strong />
               <Row label="Network" value={network === "TRON" ? "TRC-20 (TRON)" : "ERC-20 (Ethereum)"} />
             </dl>

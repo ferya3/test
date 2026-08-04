@@ -174,10 +174,13 @@ function todayAt(hours: number, minutes: number): Date {
 }
 
 /**
- * A funded deal belonging to the named buyer, with a message thread that runs
- * from 9pm last night. It demonstrates the platform acting as the go-between:
- * the buyer only ever addresses the operator, and the operator comes back with
- * the seller's answers.
+ * A part-delivered deal belonging to the named buyer: five assets bought as one
+ * lot, three handed over last night and two this morning, with the last one
+ * failing to transfer. It exercises the case escrow exists for — most of the
+ * goods arrived, one did not, and the money is still sitting with the platform.
+ *
+ * The thread also shows the operator acting as the go-between: the buyer only
+ * ever addresses the platform, and the platform relays what the seller says.
  */
 async function seedNamedBuyerThread(context: {
   admin: { id: string; email: string };
@@ -193,81 +196,197 @@ async function seedNamedBuyerThread(context: {
   );
 
   await prisma.deal.deleteMany({ where: { buyerId: buyer.id } });
+  await prisma.ledgerEntry.deleteMany({ where: { userId: buyer.id } });
+  await prisma.user.update({ where: { id: buyer.id }, data: { balanceMicro: 0n } });
 
+  const price = "9000.00";
   const deal = await createDeal({
     buyerId: buyer.id,
     sellerId: context.seller.id,
     listingId: null,
-    title: "Aged gaming account — level 240, full cosmetics library",
+    title: "Three Instagram handles and two matching .com domains",
     description:
-      "Full account handover: login, current password, the original registered email and its recovery codes. " +
-      "Buyer rebinds the email to their own address within 24 hours of delivery.",
-    amount: "1250.00",
+      "One lot of five assets:\n" +
+      "  • Instagram @artavilhayat\n" +
+      "  • Instagram @artavil.hayat\n" +
+      "  • Instagram @artavil_hayat\n" +
+      "  • Domain artavilhayat.com\n" +
+      "  • Domain artavil-hayat.com\n\n" +
+      "The seller hands over the login and password for each handle plus the recovery email they are " +
+      "bound to, and the registrar transfer (EPP) code for each domain with both domains unlocked. " +
+      "Funds are released only once all five are in the buyer's control.",
+    amount: price,
     index: 1004,
     feeBasisPoints: context.feeBasisPoints,
-    status: "FUNDED",
-    createdAt: yesterdayAt(20, 55),
-    fundedAt: yesterdayAt(21, 52),
+    status: "DELIVERED",
+    createdAt: yesterdayAt(20, 40),
+    fundedAt: yesterdayAt(20, 55),
+    deliveredAt: yesterdayAt(22, 40),
+    inspectionEndsAt: todayAt(22, 40),
   });
 
-  // Alternating buyer → operator → buyer, with the operator relaying whatever
-  // the seller said. Timestamps are set explicitly so the thread reads as a
-  // conversation that started last night.
+  // The buyer topped their wallet up with price + fee, then funded the deal
+  // from that balance — which is exactly how they described doing it.
+  const credit = await postEntry({
+    userId: buyer.id,
+    amountMicro: deal.amountMicro,
+    kind: "MANUAL_CREDIT",
+    note: "USDT received at the treasury wallet, credited to the buyer",
+    reference: "seed-demo",
+    actorId: context.admin.id,
+  });
+  const funding = await postEntry({
+    userId: buyer.id,
+    amountMicro: -deal.amountMicro,
+    kind: "DEAL_FUNDING",
+    dealId: deal.id,
+    reference: deal.reference,
+    note: `Funded deal ${deal.reference} from balance`,
+  });
+  // postEntry stamps entries as they are written; move them back onto the
+  // evening the money actually changed hands so the story reads straight.
+  await prisma.ledgerEntry.update({
+    where: { id: credit.id },
+    data: { createdAt: yesterdayAt(20, 42) },
+  });
+  await prisma.ledgerEntry.update({
+    where: { id: funding.id },
+    data: { createdAt: yesterdayAt(20, 55) },
+  });
+
+  // The vault: three handles delivered at 22:40, both domains at 04:30.
+  const vault: { label: string; kind: string; value: string; at: Date }[] = [
+    {
+      label: "Instagram @artavilhayat — password",
+      kind: "PASSWORD",
+      value: "Ar7v!l-Hayat-2019#one",
+      at: yesterdayAt(22, 40),
+    },
+    {
+      label: "Instagram @artavil.hayat — password",
+      kind: "PASSWORD",
+      value: "Ar7v!l-Hayat-2019#two",
+      at: yesterdayAt(22, 40),
+    },
+    {
+      label: "Instagram @artavil_hayat — password",
+      kind: "PASSWORD",
+      value: "Ar7v!l-Hayat-2019#three",
+      at: yesterdayAt(22, 40),
+    },
+    {
+      label: "Recovery email bound to all three handles",
+      kind: "EMAIL",
+      value: "artavil.assets@mailbox.example",
+      at: yesterdayAt(22, 40),
+    },
+    {
+      label: "Recovery email password",
+      kind: "PASSWORD",
+      value: "mailbox-9f21-recovery",
+      at: yesterdayAt(22, 40),
+    },
+    {
+      label: "artavilhayat.com — transfer (EPP) code",
+      kind: "SECRET",
+      value: "EPP-8H2K-QW71-ZC44",
+      at: todayAt(4, 30),
+    },
+    {
+      label: "artavil-hayat.com — transfer (EPP) code",
+      kind: "SECRET",
+      value: "EPP-3M9P-RT06-LD18",
+      at: todayAt(4, 30),
+    },
+    {
+      label: "Registrar and handover notes",
+      kind: "NOTE",
+      value:
+        "Both domains sit at the same registrar. Unlock is already done on artavilhayat.com. " +
+        "Change the Instagram passwords and rebind the recovery email as soon as you are in.",
+      at: todayAt(4, 30),
+    },
+  ];
+
+  await prisma.credential.deleteMany({ where: { dealId: deal.id } });
+  for (const item of vault) {
+    await prisma.credential.create({
+      data: {
+        dealId: deal.id,
+        label: item.label,
+        kind: item.kind,
+        ciphertext: encryptSecret(deal.id, item.value),
+        createdAt: item.at,
+      },
+    });
+  }
+
   const thread: { at: Date; from: "BUYER" | "STAFF"; body: string }[] = [
     {
       at: yesterdayAt(21, 0),
       from: "BUYER",
-      body: "Hi — I've just opened the deal for the level 240 account. Before I send the USDT, can you check with the seller that the original registered email is included?",
+      body:
+        "I have topped my wallet up with 9,450 USDT and funded this deal — 9,000 for the five assets plus the " +
+        "5% platform fee. To be clear about what that means: the money is held by you, not by the seller. I will " +
+        "confirm the release only once I have every username and password and I have checked all five myself.",
     },
     {
-      at: yesterdayAt(21, 6),
+      at: yesterdayAt(21, 8),
       from: "STAFF",
-      body: "Evening Saeed. Asking the seller now — give me a few minutes.",
+      body:
+        "That is exactly right, Saeed. The 9,450 USDT is in escrow with us. The seller can see the deal is funded " +
+        "but cannot touch a single dollar of it until you release. I have asked them to start with the three " +
+        "Instagram handles.",
     },
     {
-      at: yesterdayAt(21, 14),
+      at: yesterdayAt(22, 40),
       from: "STAFF",
-      body: "Seller confirms the original registered email is included, together with its recovery codes. They ask that you rebind it to an address of your own within 24 hours of handover.",
+      body:
+        "The seller has handed over the three Instagram accounts. Passwords for @artavilhayat, @artavil.hayat and " +
+        "@artavil_hayat are in the vault on this deal, along with the recovery email all three are bound to and " +
+        "its password. Sign in to each one and change the password straight away.",
     },
     {
-      at: yesterdayAt(21, 18),
+      at: yesterdayAt(23, 12),
       from: "BUYER",
-      body: "Good. Has the account ever been suspended or limited? I don't want to pay and then find out it is restricted.",
+      body:
+        "All three handles are in. I have changed every password and moved the recovery email over to my own " +
+        "address. Instagram side confirmed — three of five done. Waiting on the two domains.",
     },
     {
-      at: yesterdayAt(21, 31),
+      at: yesterdayAt(23, 20),
       from: "STAFF",
-      body: "Seller says there have been no suspensions and there are no active restrictions. They have offered to walk you through the account's security page on a screen share before you fund, if you want that.",
+      body: "Noted and logged. Passing it to the seller now to get the domain transfer codes moving.",
     },
     {
-      at: yesterdayAt(21, 35),
+      at: todayAt(4, 30),
+      from: "STAFF",
+      body:
+        "The seller has provided the transfer codes for both domains — they are in the vault. They say both " +
+        "domains are unlocked at the registrar and neither is inside a 60-day transfer lock.",
+    },
+    {
+      at: todayAt(12, 40),
       from: "BUYER",
-      body: "Not necessary. I'll fund the escrow now.",
+      body:
+        "artavilhayat.com has transferred. It is in my registrar account now, so that is four of the five " +
+        "confirmed.",
     },
     {
-      at: yesterdayAt(21, 52),
+      at: todayAt(12, 46),
       from: "BUYER",
-      body: "Sent — 1,250 USDT to the deposit address on this deal.",
+      body:
+        "artavil-hayat.com will not transfer though. The registrar rejects the EPP code and the domain still " +
+        "shows as locked on the WHOIS. Please ask the seller to unlock it and issue a fresh code. I am not " +
+        "releasing the funds while one of the five is outstanding.",
     },
     {
-      at: yesterdayAt(22, 4),
+      at: todayAt(12, 58),
       from: "STAFF",
-      body: "Confirmed on-chain. The escrow is funded and the seller has been asked to deliver. Nothing reaches them until you have checked the account and released it.",
-    },
-    {
-      at: todayAt(9, 12),
-      from: "STAFF",
-      body: "Morning. The seller says the handover pack will be in the vault before noon. I'll chase them if it slips.",
-    },
-    {
-      at: todayAt(9, 20),
-      from: "BUYER",
-      body: "Thanks. Please make sure the password they put in is the one currently active, not an old one.",
-    },
-    {
-      at: todayAt(9, 24),
-      from: "STAFF",
-      body: "Passed that on. They will reset the password immediately before delivering and put the fresh one in the vault.",
+      body:
+        "Understood, and nothing is released. The full 9,450 USDT stays with us. I have passed it to the seller " +
+        "and asked them to unlock artavil-hayat.com and reissue the code. If they cannot deliver it, open a " +
+        "dispute from this page and a moderator will decide the outcome — do not release in the meantime.",
     },
   ];
 
@@ -313,9 +432,13 @@ async function createDeal(input: {
   status: string;
   createdAt?: Date;
   fundedAt?: Date;
+  deliveredAt?: Date;
+  inspectionEndsAt?: Date;
 }) {
-  const amountMicro = parseUsdt(input.amount);
-  const feeMicro = (amountMicro * BigInt(input.feeBasisPoints)) / 10_000n;
+  // The fee is charged on top of the sale price, matching src/lib/deals.ts.
+  const priceMicro = parseUsdt(input.amount);
+  const feeMicro = (priceMicro * BigInt(input.feeBasisPoints)) / 10_000n;
+  const amountMicro = priceMicro + feeMicro;
   const now = new Date();
   const funded = input.status !== "AWAITING_PAYMENT";
   const delivered = input.status === "DELIVERED";
@@ -334,7 +457,7 @@ async function createDeal(input: {
       status: input.status,
       amountMicro,
       feeMicro,
-      payoutMicro: amountMicro - feeMicro,
+      payoutMicro: priceMicro,
       depositAddress: getWallet().deriveDepositAddress(input.index),
       depositDerivation: input.index,
       inspectionHours: 48,
@@ -342,8 +465,10 @@ async function createDeal(input: {
       createdAt,
       expiresAt: new Date(now.getTime() + 2 * 60 * 60 * 1000),
       fundedAt: funded ? fundedAt : null,
-      deliveredAt: delivered ? new Date(now.getTime() - 30 * 60 * 1000) : null,
-      inspectionEndsAt: delivered ? new Date(now.getTime() + 47 * 60 * 60 * 1000) : null,
+      deliveredAt: delivered ? (input.deliveredAt ?? new Date(now.getTime() - 30 * 60 * 1000)) : null,
+      inspectionEndsAt: delivered
+        ? (input.inspectionEndsAt ?? new Date(now.getTime() + 47 * 60 * 60 * 1000))
+        : null,
     },
   });
 }

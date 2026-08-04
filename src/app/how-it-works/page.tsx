@@ -62,7 +62,7 @@ export default async function HowItWorksPage() {
         <dl className="space-y-2 text-sm">
           <div className="flex justify-between">
             <dt className="text-slate-500">Escrow fee</dt>
-            <dd className="text-slate-200">{(settings.feeBasisPoints / 100).toFixed(2)}% — deducted from the seller</dd>
+            <dd className="text-slate-200">{(settings.feeBasisPoints / 100).toFixed(2)}% — added on top, paid by the buyer</dd>
           </div>
           <div className="flex justify-between">
             <dt className="text-slate-500">Deal size</dt>
@@ -75,8 +75,8 @@ export default async function HowItWorksPage() {
             <dd className="text-slate-200">USDT on TRON (TRC-20)</dd>
           </div>
           <div className="flex justify-between">
-            <dt className="text-slate-500">Buyer fee</dt>
-            <dd className="text-slate-200">None</dd>
+            <dt className="text-slate-500">Seller fee</dt>
+            <dd className="text-slate-200">None — they receive the full asking price</dd>
           </div>
         </dl>
       </Card>

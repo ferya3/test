@@ -38,6 +38,7 @@ The interface is in English throughout.
 * **Credentials encrypted at rest** with AES-256-GCM under a key derived per deal.
 * **The vault stays sealed** until the escrow is funded and the seller has delivered.
 * **Auto-release** protects sellers from a buyer who simply stops responding.
+* **The fee is added on top** of the sale price, so a seller receives exactly what they asked for.
 * **Disputes** freeze the deal for a moderator to release or refund.
 * **Append-only audit trail** for every payment, reveal, release and admin action.
 
@@ -53,6 +54,9 @@ the entry. Nothing else in the codebase may write `User.balanceMicro`.
 
 The treasury page recomputes every balance from its history on each load and shows a loud warning if
 a stored value disagrees — that mismatch is the signature of a write that bypassed the ledger.
+
+The platform fee is charged **on top of the sale price**: on a 9,000 USDT deal at 5% the buyer funds
+9,450 and the seller receives the full 9,000 they asked for.
 
 **Manual credits** are for money that arrived outside the normal flow, most often a buyer who sent
 USDT straight to the treasury wallet instead of a deal's deposit address. Find them under
