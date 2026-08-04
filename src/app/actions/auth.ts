@@ -77,7 +77,17 @@ export async function loginAction(_prev: FormState, formData: FormData): Promise
 
   await audit("user.login", "User", user.id, user.id);
   await createSession(user.id);
-  redirect("/dashboard");
+  redirect(safeNext(formData.get("next")));
+}
+
+/**
+ * Only same-site paths are accepted as a post-login destination, so a crafted
+ * `?next=https://elsewhere` cannot turn the login form into an open redirect.
+ */
+function safeNext(value: FormDataEntryValue | null): string {
+  const next = typeof value === "string" ? value : "";
+  if (!next.startsWith("/") || next.startsWith("//")) return "/dashboard";
+  return next;
 }
 
 export async function logoutAction(): Promise<void> {

@@ -44,11 +44,12 @@ export function RegisterForm() {
   );
 }
 
-export function LoginForm() {
+export function LoginForm({ next }: { next?: string }) {
   const [state, action] = useActionState(loginAction, initial);
 
   return (
     <form action={action} className="space-y-4">
+      {next && <input type="hidden" name="next" value={next} />}
       {state.errors?.form && <Alert tone="error">{state.errors.form}</Alert>}
 
       <Field label="Email" htmlFor="email" error={state.errors?.email}>

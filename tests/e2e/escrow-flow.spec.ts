@@ -159,3 +159,22 @@ test("the admin console is invisible to ordinary users", async ({ page }) => {
   await page.goto("/admin/treasury");
   await expect(page.getByText("Nothing here")).toBeVisible();
 });
+
+test("a signed-out visitor is sent to sign in, then on to the page they wanted", async ({ page }) => {
+  await page.goto("/admin/users");
+  await expect(page).toHaveURL(/\/login\?next=/);
+
+  await page.fill("#email", ADMIN.email);
+  await page.fill("#password", ADMIN.password);
+  await page.click('button[type="submit"]');
+  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page.getByRole("heading", { name: "Operations overview" })).toBeVisible();
+});
+
+test("the post-login redirect cannot be pointed off-site", async ({ page }) => {
+  await page.goto("/login?next=https://example.com/phish");
+  await page.fill("#email", ADMIN.email);
+  await page.fill("#password", ADMIN.password);
+  await page.click('button[type="submit"]');
+  await expect(page).toHaveURL(/\/dashboard$/);
+});

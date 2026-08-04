@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 
 const TABS = [
@@ -12,8 +12,12 @@ const TABS = [
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
-  // 404 rather than 403: an unauthorised visitor learns nothing about the console.
-  if (!user || user.role !== "ADMIN") notFound();
+  // A signed-out visitor is simply asked to sign in — an admin following a
+  // bookmark should not be told the page does not exist.
+  if (!user) redirect(`/login?next=${encodeURIComponent("/admin")}`);
+  // A signed-in non-admin gets 404 rather than 403, so the console stays
+  // invisible to anyone who has no business knowing it exists.
+  if (user.role !== "ADMIN") notFound();
 
   return (
     <div>
