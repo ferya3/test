@@ -10,6 +10,7 @@ export function PlatformSettingsForm(props: {
   feeBasisPoints: number;
   minDeal: string;
   maxDeal: string;
+  minWithdrawal: string;
   paymentWindowMins: number;
   requiredConfirmations: number;
 }) {
@@ -61,6 +62,15 @@ export function PlatformSettingsForm(props: {
 
         <Field label="Maximum deal (USDT)" htmlFor="maxDeal" error={state.errors?.maxDeal}>
           <input id="maxDeal" name="maxDeal" className="input" defaultValue={props.maxDeal} />
+        </Field>
+
+        <Field
+          label="Minimum withdrawal (USDT)"
+          htmlFor="minWithdrawal"
+          error={state.errors?.minWithdrawal}
+          hint="Below this, network fees eat too much of the transfer."
+        >
+          <input id="minWithdrawal" name="minWithdrawal" className="input" defaultValue={props.minWithdrawal} />
         </Field>
 
         <Field

@@ -6,6 +6,8 @@ import { formatUsdt } from "@/lib/money";
 import { isParticipant, buyerMayReveal, mayCancel, mayDispute, mayRelease, sellerMayDeliver } from "@/lib/deals";
 import { explorerAddressUrl, explorerTxUrl, type Network } from "@/lib/wallet";
 import { Alert, Card, PageHeader, StatusBadge, formatDate } from "@/components/ui";
+import { LEDGER_LABELS, type LedgerKind } from "@/lib/ledger";
+import { FundFromBalance } from "@/components/fund-from-balance";
 import { SubmitButton } from "@/components/submit-button";
 import { PaymentPanel } from "@/components/payment-panel";
 import { DeliveryForm } from "@/components/delivery-form";
@@ -24,14 +26,13 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
   const deal = await prisma.deal.findUnique({
     where: { id },
     include: {
-      buyer: { select: { id: true, displayName: true, email: true } },
+      buyer: { select: { id: true, displayName: true, email: true, balanceMicro: true } },
       seller: { select: { id: true, displayName: true, email: true, payoutAddress: true } },
       credentials: { orderBy: { createdAt: "asc" } },
+      ledgerEntries: { orderBy: { createdAt: "asc" } },
       payments: { orderBy: { seenAt: "desc" } },
       messages: { orderBy: { createdAt: "asc" }, include: { sender: { select: { displayName: true } } } },
       dispute: { include: { openedBy: { select: { displayName: true } } } },
-      payout: true,
-      refund: true,
     },
   });
 
@@ -86,15 +87,24 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
             />
           )}
 
+          {isBuyer && deal.status === "AWAITING_PAYMENT" && (
+            <FundFromBalance
+              dealId={deal.id}
+              balance={formatUsdt(deal.buyer.balanceMicro)}
+              amount={formatUsdt(deal.amountMicro)}
+              sufficient={deal.buyer.balanceMicro >= deal.amountMicro}
+            />
+          )}
+
           {isSeller && sellerMayDeliver(deal) && <DeliveryForm dealId={deal.id} />}
 
           {isSeller && deal.status === "FUNDED" && !deal.seller.payoutAddress && (
             <Alert tone="warn">
-              Set a payout address in{" "}
+              Your payout will land on your platform balance. Add a payout address in{" "}
               <Link href="/dashboard/settings" className="underline">
                 settings
               </Link>{" "}
-              before the buyer releases, otherwise your payout cannot be queued.
+              so you can withdraw it afterwards.
             </Alert>
           )}
 
@@ -119,7 +129,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
           {isBuyer && mayRelease(deal) && (
             <Card
               title="Finished checking?"
-              description={`Releasing pays ${formatUsdt(deal.payoutMicro)} USDT to the seller. This cannot be undone.`}
+              description={`Releasing credits ${formatUsdt(deal.payoutMicro)} USDT to the seller's balance. This cannot be undone.`}
             >
               <form action={releaseAction} className="flex flex-wrap gap-3">
                 <input type="hidden" name="dealId" value={deal.id} />
@@ -225,31 +235,29 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
             </Card>
           )}
 
-          {deal.payout && (
-            <Card title="Seller payout">
-              <p className="text-sm text-slate-300">
-                {formatUsdt(deal.payout.amountMicro)} USDT · {deal.payout.status}
+          {deal.ledgerEntries.length > 0 && (
+            <Card title="Settlement">
+              <ul className="space-y-3 text-sm">
+                {deal.ledgerEntries.map((entry) => (
+                  <li key={entry.id} className="border-b border-slate-800 pb-3 last:border-0 last:pb-0">
+                    <div className="flex justify-between gap-2">
+                      <span className="text-slate-400">
+                        {LEDGER_LABELS[entry.kind as LedgerKind] ?? entry.kind}
+                      </span>
+                      <span
+                        className={`font-semibold ${entry.amountMicro > 0n ? "text-emerald-300" : "text-slate-300"}`}
+                      >
+                        {entry.amountMicro > 0n ? "+" : "−"}
+                        {formatUsdt(entry.amountMicro < 0n ? -entry.amountMicro : entry.amountMicro)} USDT
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-slate-600">{formatDate(entry.createdAt)}</p>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 text-xs text-slate-500">
+                Settled amounts move to the recipient's platform balance, which they withdraw from their wallet.
               </p>
-              <p className="mt-1 break-all font-mono text-[11px] text-slate-500">{deal.payout.toAddress}</p>
-              {deal.payout.txHash && (
-                <a
-                  className="mt-2 block break-all font-mono text-[11px] text-emerald-300 hover:underline"
-                  href={explorerTxUrl(deal.payout.network as Network, deal.payout.txHash)}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                >
-                  {deal.payout.txHash}
-                </a>
-              )}
-            </Card>
-          )}
-
-          {deal.refund && (
-            <Card title="Buyer refund">
-              <p className="text-sm text-slate-300">
-                {formatUsdt(deal.refund.amountMicro)} USDT · {deal.refund.status}
-              </p>
-              <p className="mt-1 break-all font-mono text-[11px] text-slate-500">{deal.refund.toAddress}</p>
             </Card>
           )}
 

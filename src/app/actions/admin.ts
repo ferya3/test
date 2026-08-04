@@ -6,7 +6,21 @@ import { audit, requireAdmin } from "@/lib/auth";
 import { parseUsdt } from "@/lib/money";
 import { purgedEnvelope } from "@/lib/crypto";
 import { refundBuyer, releaseToSeller } from "@/lib/deals";
-import { fieldErrors, resolveDisputeSchema, settingsSchema } from "@/lib/validation";
+import { LedgerError, postEntry } from "@/lib/ledger";
+import {
+  approveWithdrawal,
+  markWithdrawalSent,
+  rejectWithdrawal,
+  WithdrawalError,
+} from "@/lib/withdrawals";
+import {
+  adjustBalanceSchema,
+  fieldErrors,
+  rejectWithdrawalSchema,
+  resolveDisputeSchema,
+  settingsSchema,
+  txHashSchema,
+} from "@/lib/validation";
 import type { FormState } from "./auth";
 
 export async function resolveDisputeAction(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -24,9 +38,9 @@ export async function resolveDisputeAction(_prev: FormState, formData: FormData)
 
   try {
     if (parsed.data.outcome === "RELEASE_TO_SELLER") {
-      await releaseToSeller(dealId, `Dispute resolved for the seller by ${admin.email}`);
+      await releaseToSeller(dealId, `Dispute resolved for the seller by ${admin.email}`, admin.id);
     } else {
-      await refundBuyer(dealId, `Dispute resolved for the buyer by ${admin.email}`);
+      await refundBuyer(dealId, `Dispute resolved for the buyer by ${admin.email}`, admin.id);
     }
   } catch (error) {
     return { errors: { form: (error as Error).message } };
@@ -47,30 +61,72 @@ export async function resolveDisputeAction(_prev: FormState, formData: FormData)
   return { ok: true, message: "Dispute resolved." };
 }
 
-/** Treasury operator records the hash of a transfer they broadcast by hand. */
-export async function markTransferSentAction(formData: FormData): Promise<void> {
+/**
+ * Manually moves a user's balance. This is the operator's tool for the cases
+ * the automatic flow cannot see — most often a buyer who sent USDT straight to
+ * the treasury wallet instead of a deal's deposit address.
+ *
+ * A reason is mandatory: an unexplained balance change is indistinguishable
+ * from theft when someone audits the books later.
+ */
+export async function adjustBalanceAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const admin = await requireAdmin();
-  const kind = String(formData.get("kind"));
-  const id = String(formData.get("id"));
-  const txHash = String(formData.get("txHash") ?? "").trim();
-  if (!txHash || txHash.length > 120) return;
+  const parsed = adjustBalanceSchema.safeParse({
+    userId: formData.get("userId"),
+    direction: formData.get("direction"),
+    amount: formData.get("amount"),
+    reason: formData.get("reason"),
+    reference: formData.get("reference") || undefined,
+  });
+  if (!parsed.success) return { errors: fieldErrors(parsed.error) };
 
-  if (kind === "payout") {
-    await prisma.payout.update({
-      where: { id },
-      data: { status: "SENT", txHash, sentAt: new Date() },
+  const target = await prisma.user.findUnique({ where: { id: parsed.data.userId } });
+  if (!target) return { errors: { form: "No such user." } };
+
+  const magnitude = parseUsdt(parsed.data.amount);
+  const signed = parsed.data.direction === "CREDIT" ? magnitude : -magnitude;
+
+  try {
+    await postEntry({
+      userId: target.id,
+      amountMicro: signed,
+      kind: parsed.data.direction === "CREDIT" ? "MANUAL_CREDIT" : "MANUAL_DEBIT",
+      note: parsed.data.reason,
+      reference: parsed.data.reference ?? null,
+      actorId: admin.id,
     });
-  } else if (kind === "refund") {
-    await prisma.refund.update({
-      where: { id },
-      data: { status: "SENT", txHash, sentAt: new Date() },
-    });
-  } else {
-    return;
+  } catch (error) {
+    if (error instanceof LedgerError) return { errors: { form: error.message } };
+    throw error;
   }
 
-  await audit(`${kind}.sent`, kind === "payout" ? "Payout" : "Refund", id, admin.id, { txHash });
-  revalidatePath("/admin");
+  await audit("balance.adjust", "User", target.id, admin.id, {
+    amountMicro: signed.toString(),
+    reason: parsed.data.reason,
+    reference: parsed.data.reference ?? null,
+  });
+
+  revalidatePath(`/admin/users/${target.id}`);
+  revalidatePath("/admin/treasury");
+  return {
+    ok: true,
+    message: `${parsed.data.direction === "CREDIT" ? "Credited" : "Debited"} ${parsed.data.amount} USDT.`,
+  };
+}
+
+export async function setUserRoleAction(formData: FormData): Promise<void> {
+  const admin = await requireAdmin();
+  const userId = String(formData.get("userId"));
+  const role = String(formData.get("role"));
+  if (!["USER", "ADMIN"].includes(role)) return;
+  // Demoting yourself could leave the platform with no administrator at all.
+  if (userId === admin.id) return;
+
+  await prisma.user.update({ where: { id: userId }, data: { role } });
+  await audit("user.role", "User", userId, admin.id, { role });
+
+  revalidatePath("/admin/users");
+  revalidatePath(`/admin/users/${userId}`);
 }
 
 export async function setUserBlockedAction(formData: FormData): Promise<void> {
@@ -87,7 +143,69 @@ export async function setUserBlockedAction(formData: FormData): Promise<void> {
     });
   }
   await audit(blocked ? "user.block" : "user.unblock", "User", userId, admin.id);
+
   revalidatePath("/admin/users");
+  revalidatePath(`/admin/users/${userId}`);
+}
+
+/** Signs a user out everywhere — the first move when an account may be compromised. */
+export async function revokeSessionsAction(formData: FormData): Promise<void> {
+  const admin = await requireAdmin();
+  const userId = String(formData.get("userId"));
+
+  const result = await prisma.session.updateMany({
+    where: { userId, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+  await audit("user.revoke_sessions", "User", userId, admin.id, { count: result.count });
+
+  revalidatePath(`/admin/users/${userId}`);
+}
+
+export async function approveWithdrawalAction(formData: FormData): Promise<void> {
+  const admin = await requireAdmin();
+  const id = String(formData.get("withdrawalId"));
+  try {
+    await approveWithdrawal(id, admin.id);
+    await audit("withdrawal.approve", "Withdrawal", id, admin.id);
+  } catch (error) {
+    if (!(error instanceof WithdrawalError)) throw error;
+  }
+  revalidatePath("/admin/treasury");
+}
+
+export async function rejectWithdrawalAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const admin = await requireAdmin();
+  const id = String(formData.get("withdrawalId"));
+  const parsed = rejectWithdrawalSchema.safeParse({ reason: formData.get("reason") });
+  if (!parsed.success) return { errors: fieldErrors(parsed.error) };
+
+  try {
+    await rejectWithdrawal(id, admin.id, parsed.data.reason);
+    await audit("withdrawal.reject", "Withdrawal", id, admin.id, { reason: parsed.data.reason });
+  } catch (error) {
+    if (error instanceof WithdrawalError) return { errors: { form: error.message } };
+    throw error;
+  }
+
+  revalidatePath("/admin/treasury");
+  return { ok: true, message: "Withdrawal rejected and the balance returned." };
+}
+
+/** Treasury operator records the hash of a transfer they broadcast by hand. */
+export async function markWithdrawalSentAction(formData: FormData): Promise<void> {
+  const admin = await requireAdmin();
+  const id = String(formData.get("withdrawalId"));
+  const parsed = txHashSchema.safeParse({ txHash: formData.get("txHash") });
+  if (!parsed.success) return;
+
+  try {
+    await markWithdrawalSent(id, admin.id, parsed.data.txHash);
+    await audit("withdrawal.sent", "Withdrawal", id, admin.id, { txHash: parsed.data.txHash });
+  } catch (error) {
+    if (!(error instanceof WithdrawalError)) throw error;
+  }
+  revalidatePath("/admin/treasury");
 }
 
 export async function updateSettingsAction(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -96,6 +214,7 @@ export async function updateSettingsAction(_prev: FormState, formData: FormData)
     feeBasisPoints: formData.get("feeBasisPoints"),
     minDeal: formData.get("minDeal"),
     maxDeal: formData.get("maxDeal"),
+    minWithdrawal: formData.get("minWithdrawal"),
     paymentWindowMins: formData.get("paymentWindowMins"),
     requiredConfirmations: formData.get("requiredConfirmations"),
   });
@@ -113,6 +232,7 @@ export async function updateSettingsAction(_prev: FormState, formData: FormData)
       feeBasisPoints: parsed.data.feeBasisPoints,
       minDealMicro,
       maxDealMicro,
+      minWithdrawalMicro: parseUsdt(parsed.data.minWithdrawal),
       paymentWindowMins: parsed.data.paymentWindowMins,
       requiredConfirmations: parsed.data.requiredConfirmations,
     },
@@ -141,5 +261,5 @@ export async function purgeCredentialsAction(formData: FormData): Promise<void> 
   await audit("credential.purge", "Deal", dealId, admin.id, { count: result.count });
 
   revalidatePath(`/deals/${dealId}`);
-  revalidatePath("/admin");
+  revalidatePath("/admin/treasury");
 }

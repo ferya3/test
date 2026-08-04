@@ -10,10 +10,10 @@ import { simulatePaymentAction } from "@/app/actions/deals";
 export const metadata = { title: "Admin" };
 
 export default async function AdminOverviewPage() {
-  const [openDeals, disputes, queuedPayouts, escrowHeld, recent] = await Promise.all([
+  const [openDeals, disputes, pendingWithdrawals, escrowHeld, recent] = await Promise.all([
     prisma.deal.count({ where: { status: { in: OPEN_STATUSES } } }),
     prisma.dispute.count({ where: { status: "OPEN" } }),
-    prisma.payout.count({ where: { status: "QUEUED" } }),
+    prisma.withdrawal.count({ where: { status: { in: ["REQUESTED", "APPROVED"] } } }),
     prisma.deal.aggregate({
       where: { status: { in: ["FUNDED", "DELIVERED", "DISPUTED"] } },
       _sum: { amountMicro: true },
@@ -45,7 +45,7 @@ export default async function AdminOverviewPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Open deals" value={openDeals} />
         <Stat label="Open disputes" value={disputes} />
-        <Stat label="Payouts queued" value={queuedPayouts} />
+        <Stat label="Withdrawals pending" value={pendingWithdrawals} />
         <Stat label="Held in escrow" value={`${formatUsdt(escrowHeld._sum.amountMicro ?? 0n)} USDT`} />
       </div>
 

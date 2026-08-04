@@ -83,8 +83,35 @@ export const settingsSchema = z.object({
   feeBasisPoints: z.coerce.number().int().min(0).max(2000),
   minDeal: usdtAmount,
   maxDeal: usdtAmount,
+  minWithdrawal: usdtAmount,
   paymentWindowMins: z.coerce.number().int().min(15).max(10080),
   requiredConfirmations: z.coerce.number().int().min(1).max(200),
+});
+
+/**
+ * A manual balance change always carries a reason — an unexplained movement is
+ * indistinguishable from theft when the books are audited later.
+ */
+export const adjustBalanceSchema = z.object({
+  userId: z.string().trim().min(1),
+  direction: z.enum(["CREDIT", "DEBIT"]),
+  amount: usdtAmount.refine((v) => Number(v) > 0, "Enter an amount above zero"),
+  reason: z.string().trim().min(6, "Say why you are changing this balance").max(500),
+  reference: z.string().trim().max(120).optional(),
+});
+
+export const withdrawalSchema = z.object({
+  amount: usdtAmount,
+  toAddress: z.string().trim().min(20, "Enter a valid USDT address").max(80),
+  network: z.enum(["TRON", "ETHEREUM"]),
+});
+
+export const rejectWithdrawalSchema = z.object({
+  reason: z.string().trim().min(6, "Give the user a reason").max(500),
+});
+
+export const txHashSchema = z.object({
+  txHash: z.string().trim().min(10, "Enter the transaction hash").max(120),
 });
 
 /** Turns a Zod failure into `{ field: message }` for inline form errors. */

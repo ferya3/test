@@ -3,6 +3,7 @@ import { prisma } from "./db";
 import { referenceCode } from "./crypto";
 import { feeFor } from "./money";
 import { getWallet, type Network } from "./wallet";
+import { postEntry } from "./ledger";
 
 export {
   STATUS_LABELS,
@@ -144,21 +145,50 @@ export function mayCancel(deal: { status: string }): boolean {
 }
 
 /**
- * Releases escrow to the seller and queues the payout. Called by the buyer, by
- * auto-release when the inspection window lapses, or by an admin resolving a
- * dispute in the seller's favour.
+ * Funds a deal straight from the buyer's platform balance, skipping the wait
+ * for an on-chain deposit. Used when the buyer already has credit — from an
+ * earlier refund, a completed sale, or a manual credit by an operator.
  */
-export async function releaseToSeller(dealId: string, note: string) {
-  const deal = await prisma.deal.findUniqueOrThrow({
-    where: { id: dealId },
-    include: { seller: true, payout: true },
+export async function fundDealFromBalance(dealId: string, buyerId: string) {
+  const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
+  if (deal.buyerId !== buyerId) throw new DealError("Only the buyer can fund this deal.");
+  if (deal.status !== "AWAITING_PAYMENT") throw new DealError("This deal is not awaiting payment.");
+  if (deal.expiresAt < new Date()) throw new DealError("The payment window for this deal has closed.");
+
+  return prisma.$transaction(async (tx) => {
+    // postEntry refuses to go below zero, so an insufficient balance aborts the
+    // whole transaction and the deal stays unfunded.
+    await postEntry(
+      {
+        userId: buyerId,
+        amountMicro: -deal.amountMicro,
+        kind: "DEAL_FUNDING",
+        dealId,
+        reference: deal.reference,
+        note: `Funded deal ${deal.reference} from balance`,
+      },
+      tx,
+    );
+
+    return tx.deal.update({
+      where: { id: dealId, status: "AWAITING_PAYMENT" },
+      data: { status: "FUNDED", fundedAt: new Date(), fundingSource: "FUNDED_FROM_BALANCE" },
+    });
   });
+}
+
+/**
+ * Releases escrow to the seller. The money lands on the seller's platform
+ * balance rather than going straight on-chain — they withdraw it when they
+ * choose, which keeps the number of outbound transfers (and their fees) down.
+ *
+ * Called by the buyer, by auto-release when the inspection window lapses, or by
+ * an admin resolving a dispute in the seller's favour.
+ */
+export async function releaseToSeller(dealId: string, note: string, actorId?: string) {
+  const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
   if (!["DELIVERED", "DISPUTED"].includes(deal.status)) {
     throw new DealError("This deal cannot be released in its current state.");
-  }
-  const destination = deal.seller.payoutAddress;
-  if (!destination) {
-    throw new DealError("The seller has not set a payout address yet.");
   }
 
   return prisma.$transaction(async (tx) => {
@@ -166,17 +196,20 @@ export async function releaseToSeller(dealId: string, note: string) {
       where: { id: dealId, status: deal.status },
       data: { status: "COMPLETED", completedAt: new Date() },
     });
-    if (!deal.payout) {
-      await tx.payout.create({
-        data: {
-          dealId,
-          toAddress: destination,
-          network: deal.seller.payoutNetwork,
-          amountMicro: deal.payoutMicro,
-          note,
-        },
-      });
-    }
+
+    await postEntry(
+      {
+        userId: deal.sellerId,
+        amountMicro: deal.payoutMicro,
+        kind: "DEAL_PAYOUT",
+        dealId,
+        reference: deal.reference,
+        note,
+        actorId: actorId ?? null,
+      },
+      tx,
+    );
+
     if (deal.listingId) {
       await tx.listing.updateMany({ where: { id: deal.listingId }, data: { status: "SOLD" } });
     }
@@ -184,17 +217,11 @@ export async function releaseToSeller(dealId: string, note: string) {
   });
 }
 
-/** Returns escrowed funds to the buyer and queues the refund. */
-export async function refundBuyer(dealId: string, note: string) {
-  const deal = await prisma.deal.findUniqueOrThrow({
-    where: { id: dealId },
-    include: { refund: true },
-  });
+/** Returns escrowed funds to the buyer's balance, ready to re-spend or withdraw. */
+export async function refundBuyer(dealId: string, note: string, actorId?: string) {
+  const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
   if (!["FUNDED", "DELIVERED", "DISPUTED"].includes(deal.status)) {
     throw new DealError("This deal cannot be refunded in its current state.");
-  }
-  if (!deal.buyerRefundAddress) {
-    throw new DealError("No refund address is on file for this deal.");
   }
 
   return prisma.$transaction(async (tx) => {
@@ -202,17 +229,20 @@ export async function refundBuyer(dealId: string, note: string) {
       where: { id: dealId, status: deal.status },
       data: { status: "REFUNDED", refundedAt: new Date() },
     });
-    if (!deal.refund) {
-      await tx.refund.create({
-        data: {
-          dealId,
-          toAddress: deal.buyerRefundAddress!,
-          network: deal.network,
-          amountMicro: deal.amountMicro,
-          note,
-        },
-      });
-    }
+
+    await postEntry(
+      {
+        userId: deal.buyerId,
+        amountMicro: deal.amountMicro,
+        kind: "DEAL_REFUND",
+        dealId,
+        reference: deal.reference,
+        note,
+        actorId: actorId ?? null,
+      },
+      tx,
+    );
+
     return updated;
   });
 }
@@ -240,8 +270,8 @@ export async function runScheduledTransitions(): Promise<{ expired: number; rele
     try {
       await releaseToSeller(deal.id, "Auto-released: inspection period elapsed without a dispute");
       released += 1;
-    } catch {
-      // A seller with no payout address blocks release; the admin queue surfaces it.
+    } catch (error) {
+      console.error(`[deals] auto-release failed for ${deal.id}:`, (error as Error).message);
     }
   }
 

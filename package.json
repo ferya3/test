@@ -14,7 +14,8 @@
     "db:seed": "tsx --conditions=react-server --env-file=.env prisma/seed.ts",
     "watcher": "tsx --conditions=react-server --env-file=.env scripts/watcher.ts",
     "test": "node --test --conditions=react-server --env-file=.env.test --import tsx tests/*.test.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "pretest": "node -e \"require('fs').rmSync('test.db',{force:true})\" && prisma db push --url file:./test.db"
   },
   "dependencies": {
     "@noble/curves": "^2.2.0",

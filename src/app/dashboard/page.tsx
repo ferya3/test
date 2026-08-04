@@ -27,6 +27,11 @@ export default async function DashboardPage() {
     }),
   ]);
 
+  const account = await prisma.user.findUniqueOrThrow({
+    where: { id: user.id },
+    select: { balanceMicro: true },
+  });
+
   return (
     <div>
       <PageHeader
@@ -34,6 +39,9 @@ export default async function DashboardPage() {
         subtitle="Everything you are buying and selling through escrow."
         action={
           <div className="flex gap-2">
+            <Link className="btn btn-ghost" href="/dashboard/wallet">
+              Wallet
+            </Link>
             <Link className="btn btn-ghost" href="/dashboard/listings/new">
               New listing
             </Link>
@@ -54,10 +62,11 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      <div className="mb-8 grid gap-4 sm:grid-cols-3">
+      <div className="mb-8 grid gap-4 sm:grid-cols-4">
         <Stat label="Open purchases" value={openBuying} />
         <Stat label="Open sales" value={openSelling} />
         <Stat label="Earned as seller" value={`${formatUsdt(earned._sum.payoutMicro ?? 0n)} USDT`} sub="After fees" />
+        <Stat label="Wallet balance" value={`${formatUsdt(account.balanceMicro)} USDT`} sub="Spendable now" />
       </div>
 
       <Card title="Recent deals" action={<Link className="text-sm text-emerald-300 hover:underline" href="/deals">View all</Link>}>

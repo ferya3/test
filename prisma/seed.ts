@@ -9,6 +9,7 @@ import { prisma } from "../src/lib/db";
 import { encryptSecret, referenceCode } from "../src/lib/crypto";
 import { parseUsdt } from "../src/lib/money";
 import { getWallet } from "../src/lib/wallet";
+import { postEntry } from "../src/lib/ledger";
 
 const PASSWORD = "escrow-demo-1";
 
@@ -118,6 +119,26 @@ async function main(): Promise<void> {
       kind: item.kind,
       ciphertext: encryptSecret(delivered.id, item.value),
     })),
+  });
+
+  // Give the buyer some credit so the "pay from balance" path is easy to try,
+  // and the seller an earlier payout so the wallet page has history.
+  await prisma.ledgerEntry.deleteMany({ where: { userId: { in: [buyer.id, seller.id] } } });
+  await prisma.user.updateMany({ where: { id: { in: [buyer.id, seller.id] } }, data: { balanceMicro: 0n } });
+  await postEntry({
+    userId: buyer.id,
+    amountMicro: parseUsdt("500"),
+    kind: "MANUAL_CREDIT",
+    note: "Sent USDT straight to the treasury wallet — credited by an operator",
+    reference: "seed-demo",
+    actorId: admin.id,
+  });
+  await postEntry({
+    userId: seller.id,
+    amountMicro: parseUsdt("180.25"),
+    kind: "DEAL_PAYOUT",
+    note: "Payout from an earlier completed sale",
+    reference: "seed-demo",
   });
 
   await prisma.message.createMany({

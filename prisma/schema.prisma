@@ -18,20 +18,28 @@ model User {
   passwordHash String
   displayName  String
   role         String  @default("USER") // USER | ADMIN
-  payoutAddress String? // seller's own USDT address for withdrawals
+  payoutAddress String? // the user's own USDT address for withdrawals
   payoutNetwork String  @default("TRON")
   isBlocked    Boolean @default(false)
+
+  /// Spendable balance in micro-USDT. Only ever written together with a
+  /// LedgerEntry, inside one transaction — see src/lib/ledger.ts.
+  balanceMicro BigInt @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  listings      Listing[]
-  buyerDeals    Deal[]        @relation("BuyerDeals")
-  sellerDeals   Deal[]        @relation("SellerDeals")
-  messages      Message[]
-  disputes      Dispute[]     @relation("DisputeOpener")
-  auditLogs     AuditLog[]
-  sessions      Session[]
+  listings       Listing[]
+  buyerDeals     Deal[]        @relation("BuyerDeals")
+  sellerDeals    Deal[]        @relation("SellerDeals")
+  messages       Message[]
+  disputes       Dispute[]     @relation("DisputeOpener")
+  auditLogs      AuditLog[]
+  sessions       Session[]
+  ledgerEntries  LedgerEntry[] @relation("LedgerOwner")
+  ledgerActions  LedgerEntry[] @relation("LedgerActor")
+  withdrawals    Withdrawal[]  @relation("WithdrawalOwner")
+  reviewedWithdrawals Withdrawal[] @relation("WithdrawalReviewer")
 }
 
 model Session {
@@ -106,16 +114,18 @@ model Deal {
   expiresAt     DateTime // payment window; deal auto-expires if never funded
 
   buyerRefundAddress String?
+  /// FUNDED_ON_CHAIN when the buyer sent USDT to the deposit address,
+  /// FUNDED_FROM_BALANCE when it came out of their platform balance.
+  fundingSource      String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  credentials Credential[]
-  payments    Payment[]
-  payout      Payout?
-  refund      Refund?
-  messages    Message[]
-  dispute     Dispute?
+  credentials  Credential[]
+  payments     Payment[]
+  messages     Message[]
+  dispute      Dispute?
+  ledgerEntries LedgerEntry[]
 
   @@index([buyerId, status])
   @@index([sellerId, status])
@@ -160,39 +170,65 @@ model Payment {
   @@index([dealId])
 }
 
-/// Money owed to the seller once a deal completes. The treasury operator
-/// broadcasts the transfer and records the hash here.
-model Payout {
-  id          String @id @default(cuid())
-  dealId      String @unique
-  deal        Deal   @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  toAddress   String
-  network     String
-  amountMicro BigInt
-  status      String @default("QUEUED") // QUEUED | SENT | FAILED
-  txHash      String?
-  note        String?
-  createdAt   DateTime @default(now())
-  sentAt      DateTime?
+/// Append-only record of every movement on a user's balance. The sum of a
+/// user's entries must always equal User.balanceMicro — the treasury page
+/// reconciles the two and flags any drift.
+model LedgerEntry {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation("LedgerOwner", fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([status])
+  /// Signed: positive credits the user, negative debits them.
+  amountMicro      BigInt
+  /// The user's balance immediately after this entry was applied.
+  balanceAfterMicro BigInt
+
+  // MANUAL_CREDIT | MANUAL_DEBIT | DEAL_FUNDING | DEAL_PAYOUT | DEAL_REFUND
+  // | WITHDRAWAL | WITHDRAWAL_REVERSAL
+  kind String
+
+  /// Free-text reason. Required for anything an admin does by hand.
+  note String?
+  /// On-chain hash, deal id or withdrawal id this entry relates to.
+  reference String?
+
+  dealId String?
+  deal   Deal?   @relation(fields: [dealId], references: [id], onDelete: SetNull)
+
+  /// The admin who made this happen, when it was not the user themselves.
+  actorId String?
+  actor   User?   @relation("LedgerActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([kind])
 }
 
-/// Money returned to the buyer after a cancellation or a won dispute.
-model Refund {
-  id          String @id @default(cuid())
-  dealId      String @unique
-  deal        Deal   @relation(fields: [dealId], references: [id], onDelete: Cascade)
+/// A user's request to move their balance out to their own USDT address. The
+/// treasury operator broadcasts the transfer and records the hash here.
+model Withdrawal {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation("WithdrawalOwner", fields: [userId], references: [id], onDelete: Cascade)
+
+  amountMicro BigInt
   toAddress   String
   network     String
-  amountMicro BigInt
-  status      String @default("QUEUED") // QUEUED | SENT | FAILED
-  txHash      String?
-  note        String?
-  createdAt   DateTime @default(now())
-  sentAt      DateTime?
+  // REQUESTED -> APPROVED -> SENT, or REQUESTED -> REJECTED
+  status String @default("REQUESTED")
+  txHash String?
+  note   String?
 
-  @@index([status])
+  reviewedById String?
+  reviewedBy   User?   @relation("WithdrawalReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  createdAt  DateTime @default(now())
+  reviewedAt DateTime?
+  sentAt     DateTime?
+
+  @@index([status, createdAt])
+  @@index([userId])
 }
 
 model Message {
@@ -243,6 +279,7 @@ model Settings {
   feeBasisPoints    Int    @default(300) // 3.00%
   minDealMicro      BigInt @default(5000000)   // 5 USDT
   maxDealMicro      BigInt @default(50000000000) // 50,000 USDT
+  minWithdrawalMicro BigInt @default(10000000)  // 10 USDT
   paymentWindowMins Int    @default(120)
   requiredConfirmations Int @default(20)
   nextDerivationIndex   Int @default(1)

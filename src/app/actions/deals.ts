@@ -11,6 +11,8 @@ import { isValidAddress, type Network } from "@/lib/wallet";
 import {
   createDeal,
   DealError,
+  fundDealFromBalance,
+  getSettings,
   buyerMayReveal,
   isParticipant,
   mayCancel,
@@ -27,7 +29,10 @@ import {
   fieldErrors,
   listingSchema,
   messageSchema,
+  withdrawalSchema,
 } from "@/lib/validation";
+import { LedgerError } from "@/lib/ledger";
+import { requestWithdrawal, WithdrawalError } from "@/lib/withdrawals";
 import type { FormState } from "./auth";
 
 async function loadDealForUser(dealId: string) {
@@ -133,6 +138,61 @@ export async function createDealAction(_prev: FormState, formData: FormData): Pr
   }
 
   redirect(`/deals/${dealId}`);
+}
+
+/** Buyer pays for the deal out of their platform balance instead of on-chain. */
+export async function fundFromBalanceAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const dealId = String(formData.get("dealId"));
+  const { user, deal } = await loadDealForUser(dealId);
+  if (deal.buyerId !== user.id) return { errors: { form: "Only the buyer can fund this deal." } };
+
+  try {
+    await fundDealFromBalance(dealId, user.id);
+  } catch (error) {
+    if (error instanceof DealError) return { errors: { form: error.message } };
+    if (error instanceof LedgerError) {
+      return { errors: { form: "Your balance does not cover this deal." } };
+    }
+    throw error;
+  }
+
+  await audit("deal.fund_from_balance", "Deal", dealId, user.id);
+  revalidatePath(`/deals/${dealId}`);
+  return { ok: true, message: "Deal funded from your balance." };
+}
+
+/** User asks for their balance to be sent out on-chain. */
+export async function requestWithdrawalAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const parsed = withdrawalSchema.safeParse({
+    amount: formData.get("amount"),
+    toAddress: formData.get("toAddress"),
+    network: formData.get("network"),
+  });
+  if (!parsed.success) return { errors: fieldErrors(parsed.error) };
+  if (!rateLimit(`withdraw:${user.id}`, 10, 60 * 60 * 1000)) {
+    return { errors: { form: "Too many withdrawal requests in the last hour." } };
+  }
+
+  const settings = await getSettings();
+  try {
+    const withdrawal = await requestWithdrawal({
+      userId: user.id,
+      amountMicro: parseUsdt(parsed.data.amount),
+      toAddress: parsed.data.toAddress,
+      network: parsed.data.network as Network,
+      minMicro: settings.minWithdrawalMicro,
+    });
+    await audit("withdrawal.request", "Withdrawal", withdrawal.id, user.id, {
+      amountMicro: withdrawal.amountMicro.toString(),
+    });
+  } catch (error) {
+    if (error instanceof WithdrawalError) return { errors: { form: error.message } };
+    throw error;
+  }
+
+  revalidatePath("/dashboard/wallet");
+  return { ok: true, message: "Withdrawal requested. An operator will review it shortly." };
 }
 
 export async function cancelDealAction(formData: FormData): Promise<void> {
@@ -242,7 +302,7 @@ export async function releaseAction(formData: FormData): Promise<void> {
   if (deal.buyerId !== user.id) return;
   if (!mayRelease(deal)) return;
 
-  await releaseToSeller(dealId, `Released by buyer ${user.email}`);
+  await releaseToSeller(dealId, `Released by buyer ${user.email}`, user.id);
   await audit("deal.release", "Deal", dealId, user.id);
   revalidatePath(`/deals/${dealId}`);
 }
@@ -309,7 +369,7 @@ export async function refundBuyerAction(formData: FormData): Promise<void> {
   const user = await requireUser();
   if (user.role !== "ADMIN") return;
   const dealId = String(formData.get("dealId"));
-  await refundBuyer(dealId, `Refunded by admin ${user.email}`);
+  await refundBuyer(dealId, `Refunded by admin ${user.email}`, user.id);
   await audit("deal.refund", "Deal", dealId, user.id);
   revalidatePath(`/deals/${dealId}`);
   revalidatePath("/admin");

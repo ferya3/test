@@ -24,6 +24,7 @@ export default async function AdminSettingsPage() {
           feeBasisPoints={settings.feeBasisPoints}
           minDeal={formatUsdt(settings.minDealMicro)}
           maxDeal={formatUsdt(settings.maxDealMicro)}
+          minWithdrawal={formatUsdt(settings.minWithdrawalMicro)}
           paymentWindowMins={settings.paymentWindowMins}
           requiredConfirmations={settings.requiredConfirmations}
         />

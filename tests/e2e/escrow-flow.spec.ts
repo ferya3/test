@@ -122,16 +122,102 @@ test("a deal runs from funding through delivery to payout", async ({ page }) => 
   page.once("dialog", (dialog) => dialog.accept());
   await page.click('button:has-text("Release funds to seller")');
   await expect(page.getByText("Completed").first()).toBeVisible();
-  await expect(page.getByText("Seller payout")).toBeVisible();
+  await expect(page.getByText("Settlement")).toBeVisible();
   await signOut(page);
 
-  // --- the payout is queued for the treasury ---------------------------------
+  // --- the payout landed on the seller's balance -----------------------------
+  await signIn(page, SELLER.email, SELLER.password);
+  await page.goto("/dashboard/wallet");
+  await expect(page.getByText("242.5 USDT").first()).toBeVisible();
+  await expect(page.getByText("Deal payout").first()).toBeVisible();
+
+  // --- and the seller can withdraw it ----------------------------------------
+  await page.fill("#amount", "100");
+  await page.fill("#toAddress", SELLER_PAYOUT_ADDRESS);
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.click('button:has-text("Request withdrawal")');
+  await expect(page.getByText("Withdrawal requested.")).toBeVisible();
+  // The balance drops immediately, so the same funds cannot be requested twice.
+  await expect(page.getByText("142.5 USDT").first()).toBeVisible();
+  await signOut(page);
+
+  // --- the request shows up in the treasury queue ----------------------------
   await signIn(page, ADMIN.email, ADMIN.password);
   await page.goto("/admin/treasury");
-  const payoutRow = page.locator("li", { has: page.locator(`a[href="/deals/${dealId}"]`) }).first();
-  await expect(payoutRow).toContainText("242.5 USDT");
-  await expect(payoutRow).toContainText("QUEUED");
-  await expect(payoutRow).toContainText(SELLER_PAYOUT_ADDRESS);
+  const row = page.locator("li", { hasText: SELLER.email }).first();
+  await expect(row).toContainText("100 USDT");
+  await expect(row).toContainText("Awaiting review");
+});
+
+test("an operator can credit a balance by hand and the buyer can spend it", async ({ page }) => {
+  test.slow();
+
+  const buyer = { email: `credit-buyer-${STAMP}@example.test`, name: "Credit Buyer", password: "escrow-test-1" };
+  const seller = { email: `credit-seller-${STAMP}@example.test`, name: "Credit Seller", password: "escrow-test-1" };
+
+  await register(page, seller);
+  await signOut(page);
+  await register(page, buyer);
+  await signOut(page);
+
+  // The operator credits the buyer for USDT that arrived outside a deal.
+  await signIn(page, ADMIN.email, ADMIN.password);
+  await page.goto(`/admin/users?q=${encodeURIComponent(buyer.email)}`);
+  await page.getByText(buyer.email).click();
+  await expect(page.getByRole("heading", { name: buyer.name })).toBeVisible();
+
+  await page.fill("#amount", "300");
+  await page.fill("#reason", "Sent USDT straight to the treasury wallet");
+  await page.fill("#reference", "0xdeadbeefcafe");
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.click('button:has-text("Credit balance")');
+  await expect(page.getByText("Credited 300 USDT.")).toBeVisible();
+
+  // A manual credit must be attributable, so it appears on the ledger with its reason.
+  await expect(page.getByText("Sent USDT straight to the treasury wallet").first()).toBeVisible();
+  await signOut(page);
+
+  // The buyer spends that credit on a deal instead of waiting for a transfer.
+  await signIn(page, buyer.email, buyer.password);
+  await expect(page.getByText("300 USDT").first()).toBeVisible();
+
+  await page.goto("/deals/new");
+  await page.fill("#sellerEmail", seller.email);
+  await page.fill("#title", "Subscription workspace handover");
+  await page.fill("#description", "Owner account plus the billing inbox, transferred the same day.");
+  await page.fill("#amount", "120");
+  await page.fill("#refundAddress", BUYER_REFUND_ADDRESS);
+  await page.click('button:has-text("Open deal")');
+  await expect(page).toHaveURL(/\/deals\/(?!new$)[a-z0-9]{16,}$/);
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.click('button:has-text("Fund from balance")');
+  await expect(page.getByText("Funds in escrow")).toBeVisible();
+
+  // 300 credited − 120 spent leaves 180 on the balance.
+  await page.goto("/dashboard/wallet");
+  await expect(page.getByText("180 USDT").first()).toBeVisible();
+  await expect(page.getByText("Deal funded").first()).toBeVisible();
+});
+
+test("a user cannot withdraw more than their balance", async ({ page }) => {
+  const pauper = { email: `pauper-${STAMP}@example.test`, name: "No Funds", password: "escrow-test-1" };
+  await register(page, pauper);
+
+  await page.goto("/dashboard/wallet");
+  await page.fill("#amount", "500");
+  await page.fill("#toAddress", SELLER_PAYOUT_ADDRESS);
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.click('button:has-text("Request withdrawal")');
+
+  await expect(page.getByText("Your balance does not cover that amount.")).toBeVisible();
+  await expect(page.getByText("0 USDT").first()).toBeVisible();
+});
+
+test("an ordinary user cannot reach the balance controls", async ({ page }) => {
+  await signIn(page, `pauper-${STAMP}@example.test`, "escrow-test-1");
+  await page.goto("/admin/users");
+  await expect(page.getByText("Nothing here")).toBeVisible();
 });
 
 test("a stranger cannot open someone else's deal", async ({ page }) => {
