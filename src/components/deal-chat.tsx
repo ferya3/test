@@ -36,7 +36,7 @@ export function DealChat({
       {messages.length === 0 ? (
         <p className="text-sm text-slate-500">No messages yet. Agree the details here before delivering.</p>
       ) : (
-        <ul className="max-h-96 space-y-3 overflow-y-auto pr-1">
+        <ul className="max-h-[34rem] space-y-3 overflow-y-auto pr-1">
           {messages.map((message) => {
             const mine = message.senderId === currentUserId;
             return (

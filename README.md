@@ -96,7 +96,9 @@ permanently unreadable.
 The **first account to register becomes the administrator**. After that, everyone signs up as a
 regular user who can both buy and sell.
 
-Seeded demo accounts (password `escrow-demo-1`): `admin@`, `seller@`, `buyer@escrowbridge.test`.
+Seeded demo accounts (password `escrow-demo-1`): `admin@`, `seller@`, `buyer@escrowbridge.test`, plus a
+named buyer whose deal carries a worked example of the operator relaying the seller's answers. Point
+that account at a different address with `DEMO_BUYER_EMAIL=you@example.com npm run db:seed`.
 
 ## Wallet configuration
 
