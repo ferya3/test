@@ -1,0 +1,250 @@
+// EscrowBridge — escrow platform for digital goods paid in USDT.
+//
+// Money is stored as integer "micro-USDT" (6 decimals, matching the USDT
+// contract) so no float rounding can ever creep into a balance.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id           String  @id @default(cuid())
+  email        String  @unique
+  passwordHash String
+  displayName  String
+  role         String  @default("USER") // USER | ADMIN
+  payoutAddress String? // seller's own USDT address for withdrawals
+  payoutNetwork String  @default("TRON")
+  isBlocked    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  listings      Listing[]
+  buyerDeals    Deal[]        @relation("BuyerDeals")
+  sellerDeals   Deal[]        @relation("SellerDeals")
+  messages      Message[]
+  disputes      Dispute[]     @relation("DisputeOpener")
+  auditLogs     AuditLog[]
+  sessions      Session[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  userAgent String?
+  ip        String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Listing {
+  id          String  @id @default(cuid())
+  sellerId    String
+  seller      User    @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  title       String
+  category    String  @default("OTHER") // GAMING | SOCIAL | SOFTWARE | SUBSCRIPTION | DOMAIN | OTHER
+  description String
+  priceMicro  BigInt // asking price in micro-USDT
+  status      String  @default("ACTIVE") // ACTIVE | PAUSED | SOLD | REMOVED
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deals Deal[]
+
+  @@index([status, createdAt])
+  @@index([sellerId])
+}
+
+/// A single escrow transaction between one buyer and one seller.
+model Deal {
+  id        String  @id @default(cuid())
+  reference String  @unique // human-friendly code shown in the UI, e.g. EB-7QK2M9
+
+  listingId String?
+  listing   Listing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
+
+  buyerId  String
+  buyer    User   @relation("BuyerDeals", fields: [buyerId], references: [id])
+  sellerId String
+  seller   User   @relation("SellerDeals", fields: [sellerId], references: [id])
+
+  title       String
+  description String
+
+  // AWAITING_PAYMENT -> FUNDED -> DELIVERED -> COMPLETED
+  //                            \-> DISPUTED -> COMPLETED | REFUNDED
+  //                  \-> CANCELLED | EXPIRED
+  status String @default("AWAITING_PAYMENT")
+
+  amountMicro   BigInt // what the buyer pays into escrow
+  feeMicro      BigInt // platform fee, deducted from the seller's payout
+  payoutMicro   BigInt // amountMicro - feeMicro
+  network       String @default("TRON") // TRON (TRC-20) | ETHEREUM (ERC-20)
+
+  depositAddress    String  @unique
+  depositDerivation Int     @unique // HD index used to derive depositAddress
+  inspectionHours   Int     @default(48)
+
+  fundedAt      DateTime?
+  deliveredAt   DateTime?
+  inspectionEndsAt DateTime?
+  completedAt   DateTime?
+  cancelledAt   DateTime?
+  refundedAt    DateTime?
+  expiresAt     DateTime // payment window; deal auto-expires if never funded
+
+  buyerRefundAddress String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  credentials Credential[]
+  payments    Payment[]
+  payout      Payout?
+  refund      Refund?
+  messages    Message[]
+  dispute     Dispute?
+
+  @@index([buyerId, status])
+  @@index([sellerId, status])
+  @@index([status])
+}
+
+/// A secret handed over by the seller (login, password, recovery code, note).
+/// `ciphertext` is AES-256-GCM; the plaintext never touches the database.
+model Credential {
+  id        String @id @default(cuid())
+  dealId    String
+  deal      Deal   @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  label     String
+  kind      String @default("SECRET") // USERNAME | PASSWORD | EMAIL | RECOVERY | SECRET | NOTE
+  /// Secret material is stored only in this envelope: iv:tag:ciphertext (base64).
+  ciphertext String
+  /// Set once the buyer has actually read the value, for the audit trail.
+  firstRevealedAt DateTime?
+  revealCount     Int      @default(0)
+  purgedAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([dealId])
+}
+
+/// An on-chain USDT transfer observed on a deal's deposit address.
+model Payment {
+  id            String @id @default(cuid())
+  dealId        String
+  deal          Deal   @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  txHash        String @unique
+  fromAddress   String?
+  amountMicro   BigInt
+  network       String
+  confirmations Int    @default(0)
+  status        String @default("PENDING") // PENDING | CONFIRMED | UNDERPAID | OVERPAID
+  seenAt        DateTime @default(now())
+  confirmedAt   DateTime?
+
+  @@index([dealId])
+}
+
+/// Money owed to the seller once a deal completes. The treasury operator
+/// broadcasts the transfer and records the hash here.
+model Payout {
+  id          String @id @default(cuid())
+  dealId      String @unique
+  deal        Deal   @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  toAddress   String
+  network     String
+  amountMicro BigInt
+  status      String @default("QUEUED") // QUEUED | SENT | FAILED
+  txHash      String?
+  note        String?
+  createdAt   DateTime @default(now())
+  sentAt      DateTime?
+
+  @@index([status])
+}
+
+/// Money returned to the buyer after a cancellation or a won dispute.
+model Refund {
+  id          String @id @default(cuid())
+  dealId      String @unique
+  deal        Deal   @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  toAddress   String
+  network     String
+  amountMicro BigInt
+  status      String @default("QUEUED") // QUEUED | SENT | FAILED
+  txHash      String?
+  note        String?
+  createdAt   DateTime @default(now())
+  sentAt      DateTime?
+
+  @@index([status])
+}
+
+model Message {
+  id       String @id @default(cuid())
+  dealId   String
+  deal     Deal   @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  senderId String
+  sender   User   @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  body     String
+  isStaff  Boolean @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([dealId, createdAt])
+}
+
+model Dispute {
+  id         String @id @default(cuid())
+  dealId     String @unique
+  deal       Deal   @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  openedById String
+  openedBy   User   @relation("DisputeOpener", fields: [openedById], references: [id])
+  reason     String
+  status     String @default("OPEN") // OPEN | RESOLVED_BUYER | RESOLVED_SELLER
+  resolution String?
+  createdAt  DateTime @default(now())
+  resolvedAt DateTime?
+}
+
+/// Append-only trail of every state change that touches money or secrets.
+model AuditLog {
+  id       String  @id @default(cuid())
+  actorId  String?
+  actor    User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action   String
+  entity   String
+  entityId String
+  metadata String? // JSON
+  ip       String?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
+
+/// Single-row table holding operator-tunable settings.
+model Settings {
+  id                String @id @default("singleton")
+  feeBasisPoints    Int    @default(300) // 3.00%
+  minDealMicro      BigInt @default(5000000)   // 5 USDT
+  maxDealMicro      BigInt @default(50000000000) // 50,000 USDT
+  paymentWindowMins Int    @default(120)
+  requiredConfirmations Int @default(20)
+  nextDerivationIndex   Int @default(1)
+  updatedAt DateTime @updatedAt @default(now())
+}

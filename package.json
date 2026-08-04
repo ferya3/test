@@ -1,0 +1,46 @@
+{
+  "name": "escrowbridge",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "db:push": "prisma db push",
+    "db:seed": "tsx --conditions=react-server --env-file=.env prisma/seed.ts",
+    "watcher": "tsx --conditions=react-server --env-file=.env scripts/watcher.ts",
+    "test": "node --test --conditions=react-server --env-file=.env.test --import tsx tests/*.test.ts",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@noble/curves": "^2.2.0",
+    "@noble/hashes": "^2.2.0",
+    "@prisma/adapter-better-sqlite3": "^7.9.1",
+    "@prisma/client": "^7.9.1",
+    "@scure/base": "^2.2.0",
+    "@scure/bip32": "^2.2.0",
+    "bcryptjs": "^3.0.3",
+    "jose": "^6.2.8",
+    "next": "^16.3.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "server-only": "^0.0.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^26.1.2",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "dotenv": "^17.4.2",
+    "postcss": "^8.5.25",
+    "prisma": "^7.9.1",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.5",
+    "typescript": "^5.9.3"
+  }
+}

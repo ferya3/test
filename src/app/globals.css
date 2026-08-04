@@ -1,0 +1,126 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+:root {
+  --bg: #0b1020;
+  --surface: #121a33;
+  --surface-2: #172244;
+  --border: #26325c;
+  --text: #e8ecf8;
+  --muted: #96a2c4;
+  --accent: #34d399;
+  --accent-strong: #10b981;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background:
+    radial-gradient(1100px 600px at 12% -8%, rgba(52, 211, 153, 0.13), transparent 60%),
+    radial-gradient(900px 520px at 88% 0%, rgba(99, 102, 241, 0.16), transparent 55%),
+    var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+  .card {
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    backdrop-filter: blur(6px);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.625rem;
+    padding: 0.6rem 1.1rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: filter 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: linear-gradient(180deg, var(--accent), var(--accent-strong));
+    color: #04231a;
+  }
+  .btn-primary:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+  .btn-ghost {
+    border-color: var(--border);
+    background: transparent;
+    color: var(--text);
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background: var(--surface-2);
+  }
+  .btn-danger {
+    background: #b91c1c;
+    color: #fff;
+  }
+  .btn-danger:hover:not(:disabled) {
+    filter: brightness(1.1);
+  }
+
+  .input,
+  .textarea,
+  .select {
+    width: 100%;
+    background: #0d1428;
+    border: 1px solid var(--border);
+    border-radius: 0.625rem;
+    padding: 0.6rem 0.8rem;
+    color: var(--text);
+    font-size: 0.925rem;
+    outline: none;
+  }
+  .input:focus,
+  .textarea:focus,
+  .select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.16);
+  }
+  .textarea {
+    min-height: 7rem;
+    resize: vertical;
+  }
+  .label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 0.35rem;
+  }
+  .field-error {
+    color: #fca5a5;
+    font-size: 0.8rem;
+    margin-top: 0.3rem;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 999px;
+    padding: 0.2rem 0.65rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: 1px solid;
+  }
+}
