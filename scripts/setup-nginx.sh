@@ -87,16 +87,32 @@ else
     apt-get install -y -qq certbot python3-certbot-nginx
   }
 
+  # Asking for a name that has no DNS record fails the whole request, taking
+  # the apex down with it, so only ask for www when www actually resolves.
+  names=(-d "${DOMAIN}")
+  if [ -n "$(getent hosts "www.${DOMAIN}" || true)" ]; then
+    names+=(-d "www.${DOMAIN}")
+  else
+    warn "www.${DOMAIN} has no DNS record — requesting the certificate for ${DOMAIN} alone."
+  fi
+
   say "Requesting a certificate for ${DOMAIN}"
-  # Non-fatal: HTTP already works, and the usual cause is DNS that has not
-  # propagated yet — which is fixed by waiting and re-running, not by unwinding
-  # everything done above.
-  if certbot --nginx -d "${DOMAIN}" -d "www.${DOMAIN}" --redirect --agree-tos --register-unsafely-without-email --non-interactive; then
+  # --expand covers re-running against an existing certificate for a subset of
+  # these names, which is otherwise an interactive prompt that --non-interactive
+  # turns into a hard failure.
+  #
+  # Non-fatal overall: HTTP already works by this point, so a certificate
+  # problem is worth reporting and retrying, not worth unwinding a good proxy
+  # configuration over.
+  if certbot --nginx "${names[@]}" --expand --redirect --agree-tos \
+      --register-unsafely-without-email --non-interactive; then
     say "HTTPS is live"
   else
     warn "certbot failed. The site still works over http://${DOMAIN}"
-    warn "Most often this is DNS: check that ${DOMAIN} resolves to this server,"
-    warn "then run:  sudo certbot --nginx -d ${DOMAIN}"
+    warn "Check that ${DOMAIN} resolves to this server (dig +short ${DOMAIN}),"
+    warn "then re-run this script, or:"
+    warn "    sudo certbot --nginx -d ${DOMAIN} --expand"
+    warn "Details are in /var/log/letsencrypt/letsencrypt.log"
   fi
 fi
 
