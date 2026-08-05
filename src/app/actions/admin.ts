@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { audit, hashPassword, requireAdmin, revokeSessions } from "@/lib/auth";
-import { parseUsdt } from "@/lib/money";
+import { formatUsdt, parseUsdt } from "@/lib/money";
 import { purgedEnvelope } from "@/lib/crypto";
 import { refundBuyer, releaseToSeller } from "@/lib/deals";
 import { LedgerError, postEntry } from "@/lib/ledger";
@@ -78,7 +78,7 @@ export async function adjustBalanceAction(_prev: FormState, formData: FormData):
   const parsed = adjustBalanceSchema.safeParse({
     userId: formData.get("userId"),
     direction: formData.get("direction"),
-    amount: formData.get("amount"),
+    amount: formData.get("amount") || undefined,
     reason: formData.get("reason"),
     reference: formData.get("reference") || undefined,
     network: formData.get("network") || undefined,
@@ -89,8 +89,19 @@ export async function adjustBalanceAction(_prev: FormState, formData: FormData):
   const target = await prisma.user.findUnique({ where: { id: parsed.data.userId } });
   if (!target) return { errors: { form: "No such user." } };
 
-  const magnitude = parseUsdt(parsed.data.amount);
-  const signed = parsed.data.direction === "CREDIT" ? magnitude : -magnitude;
+  // Reading the balance here rather than trusting a number typed by the
+  // operator is the point of ZERO: a mistyped debit leaves a residue that then
+  // has to be chased down.
+  let signed: bigint;
+  if (parsed.data.direction === "ZERO") {
+    if (target.balanceMicro === 0n) {
+      return { errors: { form: "That balance is already zero." } };
+    }
+    signed = -target.balanceMicro;
+  } else {
+    const magnitude = parseUsdt(parsed.data.amount!);
+    signed = parsed.data.direction === "CREDIT" ? magnitude : -magnitude;
+  }
 
   // Where the money came from belongs on the entry itself, so the ledger alone
   // is enough to trace a deposit back to the chain without a separate note.
@@ -126,9 +137,16 @@ export async function adjustBalanceAction(_prev: FormState, formData: FormData):
 
   revalidatePath(`/admin/users/${target.id}`);
   revalidatePath("/admin/treasury");
+
+  const moved = formatUsdt(signed < 0n ? -signed : signed);
   return {
     ok: true,
-    message: `${parsed.data.direction === "CREDIT" ? "Credited" : "Debited"} ${parsed.data.amount} USDT.`,
+    message:
+      parsed.data.direction === "CREDIT"
+        ? `Credited ${moved} USDT.`
+        : parsed.data.direction === "ZERO"
+          ? `Took ${moved} USDT off the balance. It is now zero.`
+          : `Debited ${moved} USDT.`,
   };
 }
 

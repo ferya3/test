@@ -123,6 +123,13 @@ Admin → Users → the account, enter the amount and a reason, and it lands on 
 name against it. Crediting does not move any USDT — it records a debt the treasury must be able to
 cover, so only credit what you have actually received.
 
+**Undoing one** is the same form: pick *Debit* for part of it, or *Zero* to take the whole balance
+back to nothing. Zero reads the amount from the account rather than from a number you retype, so a
+reversal cannot leave a few USDT behind. Both leave the original credit on the ledger with the
+correction beneath it — the history stays readable, which is the point of an append-only ledger.
+Note that a debit only moves the number: if the user has already withdrawn, reversing the credit
+here does not bring the USDT back.
+
 ## Stack
 
 | Layer     | Choice                                               |

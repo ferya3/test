@@ -19,10 +19,15 @@ export const CREDENTIAL_KINDS = [
   "NOTE",
 ] as const;
 
+// Balances are rendered with thousands separators, so "9,450" is exactly what
+// an operator copies out of the page next to the field. parseUsdt has always
+// accepted that form; strip the separators here too rather than rejecting the
+// figure the interface just showed them.
 const usdtAmount = z
   .string()
   .trim()
-  .regex(/^\d{1,9}(\.\d{1,6})?$/, "Enter a USDT amount with up to 6 decimals");
+  .transform((v) => v.replace(/,/g, ""))
+  .pipe(z.string().regex(/^\d{1,9}(\.\d{1,6})?$/, "Enter a USDT amount with up to 6 decimals"));
 
 /** One rule for password strength, applied wherever a password is set. */
 const strongPassword = z
@@ -139,17 +144,25 @@ export const settingsSchema = z.object({
  * A manual balance change always carries a reason — an unexplained movement is
  * indistinguishable from theft when the books are audited later.
  */
-export const adjustBalanceSchema = z.object({
-  userId: z.string().trim().min(1),
-  direction: z.enum(["CREDIT", "DEBIT"]),
-  amount: usdtAmount.refine((v) => Number(v) > 0, "Enter an amount above zero"),
-  reason: z.string().trim().min(6, "Say why you are changing this balance").max(500),
-  reference: z.string().trim().max(120).optional(),
-  /** Which chain the money arrived on, when it arrived on one. */
-  network: z.enum(NETWORK_VALUES).optional(),
-  /** The address the user sent from, for matching against the explorer. */
-  fromAddress: z.string().trim().max(80).optional(),
-});
+export const adjustBalanceSchema = z
+  .object({
+    userId: z.string().trim().min(1),
+    /** ZERO debits whatever is there, so undoing a mistake needs no arithmetic. */
+    direction: z.enum(["CREDIT", "DEBIT", "ZERO"]),
+    amount: usdtAmount.refine((v) => Number(v) > 0, "Enter an amount above zero").optional(),
+    reason: z.string().trim().min(6, "Say why you are changing this balance").max(500),
+    reference: z.string().trim().max(120).optional(),
+    /** Which chain the money arrived on, when it arrived on one. */
+    network: z.enum(NETWORK_VALUES).optional(),
+    /** The address the user sent from, for matching against the explorer. */
+    fromAddress: z.string().trim().max(80).optional(),
+  })
+  // The amount for ZERO is read from the account itself, so requiring one would
+  // just be a second chance to mistype the number being corrected.
+  .refine((data) => data.direction === "ZERO" || data.amount !== undefined, {
+    message: "Enter an amount",
+    path: ["amount"],
+  });
 
 export const treasuryWalletSchema = z.object({
   network: z.enum(NETWORK_VALUES),

@@ -7,6 +7,8 @@ import { NETWORKS } from "@/lib/networks";
 import { Alert, Field } from "./ui";
 import { SubmitButton } from "./submit-button";
 
+type Direction = "CREDIT" | "DEBIT" | "ZERO";
+
 export function AdjustBalanceForm({
   userId,
   currentBalance,
@@ -15,7 +17,8 @@ export function AdjustBalanceForm({
   currentBalance: string;
 }) {
   const [state, action] = useActionState<FormState, FormData>(adjustBalanceAction, {});
-  const [direction, setDirection] = useState<"CREDIT" | "DEBIT">("CREDIT");
+  const [direction, setDirection] = useState<Direction>("CREDIT");
+  const zeroing = direction === "ZERO";
 
   return (
     <form action={action} className="space-y-4">
@@ -30,21 +33,36 @@ export function AdjustBalanceForm({
             name="direction"
             className="select"
             value={direction}
-            onChange={(event) => setDirection(event.target.value as "CREDIT" | "DEBIT")}
+            onChange={(event) => setDirection(event.target.value as Direction)}
           >
             <option value="CREDIT">Credit — add to their balance</option>
             <option value="DEBIT">Debit — take from their balance</option>
+            <option value="ZERO">Zero — take all of it, back to 0</option>
           </select>
         </Field>
 
-        <Field
-          label="Amount (USDT)"
-          htmlFor="amount"
-          error={state.errors?.amount}
-          hint={`Current balance: ${currentBalance} USDT`}
-        >
-          <input id="amount" name="amount" className="input" inputMode="decimal" placeholder="100.00" required />
-        </Field>
+        {zeroing ? (
+          <Field label="Amount (USDT)" htmlFor="amount">
+            {/* Disabled rather than hidden, so the figure being removed stays
+                on screen while the reason is written. */}
+            <input
+              id="amount"
+              className="input opacity-60"
+              value={currentBalance}
+              disabled
+              readOnly
+            />
+          </Field>
+        ) : (
+          <Field
+            label="Amount (USDT)"
+            htmlFor="amount"
+            error={state.errors?.amount}
+            hint={`Current balance: ${currentBalance} USDT`}
+          >
+            <input id="amount" name="amount" className="input" inputMode="decimal" placeholder="100.00" required />
+          </Field>
+        )}
       </div>
 
       <Field
@@ -110,15 +128,18 @@ export function AdjustBalanceForm({
         confirm={
           direction === "CREDIT"
             ? "Add this amount to the user's balance? The platform must actually hold the USDT."
-            : "Take this amount off the user's balance?"
+            : direction === "ZERO"
+              ? `Take the whole ${currentBalance} USDT off this balance, leaving it at zero?`
+              : "Take this amount off the user's balance?"
         }
       >
-        {direction === "CREDIT" ? "Credit balance" : "Debit balance"}
+        {direction === "CREDIT" ? "Credit balance" : direction === "ZERO" ? "Zero the balance" : "Debit balance"}
       </SubmitButton>
 
       <p className="text-xs text-slate-500">
         Crediting a balance does not move any USDT — it records that the platform owes the user that much. Only credit
-        funds the treasury has actually received.
+        funds the treasury has actually received. Debiting one does not send anything back either: if the user has
+        already withdrawn, reversing the credit here does not recover the USDT.
       </p>
     </form>
   );

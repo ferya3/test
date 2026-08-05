@@ -10,6 +10,7 @@ import {
   isValidEvmAddress,
 } from "../src/lib/wallet";
 import { isEvmNetwork, networkShort } from "../src/lib/networks";
+import { adjustBalanceSchema } from "../src/lib/validation";
 
 test("parseUsdt converts decimal strings to micro-USDT", () => {
   assert.equal(parseUsdt("1"), 1_000_000n);
@@ -108,4 +109,22 @@ test("address validation rejects the wrong chain and bad checksums", () => {
   assert.ok(!isValidTronAddress("TAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"));
   assert.ok(isValidEvmAddress("0x0000000000000000000000000000000000000000"));
   assert.ok(!isValidEvmAddress("T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb"));
+});
+
+test("a balance amount can be entered the way the page displays it", () => {
+  // formatUsdt groups thousands, so this is exactly what an operator copies
+  // out of the balance shown beside the field.
+  assert.equal(formatUsdt(9_450_000_000n), "9,450");
+  assert.equal(adjustBalanceSchema.safeParse({
+    userId: "u1",
+    direction: "DEBIT",
+    amount: "9,450",
+    reason: "Credited the wrong account",
+  }).success, true);
+});
+
+test("zeroing a balance needs no amount, every other direction does", () => {
+  const base = { userId: "u1", reason: "Credited the wrong account" };
+  assert.equal(adjustBalanceSchema.safeParse({ ...base, direction: "ZERO" }).success, true);
+  assert.equal(adjustBalanceSchema.safeParse({ ...base, direction: "DEBIT" }).success, false);
 });

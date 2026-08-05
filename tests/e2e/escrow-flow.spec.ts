@@ -232,6 +232,45 @@ test("an operator can credit a balance by hand and the buyer can spend it", asyn
   await expect(page.getByText("Deal funded").first()).toBeVisible();
 });
 
+test("an operator can undo a credit sent to the wrong account", async ({ page }) => {
+  const wrong = { email: `misdirected-${STAMP}@example.test`, name: "Wrong Account", password: "escrow-test-1" };
+
+  await register(page, wrong);
+  await signOut(page);
+
+  await signIn(page, ADMIN.email, ADMIN.password);
+  await page.goto(`/admin/users?q=${encodeURIComponent(wrong.email)}`);
+  await page.getByText(wrong.email).click();
+
+  // A figure with a thousands separator is what the page itself displays, so
+  // it has to be accepted back.
+  await page.fill("#amount", "1,250.50");
+  await page.fill("#reason", "Deposit credited on arrival");
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.click('button:has-text("Credit balance")');
+  await expect(page.getByText("Credited 1,250.5 USDT.")).toBeVisible();
+
+  // Zeroing takes the balance from the account rather than from a retyped
+  // number, so the operator cannot leave a residue behind.
+  await page.selectOption("#direction", "ZERO");
+  await page.fill("#reason", "Credited the wrong account, reversing");
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.click('button:has-text("Zero the balance")');
+  await expect(page.getByText("Took 1,250.5 USDT off the balance. It is now zero.")).toBeVisible();
+
+  // Refusing a second attempt keeps a stray zero-value entry off the ledger.
+  await page.selectOption("#direction", "ZERO");
+  await page.fill("#reason", "Credited the wrong account, reversing");
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.click('button:has-text("Zero the balance")');
+  await expect(page.getByText("That balance is already zero.")).toBeVisible();
+
+  await signOut(page);
+  await signIn(page, wrong.email, wrong.password);
+  await page.goto("/dashboard/wallet");
+  await expect(page.getByText("Manual debit").first()).toBeVisible();
+});
+
 test("a user cannot withdraw more than their balance", async ({ page }) => {
   const pauper = { email: `pauper-${STAMP}@example.test`, name: "No Funds", password: "escrow-test-1" };
   await register(page, pauper);
