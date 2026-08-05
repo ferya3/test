@@ -18,6 +18,7 @@ import {
 import {
   adjustBalanceSchema,
   adminSetPasswordSchema,
+  companySchema,
   fieldErrors,
   treasuryWalletSchema,
   rejectWithdrawalSchema,
@@ -348,6 +349,28 @@ export async function updateSettingsAction(_prev: FormState, formData: FormData)
 
   revalidatePath("/admin/settings");
   return { ok: true, message: "Settings saved." };
+}
+
+/** The operator's own details, as they appear on invoices and the imprint. */
+export async function updateCompanyAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const admin = await requireAdmin();
+  const parsed = companySchema.safeParse({
+    companyName: formData.get("companyName"),
+    companyStreet: formData.get("companyStreet"),
+    companyPostalCode: formData.get("companyPostalCode"),
+    companyCity: formData.get("companyCity"),
+    companyCountry: formData.get("companyCountry"),
+    companyEmail: formData.get("companyEmail"),
+    companyRegistration: formData.get("companyRegistration"),
+  });
+  if (!parsed.success) return { errors: fieldErrors(parsed.error) };
+
+  await prisma.settings.update({ where: { id: "singleton" }, data: parsed.data });
+  await audit("settings.company", "Settings", "singleton", admin.id);
+
+  revalidatePath("/admin/settings");
+  revalidatePath("/imprint");
+  return { ok: true, message: "Company details saved." };
 }
 
 /**

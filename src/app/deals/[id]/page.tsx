@@ -56,7 +56,14 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
       <PageHeader
         title={deal.title}
         subtitle={`Reference ${deal.reference} · opened ${formatDate(deal.createdAt)}`}
-        action={<StatusBadge status={deal.status} />}
+        action={
+          <div className="flex items-center gap-3">
+            <Link href={`/deals/${deal.id}/invoice`} className="btn btn-ghost">
+              Invoice
+            </Link>
+            <StatusBadge status={deal.status} />
+          </div>
+        }
       />
 
       <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr] lg:items-start">

@@ -102,6 +102,23 @@ SMTP_HOST=…   SMTP_PORT=587   SMTP_USER=…   SMTP_PASSWORD=…
 Also set `APP_URL` to the address users actually reach — `https://escrowbridge.site` in production. It
 is what the links in emails are built from.
 
+## Invoices
+
+Every deal has one at `/deals/<id>/invoice`, reachable from the deal page and readable only by the
+buyer, the seller and an operator. It prints — the browser's own dialog covers "save as PDF" on every
+platform — and the page chrome drops away when it does.
+
+The split matters: the sale price is shown as **held in escrow, not a charge by the platform**, and
+only the fee is billed as a service. On a 9,000 USDT deal at 5% that reads 9,000 + 450 = 9,450, with
+a line saying the 9,000 goes to the seller on release. An invoice that claimed the whole 9,450 as
+platform revenue would be wrong in a way an accountant would notice.
+
+The document is dated from when the deal was funded rather than when the page was opened, so
+reprinting it later does not change it. If the deal is not funded yet, it says so instead of implying
+payment.
+
+The issuer's name and address come from Admin → Settings, alongside the `/imprint` page.
+
 ## Time
 
 Every displayed timestamp is rendered in one fixed zone, `NEXT_PUBLIC_DISPLAY_TIMEZONE`

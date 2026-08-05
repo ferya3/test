@@ -331,5 +331,18 @@ model Settings {
   /// They are shown to visitors, so keep them defensible.
   showcaseUsers Int @default(4000)
   showcaseDeals Int @default(1800)
+
+  /// The operator's own details, printed on invoices and the imprint page.
+  /// Germany requires a complete, genuine business address on any commercial
+  /// site (§5 TMG), so these ship blank rather than pre-filled with something
+  /// invented — an address that is not really yours is worse than none.
+  companyName         String @default("EscrowBridge")
+  companyStreet       String @default("")
+  companyPostalCode   String @default("")
+  companyCity         String @default("Berlin")
+  companyCountry      String @default("Germany")
+  companyEmail        String @default("")
+  /// Handelsregister number, VAT ID, or whatever the jurisdiction requires.
+  companyRegistration String @default("")
   updatedAt DateTime @updatedAt @default(now())
 }

@@ -77,6 +77,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <Link className="hover:text-slate-300" href="/security">
                   Security
                 </Link>
+                <Link className="hover:text-slate-300" href="/imprint">
+                  Imprint
+                </Link>
               </div>
             </div>
           </footer>

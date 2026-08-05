@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { formatUsdt, parseUsdt, feeFor } from "../src/lib/money";
+import { formatUsdt, formatUsdtFixed, parseUsdt, feeFor } from "../src/lib/money";
 import { encryptSecret, decryptSecret, referenceCode } from "../src/lib/crypto";
 import {
   tronAddressFromPublicKey,
@@ -152,4 +152,12 @@ test("the day before the first of a month is the last of the previous one", () =
 test("todayIn reports the calendar date of the zone it is asked about", () => {
   const t = todayIn("Asia/Tehran");
   assert.ok(t.year > 2000 && t.month >= 1 && t.month <= 12 && t.day >= 1 && t.day <= 31);
+});
+
+test("invoice amounts always carry two decimals", () => {
+  assert.equal(formatUsdtFixed(parseUsdt("9000")), "9,000.00");
+  assert.equal(formatUsdtFixed(parseUsdt("450")), "450.00");
+  assert.equal(formatUsdtFixed(parseUsdt("0.5")), "0.50");
+  // More precision than two decimals is kept, not rounded away.
+  assert.equal(formatUsdtFixed(parseUsdt("1.234567")), "1.234567");
 });

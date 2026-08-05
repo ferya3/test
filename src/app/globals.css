@@ -124,3 +124,39 @@ body {
     border: 1px solid;
   }
 }
+
+/* The invoice is a document, not a screen: it stays on white paper inside the
+   dark app so that what you see is what comes out of the printer. */
+.invoice-sheet {
+  background: #ffffff;
+  color: #0f172a;
+  border-radius: 0.75rem;
+  padding: 2.5rem;
+  box-shadow: 0 20px 45px -20px rgba(0, 0, 0, 0.6);
+}
+
+@media print {
+  /* Everything except the sheet is navigation, and navigation does not print. */
+  body {
+    background: #ffffff;
+  }
+  header,
+  footer,
+  .print\:hidden {
+    display: none !important;
+  }
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+  .invoice-sheet {
+    box-shadow: none;
+    border-radius: 0;
+    padding: 0;
+  }
+  /* A table row split across a page break is unreadable on an invoice. */
+  tr,
+  section {
+    break-inside: avoid;
+  }
+}

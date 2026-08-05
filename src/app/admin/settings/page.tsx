@@ -3,6 +3,7 @@ import { listTreasuryWallets } from "@/lib/treasury";
 import { TreasuryWalletsForm } from "@/components/treasury-wallets-form";
 import { formatUsdt } from "@/lib/money";
 import { PlatformSettingsForm } from "@/components/platform-settings-form";
+import { CompanyDetailsForm } from "@/components/company-details-form";
 import { Card, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatDate } from "@/components/ui";
@@ -32,6 +33,21 @@ export default async function AdminSettingsPage() {
           requiredConfirmations={settings.requiredConfirmations}
           showcaseUsers={settings.showcaseUsers}
           showcaseDeals={settings.showcaseDeals}
+        />
+      </Card>
+
+      <Card
+        title="Company details"
+        description="Printed on invoices and shown on the imprint page. These have to be genuine — an address you cannot receive post at is worse than leaving it blank."
+      >
+        <CompanyDetailsForm
+          companyName={settings.companyName}
+          companyStreet={settings.companyStreet}
+          companyPostalCode={settings.companyPostalCode}
+          companyCity={settings.companyCity}
+          companyCountry={settings.companyCountry}
+          companyEmail={settings.companyEmail}
+          companyRegistration={settings.companyRegistration}
         />
       </Card>
 

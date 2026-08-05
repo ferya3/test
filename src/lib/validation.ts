@@ -140,6 +140,17 @@ export const settingsSchema = z.object({
   showcaseDeals: z.coerce.number().int().min(0).max(10_000_000),
 });
 
+/** The operator's own details, as printed on invoices and the imprint. */
+export const companySchema = z.object({
+  companyName: z.string().trim().min(2, "Enter the trading name").max(120),
+  companyStreet: z.string().trim().max(160),
+  companyPostalCode: z.string().trim().max(20),
+  companyCity: z.string().trim().max(80),
+  companyCountry: z.string().trim().max(80),
+  companyEmail: z.union([z.literal(""), z.string().trim().toLowerCase().email("Enter a valid email address").max(255)]),
+  companyRegistration: z.string().trim().max(120),
+});
+
 /**
  * A manual balance change always carries a reason — an unexplained movement is
  * indistinguishable from theft when the books are audited later.

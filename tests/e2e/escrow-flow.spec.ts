@@ -581,3 +581,77 @@ test("the post-login redirect cannot be pointed off-site", async ({ page }) => {
   await page.click('button[type="submit"]');
   await expect(page).toHaveURL(/\/dashboard$/);
 });
+
+test("a funded deal produces an invoice the buyer can open", async ({ page, browser }) => {
+  test.slow();
+
+  const buyer = { email: `inv-buyer-${STAMP}@example.test`, name: "Invoice Buyer", password: "escrow-test-1" };
+  const seller = { email: `inv-seller-${STAMP}@example.test`, name: "Invoice Seller", password: "escrow-test-1" };
+
+  await register(page, seller);
+  await signOut(page);
+  await register(page, buyer);
+
+  // 800 sale price at the seeded 5% is 40 fee, so the buyer funds 840.
+  await page.goto("/deals/new");
+  await page.fill("#sellerEmail", seller.email);
+  await page.fill("#title", "Aged domain with clean history");
+  await page.fill("#description", "Registrar transfer code plus account access.");
+  await page.fill("#amount", "800");
+  await page.selectOption("#network", "BSC");
+  await page.fill("#refundAddress", BUYER_BSC_ADDRESS);
+  await page.click('button:has-text("Open deal")');
+  await expect(page).toHaveURL(/\/deals\/(?!new$)[a-z0-9]{16,}$/);
+  const dealUrl = page.url();
+  await signOut(page);
+
+  // Before funding, the invoice says so rather than claiming payment.
+  await signIn(page, ADMIN.email, ADMIN.password);
+  await page.goto(`${dealUrl}/invoice`);
+  await expect(page.getByText("has not been funded yet")).toBeVisible();
+
+  const dealId = dealUrl.split("/").pop()!;
+  await page.goto("/admin");
+  await page
+    .locator("li", { has: page.locator(`a[href="/deals/${dealId}"]`) })
+    .getByRole("button", { name: "Mark as paid" })
+    .click();
+  await expect(page.locator("li", { has: page.locator(`a[href="/deals/${dealId}"]`) })).toContainText(
+    "Funds in escrow",
+  );
+  await signOut(page);
+
+  await signIn(page, buyer.email, buyer.password);
+  await page.goto(dealUrl);
+  await page.click('a:has-text("Invoice")');
+  await expect(page).toHaveURL(/\/invoice$/);
+
+  // The three figures are the whole point of the document.
+  await expect(page.getByText("800.00", { exact: true })).toBeVisible();
+  await expect(page.getByText("40.00", { exact: true })).toBeVisible();
+  await expect(page.getByText("840.00", { exact: true })).toBeVisible();
+  await expect(page.getByText("Escrow service fee (5%)")).toBeVisible();
+  await expect(page.getByText("Berlin")).toBeVisible();
+  await expect(page.getByText(buyer.email)).toBeVisible();
+  await expect(page.getByText("Payment received in full")).toBeVisible();
+
+  // An invoice carries both parties' names and amounts, so it must not be
+  // readable by anyone who is not on the deal.
+  const outsider = await browser.newContext();
+  const outsiderPage = await outsider.newPage();
+  await register(outsiderPage, {
+    email: `inv-stranger-${STAMP}@example.test`,
+    name: "Invoice Stranger",
+    password: "escrow-test-1",
+  });
+  await outsiderPage.goto(`${dealUrl}/invoice`);
+  await expect(outsiderPage.getByText("Nothing here")).toBeVisible();
+  await outsider.close();
+});
+
+test("the imprint names the operator", async ({ page }) => {
+  await page.goto("/imprint");
+  await expect(page.getByRole("heading", { name: "Imprint" })).toBeVisible();
+  await expect(page.getByText("10115 Berlin")).toBeVisible();
+  await expect(page.getByText("Germany")).toBeVisible();
+});

@@ -23,11 +23,24 @@ async function main(): Promise<void> {
   const passwordHash = await bcrypt.hash(PASSWORD, 10);
   const wallet = requireWallet();
 
+  // "Musterstraße" is the German equivalent of "Example Street" — it reads as a
+  // placeholder to anyone who speaks the language, which is the point. A real
+  // street and number here would land on somebody's actual building.
+  const company = {
+    companyName: "EscrowBridge",
+    companyStreet: "Musterstraße 1",
+    companyPostalCode: "10115",
+    companyCity: "Berlin",
+    companyCountry: "Germany",
+    companyEmail: "support@escrowbridge.site",
+    companyRegistration: "",
+  };
+
   const settings = await prisma.settings.upsert({
     where: { id: "singleton" },
-    create: { id: "singleton", feeBasisPoints: 500 },
+    create: { id: "singleton", feeBasisPoints: 500, ...company },
     // The demo runs at 5%, so bring an older database along with it.
-    update: { feeBasisPoints: 500 },
+    update: { feeBasisPoints: 500, ...company },
   });
 
   await prisma.treasuryWallet.upsert({
