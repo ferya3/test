@@ -72,6 +72,18 @@ if command -v pm2 >/dev/null 2>&1; then
   pm2 start npm --name escrowbridge -- start
   pm2 start npm --name escrowbridge-watcher -- run watcher
   pm2 save
+
+  # Without this, `pm2 save` alone restores nothing: it records which processes
+  # should run, but nothing starts pm2 itself at boot, so the first reboot
+  # leaves nginx proxying to a port with nothing behind it — a 502.
+  say "Making it survive a reboot"
+  if sudo env PATH="$PATH" pm2 startup systemd -u "$(id -un)" --hp "$HOME" >/dev/null; then
+    pm2 save >/dev/null
+    systemctl is-enabled "pm2-$(id -un)" >/dev/null 2>&1 &&
+      say "Enabled: pm2-$(id -un).service"
+  else
+    warn "Could not install the boot service. Run 'pm2 startup' and follow it."
+  fi
 else
   warn "Skipping the process manager. Start it by hand with:"
   warn "    npm start        # the web app"
@@ -94,10 +106,7 @@ cat <<'NEXT'
     domain's A record points at this server:
        sudo bash scripts/setup-nginx.sh your-domain
 
- 3. Survive a reboot:
-       pm2 startup       # then run the line it prints
-
- 4. Register the first account — it becomes the administrator — and set
+ 3. Register the first account — it becomes the administrator — and set
     your receiving address under Admin -> Settings.
 
  Back up .env somewhere off this machine. Without CREDENTIAL_MASTER_KEY

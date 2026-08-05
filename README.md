@@ -176,6 +176,23 @@ That replaces nginx's default site — the one responsible for the "Welcome to n
 proxy to the app, forwards `X-Forwarded-For` so the per-IP rate limits see real visitors rather than
 `127.0.0.1`, and runs certbot. `SKIP_TLS=yes` leaves it on plain HTTP.
 
+### 502 Bad Gateway
+
+nginx is up and the app behind it is not. `pm2 list` says which. The usual cause is a reboot on a
+server where pm2 was never registered as a boot service: `pm2 save` records which processes should
+run, but something has to start pm2 itself, and that is `pm2 startup`. The installer does this now;
+on a server built before it did:
+
+```
+pm2 start npm --name escrowbridge -- start
+pm2 start npm --name escrowbridge-watcher -- run watcher
+pm2 save
+sudo env PATH=$PATH pm2 startup systemd -u $USER --hp $HOME
+```
+
+If pm2 shows the app as running and the 502 persists, it is exiting on startup — `pm2 logs
+escrowbridge --lines 50` has the reason, most often a `.env` value that was edited and left invalid.
+
 **After pulling a change that touches `prisma/schema.prisma`, re-run `npm run db:push`.** Prisma 7
 does not regenerate its client as a side effect of applying the schema, and a stale client reports
 newly added fields as unknown.
