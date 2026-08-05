@@ -10,11 +10,18 @@ import {
   destroySession,
   hashPassword,
   requireUser,
+  revokeSessions,
   verifyPassword,
 } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { env } from "@/lib/env";
-import { fieldErrors, loginSchema, payoutAddressSchema, registerSchema } from "@/lib/validation";
+import {
+  changePasswordSchema,
+  fieldErrors,
+  loginSchema,
+  payoutAddressSchema,
+  registerSchema,
+} from "@/lib/validation";
 import { addressHint, isValidAddress, type Network } from "@/lib/wallet";
 
 export type FormState = { errors?: Record<string, string>; message?: string; ok?: boolean };
@@ -93,6 +100,48 @@ function safeNext(value: FormDataEntryValue | null): string {
 export async function logoutAction(): Promise<void> {
   await destroySession();
   redirect("/");
+}
+
+/**
+ * A user changes their own password. Every other session is signed out, so a
+ * password change actually evicts whoever prompted it — the whole point when
+ * someone suspects their account is compromised.
+ */
+export async function changePasswordAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const user = await requireUser();
+
+  // Rate-limited because the form takes the current password: without this a
+  // stolen session could be used to brute-force it.
+  if (!rateLimit(`password:${user.id}`, 10, 60 * 60 * 1000)) {
+    return { errors: { form: "Too many attempts. Try again later." } };
+  }
+
+  const parsed = changePasswordSchema.safeParse({
+    currentPassword: formData.get("currentPassword"),
+    newPassword: formData.get("newPassword"),
+    confirmPassword: formData.get("confirmPassword"),
+  });
+  if (!parsed.success) return { errors: fieldErrors(parsed.error) };
+
+  const record = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+  if (!(await verifyPassword(parsed.data.currentPassword, record.passwordHash))) {
+    return { errors: { currentPassword: "That is not your current password." } };
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash: await hashPassword(parsed.data.newPassword) },
+  });
+  const revoked = await revokeSessions(user.id, true);
+  await audit("user.password_change", "User", user.id, user.id, { sessionsRevoked: revoked });
+
+  return {
+    ok: true,
+    message:
+      revoked > 0
+        ? `Password changed. ${revoked} other session${revoked === 1 ? " was" : "s were"} signed out.`
+        : "Password changed.",
+  };
 }
 
 export async function savePayoutAddressAction(_prev: FormState, formData: FormData): Promise<FormState> {

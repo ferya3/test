@@ -42,6 +42,7 @@ The interface is in English throughout.
 * **The fee is added on top** of the sale price, so a seller receives exactly what they asked for.
 * **Disputes** freeze the deal for a moderator to release or refund.
 * **Append-only audit trail** for every payment, reveal, release and admin action.
+* **Password management**: users change their own, operators can reset one for a locked-out user.
 
 ## Receiving addresses
 
@@ -64,6 +65,19 @@ A lot of five assets does not arrive all at once. The buyer marks each vault ite
 reports a problem against it, and the deal shows a running count. Releasing while items are still
 outstanding is possible — sometimes that is the right call — but the buyer is told exactly what they
 are paying for first.
+
+## Passwords
+
+Users change their own password under Settings, which signs out every other device but keeps the one
+they are on — so a password change actually evicts whoever prompted it.
+
+An operator can set a password for a user who has lost access, under Admin → Users → the account. It
+carries a mandatory reason, destroys every session the user has, and is written to the audit trail
+against the admin who did it. It is a real power — knowing a password means being able to read that
+user's credential vault — so treat it as a support action of last resort, verify who you are talking
+to first, and tell them to change it immediately.
+
+There is no self-service "forgot password" yet; that needs email delivery.
 
 ## Balances and the ledger
 

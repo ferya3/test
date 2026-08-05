@@ -51,6 +51,30 @@ export async function createSession(userId: string): Promise<void> {
   });
 }
 
+/**
+ * Signs a user out everywhere. `exceptCurrent` keeps the caller's own session
+ * alive, which is what you want after someone changes their own password: every
+ * other device is kicked out, but they are not logged out of the one they are
+ * using.
+ */
+export async function revokeSessions(userId: string, exceptCurrent = false): Promise<number> {
+  let currentHash: string | undefined;
+  if (exceptCurrent) {
+    const token = (await cookies()).get(SESSION_COOKIE)?.value;
+    if (token) currentHash = sha256(token);
+  }
+
+  const result = await prisma.session.updateMany({
+    where: {
+      userId,
+      revokedAt: null,
+      ...(currentHash ? { NOT: { tokenHash: currentHash } } : {}),
+    },
+    data: { revokedAt: new Date() },
+  });
+  return result.count;
+}
+
 export async function destroySession(): Promise<void> {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;

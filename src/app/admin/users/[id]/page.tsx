@@ -10,6 +10,7 @@ import { setUserBlockedAction, setUserRoleAction, revokeSessionsAction } from "@
 import { Card, Crumb, Empty, PageHeader, Stat, StatusBadge, formatDate } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
 import { AdjustBalanceForm } from "@/components/adjust-balance-form";
+import { AdminSetPasswordForm } from "@/components/password-forms";
 
 export const metadata = { title: "User" };
 
@@ -76,6 +77,13 @@ export default async function AdminUserPage({ params }: { params: Promise<{ id: 
             description="Use this when money moved outside the normal flow — for example a buyer who sent USDT straight to the treasury wallet instead of a deal's deposit address."
           >
             <AdjustBalanceForm userId={user.id} currentBalance={formatUsdt(user.balanceMicro)} />
+          </Card>
+
+          <Card
+            title="Reset password"
+            description="For the support case where a user has lost access. They are signed out everywhere and must be told the new password over a channel you trust."
+          >
+            <AdminSetPasswordForm userId={user.id} email={user.email} />
           </Card>
 
           <Card title="Ledger" description="Every movement on this balance, newest first.">

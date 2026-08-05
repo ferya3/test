@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { audit, requireAdmin } from "@/lib/auth";
+import { audit, hashPassword, requireAdmin, revokeSessions } from "@/lib/auth";
 import { parseUsdt } from "@/lib/money";
 import { purgedEnvelope } from "@/lib/crypto";
 import { refundBuyer, releaseToSeller } from "@/lib/deals";
@@ -17,6 +17,7 @@ import {
 } from "@/lib/withdrawals";
 import {
   adjustBalanceSchema,
+  adminSetPasswordSchema,
   fieldErrors,
   treasuryWalletSchema,
   rejectWithdrawalSchema,
@@ -157,6 +158,44 @@ export async function setTreasuryWalletAction(_prev: FormState, formData: FormDa
     message: parsed.data.address.trim()
       ? `${networkShort(parsed.data.network)} address saved.`
       : `${networkShort(parsed.data.network)} address cleared.`,
+  };
+}
+
+/**
+ * An operator sets a user's password, for the support case where someone has
+ * lost access and there is no self-service reset yet.
+ *
+ * This hands the operator the ability to sign in as that user and read their
+ * vault, so it is deliberately noisy: a reason is required, every session the
+ * user has is destroyed, and the act is written to the audit trail against the
+ * admin who did it.
+ */
+export async function adminSetPasswordAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const admin = await requireAdmin();
+  const parsed = adminSetPasswordSchema.safeParse({
+    userId: formData.get("userId"),
+    newPassword: formData.get("newPassword"),
+    reason: formData.get("reason"),
+  });
+  if (!parsed.success) return { errors: fieldErrors(parsed.error) };
+
+  const target = await prisma.user.findUnique({ where: { id: parsed.data.userId } });
+  if (!target) return { errors: { form: "No such user." } };
+
+  await prisma.user.update({
+    where: { id: target.id },
+    data: { passwordHash: await hashPassword(parsed.data.newPassword) },
+  });
+  const revoked = await revokeSessions(target.id);
+  await audit("user.password_reset", "User", target.id, admin.id, {
+    reason: parsed.data.reason,
+    sessionsRevoked: revoked,
+  });
+
+  revalidatePath(`/admin/users/${target.id}`);
+  return {
+    ok: true,
+    message: `Password set for ${target.email}. ${revoked} session${revoked === 1 ? "" : "s"} signed out. Pass the new password to them over a channel you trust, and ask them to change it.`,
   };
 }
 

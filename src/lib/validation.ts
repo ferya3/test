@@ -24,14 +24,42 @@ const usdtAmount = z
   .trim()
   .regex(/^\d{1,9}(\.\d{1,6})?$/, "Enter a USDT amount with up to 6 decimals");
 
+/** One rule for password strength, applied wherever a password is set. */
+const strongPassword = z
+  .string()
+  .min(10, "Use at least 10 characters")
+  .max(200, "Password is too long")
+  .refine((v) => /[a-zA-Z]/.test(v) && /\d/.test(v), "Include at least one letter and one number");
+
 export const registerSchema = z.object({
   email: z.string().trim().toLowerCase().email("Enter a valid email address").max(255),
   displayName: z.string().trim().min(2, "Display name is too short").max(60),
-  password: z
-    .string()
-    .min(10, "Use at least 10 characters")
-    .max(200, "Password is too long")
-    .refine((v) => /[a-zA-Z]/.test(v) && /\d/.test(v), "Include at least one letter and one number"),
+  password: strongPassword,
+});
+
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Enter your current password"),
+    newPassword: strongPassword,
+    confirmPassword: z.string().min(1, "Repeat the new password"),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "The two passwords do not match",
+    path: ["confirmPassword"],
+  })
+  .refine((data) => data.newPassword !== data.currentPassword, {
+    message: "Choose a password you have not used here before",
+    path: ["newPassword"],
+  });
+
+/**
+ * An admin setting someone else's password is a serious act — it hands them
+ * the ability to sign in as that user — so it carries a mandatory reason.
+ */
+export const adminSetPasswordSchema = z.object({
+  userId: z.string().trim().min(1),
+  newPassword: strongPassword,
+  reason: z.string().trim().min(6, "Record why you are resetting this password").max(500),
 });
 
 export const loginSchema = z.object({

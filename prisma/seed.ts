@@ -206,7 +206,8 @@ async function seedNamedBuyerThread(context: {
     "Saeed Raminfar",
     await bcrypt.hash(PASSWORD, 10),
     "USER",
-    getWallet().deriveDepositAddress(9003, "BSC"),
+    BUYER_BSC_ADDRESS,
+    "BSC",
   );
 
   await prisma.deal.deleteMany({ where: { buyerId: buyer.id } });
@@ -434,11 +435,12 @@ function upsertUser(
   passwordHash: string,
   role: string,
   payoutAddress: string | null,
+  payoutNetwork = "TRON",
 ) {
   return prisma.user.upsert({
     where: { email },
-    create: { email, displayName, passwordHash, role, payoutAddress },
-    update: { displayName, passwordHash, role, payoutAddress },
+    create: { email, displayName, passwordHash, role, payoutAddress, payoutNetwork },
+    update: { displayName, passwordHash, role, payoutAddress, payoutNetwork },
   });
 }
 

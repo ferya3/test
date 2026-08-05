@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { PayoutAddressForm } from "@/components/payout-form";
+import { ChangePasswordForm } from "@/components/password-forms";
 import { Card, PageHeader } from "@/components/ui";
 
 export const metadata = { title: "Settings" };
@@ -28,6 +29,10 @@ export default async function SettingsPage() {
             <dd className="text-slate-200">{user.role}</dd>
           </div>
         </dl>
+      </Card>
+
+      <Card title="Password" description="Pick something you do not use anywhere else.">
+        <ChangePasswordForm />
       </Card>
 
       <Card

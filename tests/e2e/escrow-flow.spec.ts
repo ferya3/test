@@ -313,6 +313,98 @@ test("an operator can set the platform's receiving address per network", async (
   await expect(page.getByText("That address is not valid for this network.")).toBeVisible();
 });
 
+test("a user changes their own password and the old one stops working", async ({ page }) => {
+  test.slow();
+
+  const account = {
+    email: `pwd-${STAMP}@example.test`,
+    name: "Password Changer",
+    password: "escrow-test-1",
+  };
+  const newPassword = "brand-new-secret-42";
+
+  await register(page, account);
+  await page.goto("/dashboard/settings");
+
+  // The current password has to be right, or nothing happens.
+  await page.fill("#currentPassword", "not-my-password");
+  await page.fill("#newPassword", newPassword);
+  await page.fill("#confirmPassword", newPassword);
+  await page.click('button:has-text("Change password")');
+  await expect(page.getByText("That is not your current password.")).toBeVisible();
+
+  // And the two new entries have to agree.
+  await page.fill("#currentPassword", account.password);
+  await page.fill("#newPassword", newPassword);
+  await page.fill("#confirmPassword", "something-else-99");
+  await page.click('button:has-text("Change password")');
+  await expect(page.getByText("The two passwords do not match")).toBeVisible();
+
+  await page.fill("#currentPassword", account.password);
+  await page.fill("#newPassword", newPassword);
+  await page.fill("#confirmPassword", newPassword);
+  await page.click('button:has-text("Change password")');
+  await expect(page.getByText(/Password changed/)).toBeVisible();
+
+  // The change keeps this session alive but retires the old password.
+  await signOut(page);
+  await page.goto("/login");
+  await page.fill("#email", account.email);
+  await page.fill("#password", account.password);
+  await page.click('button[type="submit"]');
+  await expect(page.getByText("Email or password is incorrect.")).toBeVisible();
+
+  await signIn(page, account.email, newPassword);
+});
+
+test("an operator resets a password and the user is signed out everywhere", async ({ page, browser }) => {
+  test.slow();
+
+  const account = {
+    email: `reset-${STAMP}@example.test`,
+    name: "Locked Out",
+    password: "escrow-test-1",
+  };
+  const issued = "operator-issued-77";
+
+  await register(page, account);
+  await expect(page).toHaveURL(/\/dashboard/);
+
+  // A separate browser context stands in for the user's other device — it needs
+  // its own cookie jar, or signing in as the admin here would replace it.
+  const otherContext = await browser.newContext();
+  const other = await otherContext.newPage();
+  await signIn(other, account.email, account.password);
+  await expect(other.getByRole("heading", { name: /Welcome back/ })).toBeVisible();
+
+  await signOut(page);
+  await signIn(page, ADMIN.email, ADMIN.password);
+  await page.goto(`/admin/users?q=${encodeURIComponent(account.email)}`);
+  await page.getByText(account.email).click();
+
+  // A reason is mandatory — an unexplained reset is indistinguishable from a
+  // takeover — and the browser refuses to submit without one.
+  await page.fill("#resetPassword", issued);
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.click('button:has-text("Set password")');
+  await expect(page.locator("#resetReason")).toHaveJSProperty("validity.valueMissing", true);
+  await expect(page.getByText(/Password set for/)).toHaveCount(0);
+
+  await page.fill("#resetPassword", issued);
+  await page.fill("#resetReason", "Lost access, identity verified over email");
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.click('button:has-text("Set password")');
+  await expect(page.getByText(new RegExp(`Password set for ${account.email}`))).toBeVisible();
+
+  // The other device is now signed out.
+  await other.goto("/dashboard");
+  await expect(other).toHaveURL(/\/login/);
+  await otherContext.close();
+
+  await signOut(page);
+  await signIn(page, account.email, issued);
+});
+
 test("a stranger cannot open someone else's deal", async ({ page }) => {
   await register(page, {
     email: `nosy-${STAMP}@example.test`,
