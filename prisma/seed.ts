@@ -10,6 +10,7 @@ import { encryptSecret, referenceCode } from "../src/lib/crypto";
 import { parseUsdt } from "../src/lib/money";
 import { requireWallet } from "../src/lib/wallet";
 import { postEntry } from "../src/lib/ledger";
+import { todayIn, zonedTime } from "../src/lib/time";
 
 const PASSWORD = "escrow-demo-1";
 // Override to seed the demo thread against a different account.
@@ -173,18 +174,17 @@ async function main(): Promise<void> {
   console.log(`  buyer  ${namedBuyer.email}  (has the relayed chat history)`);
 }
 
-/** Yesterday at the given wall-clock time, in the machine's own timezone. */
+// These are wall-clock times as the operator experienced them, so they are
+// anchored to the display zone rather than to the server's. A VPS runs in UTC,
+// where "yesterday 22:40" is 02:10 tomorrow in Tehran — which moved the whole
+// evening of this thread onto the wrong day.
 function yesterdayAt(hours: number, minutes: number): Date {
-  const date = new Date();
-  date.setDate(date.getDate() - 1);
-  date.setHours(hours, minutes, 0, 0);
-  return date;
+  const today = todayIn();
+  return zonedTime({ ...today, day: today.day - 1, hours, minutes });
 }
 
 function todayAt(hours: number, minutes: number): Date {
-  const date = new Date();
-  date.setHours(hours, minutes, 0, 0);
-  return date;
+  return zonedTime({ ...todayIn(), hours, minutes });
 }
 
 /**

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
+import { formatDayTime } from "@/lib/time";
 import { sendMessageAction } from "@/app/actions/deals";
 import type { FormState } from "@/app/actions/auth";
 import { Card } from "./ui";
@@ -53,12 +54,7 @@ export function DealChat({
                   <p className="mb-1 text-[11px] text-slate-400">
                     {message.senderName}
                     {message.isStaff && " · moderator"} ·{" "}
-                    {new Date(message.createdAt).toLocaleString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {formatDayTime(message.createdAt)}
                   </p>
                   <p className="whitespace-pre-wrap break-words">{message.body}</p>
                 </div>

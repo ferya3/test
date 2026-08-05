@@ -128,13 +128,4 @@ export function Crumb({ href, children }: { href: string; children: ReactNode })
   );
 }
 
-export function formatDate(date: Date | string | null | undefined): string {
-  if (!date) return "—";
-  return new Date(date).toLocaleString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+export { formatDateTime as formatDate } from "@/lib/time";

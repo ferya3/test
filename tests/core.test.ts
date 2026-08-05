@@ -11,6 +11,7 @@ import {
 } from "../src/lib/wallet";
 import { isEvmNetwork, networkShort } from "../src/lib/networks";
 import { adjustBalanceSchema } from "../src/lib/validation";
+import { formatDayTime, todayIn, zonedTime } from "../src/lib/time";
 
 test("parseUsdt converts decimal strings to micro-USDT", () => {
   assert.equal(parseUsdt("1"), 1_000_000n);
@@ -127,4 +128,28 @@ test("zeroing a balance needs no amount, every other direction does", () => {
   const base = { userId: "u1", reason: "Credited the wrong account" };
   assert.equal(adjustBalanceSchema.safeParse({ ...base, direction: "ZERO" }).success, true);
   assert.equal(adjustBalanceSchema.safeParse({ ...base, direction: "DEBIT" }).success, false);
+});
+
+test("a wall-clock time is stored as that time in the display zone", () => {
+  // 22:40 in Tehran is 19:10 UTC — the offset is +03:30.
+  const at = zonedTime({ year: 2026, month: 8, day: 4, hours: 22, minutes: 40 }, "Asia/Tehran");
+  assert.equal(at.toISOString(), "2026-08-04T19:10:00.000Z");
+});
+
+test("timestamps render in the display zone, not the server's", () => {
+  // The regression: built naively on a UTC server, this evening message showed
+  // up on the following day for anyone reading it from Tehran.
+  const at = zonedTime({ year: 2026, month: 8, day: 4, hours: 22, minutes: 40 }, "Asia/Tehran");
+  assert.equal(formatDayTime(at), "Aug 4, 10:40 PM");
+  assert.match(at.toLocaleString("en-US", { timeZone: "UTC", day: "numeric" }), /^4$/);
+});
+
+test("the day before the first of a month is the last of the previous one", () => {
+  const at = zonedTime({ year: 2026, month: 8, day: 0, hours: 21, minutes: 0 }, "Asia/Tehran");
+  assert.equal(formatDayTime(at), "Jul 31, 09:00 PM");
+});
+
+test("todayIn reports the calendar date of the zone it is asked about", () => {
+  const t = todayIn("Asia/Tehran");
+  assert.ok(t.year > 2000 && t.month >= 1 && t.month <= 12 && t.day >= 1 && t.day <= 31);
 });

@@ -101,6 +101,16 @@ SMTP_HOST=…   SMTP_PORT=587   SMTP_USER=…   SMTP_PASSWORD=…
 Also set `APP_URL` to the address users actually reach — `https://escrowbridge.site` in production. It
 is what the links in emails are built from.
 
+## Time
+
+Every displayed timestamp is rendered in one fixed zone, `NEXT_PUBLIC_DISPLAY_TIMEZONE`
+(`Asia/Tehran` by default). A server almost always runs in UTC, so without this a deal delivered at
+22:40 Tehran showed as 02:10 the *following* day — and the server and the browser disagreed with each
+other on top of that.
+
+A deal's history is evidence when a trade is disputed, so it has to read the same for everyone
+looking at it. Set this to the zone your operators work in.
+
 ## Balances and the ledger
 
 Settlement lands on a **platform balance** rather than going straight on-chain: a completed deal

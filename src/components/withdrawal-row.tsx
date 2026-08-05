@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { formatDayTime } from "@/lib/time";
 import { useActionState, useState } from "react";
 import {
   approveWithdrawalAction,
@@ -45,12 +46,7 @@ export function WithdrawalRow(props: {
         <span className="text-xs text-slate-500">{props.network}</span>
         <span className={`badge ${TONE[props.status] ?? TONE.REJECTED}`}>{props.statusLabel}</span>
         <span className="w-28 text-right text-xs text-slate-500">
-          {new Date(props.createdAt).toLocaleString("en-US", {
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
+          {formatDayTime(props.createdAt)}
         </span>
       </div>
 
