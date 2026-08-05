@@ -46,7 +46,7 @@ export function NewDealForm({
         label="Seller's account email"
         htmlFor="sellerEmail"
         error={state.errors?.sellerEmail}
-        hint="They need an EscrowBridge account before you can open the deal."
+        hint="They need an Sedo account before you can open the deal."
       >
         <input
           id="sellerEmail"

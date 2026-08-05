@@ -5,8 +5,8 @@ export const metadata = { title: "Terms" };
 export default function TermsPage() {
   const sections = [
     {
-      title: "1. What EscrowBridge does",
-      body: "EscrowBridge is a neutral intermediary. We hold a buyer's USDT and a seller's credentials while a trade completes. We are not a party to the trade itself and do not verify the underlying goods beyond what the parties tell us.",
+      title: "1. What Sedo does",
+      body: "Sedo is a neutral intermediary. We hold a buyer's USDT and a seller's credentials while a trade completes. We are not a party to the trade itself and do not verify the underlying goods beyond what the parties tell us.",
     },
     {
       title: "2. Funding and settlement",
@@ -26,7 +26,7 @@ export default function TermsPage() {
     },
     {
       title: "6. Acceptable use",
-      body: "You may not use EscrowBridge for anything unlawful, for stolen or fraudulently obtained accounts, or for any trade you are not entitled to make. You are responsible for checking that the sale you are making is permitted by the terms of the service the account belongs to — many providers prohibit account transfers, and a deal completed here does not override those rules. We suspend accounts and cooperate with lawful requests where abuse is established.",
+      body: "You may not use Sedo for anything unlawful, for stolen or fraudulently obtained accounts, or for any trade you are not entitled to make. You are responsible for checking that the sale you are making is permitted by the terms of the service the account belongs to — many providers prohibit account transfers, and a deal completed here does not override those rules. We suspend accounts and cooperate with lawful requests where abuse is established.",
     },
     {
       title: "7. Credential handling",
@@ -40,7 +40,7 @@ export default function TermsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <PageHeader title="Terms of service" subtitle="The rules that govern deals settled through EscrowBridge." />
+      <PageHeader title="Terms of service" subtitle="The rules that govern deals settled through Sedo." />
       {sections.map((section) => (
         <Card key={section.title}>
           <h2 className="font-semibold text-slate-100">{section.title}</h2>

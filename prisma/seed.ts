@@ -40,9 +40,9 @@ async function main(): Promise<void> {
   });
 
   const [admin, seller, buyer] = await Promise.all([
-    upsertUser("admin@escrowbridge.test", "Platform Admin", passwordHash, "ADMIN", null),
-    upsertUser("seller@escrowbridge.test", "Nadia Sells", passwordHash, "USER", wallet.deriveDepositAddress(9001, "TRON")),
-    upsertUser("buyer@escrowbridge.test", "Omar Buys", passwordHash, "USER", wallet.deriveDepositAddress(9002, "TRON")),
+    upsertUser("admin@sedo.test", "Platform Admin", passwordHash, "ADMIN", null),
+    upsertUser("seller@sedo.test", "Nadia Sells", passwordHash, "USER", wallet.deriveDepositAddress(9001, "TRON")),
+    upsertUser("buyer@sedo.test", "Omar Buys", passwordHash, "USER", wallet.deriveDepositAddress(9002, "TRON")),
   ]);
 
   await prisma.listing.deleteMany({ where: { sellerId: seller.id } });

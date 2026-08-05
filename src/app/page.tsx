@@ -28,7 +28,7 @@ export default async function HomePage() {
             The trusted middleman for buying and selling digital accounts.
           </h1>
           <p className="mt-5 max-w-xl text-lg text-slate-300">
-            The buyer sends USDT to EscrowBridge, not to the seller. We hold the funds while the seller hands over the
+            The buyer sends USDT to Sedo, not to the seller. We hold the funds while the seller hands over the
             login details through an encrypted vault. The seller is only paid once the buyer confirms everything works.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">

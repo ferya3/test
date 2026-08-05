@@ -40,7 +40,7 @@ export const env = {
   usdtContract: process.env.USDT_TRC20_CONTRACT ?? "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
   // "console" prints emails to the server log; "smtp" actually sends them.
   mailProvider: (process.env.MAIL_PROVIDER ?? "console") as "console" | "smtp",
-  mailFrom: process.env.MAIL_FROM ?? "EscrowBridge <no-reply@escrowbridge.local>",
+  mailFrom: process.env.MAIL_FROM ?? "Sedo <no-reply@sedo.site>",
   smtpHost: process.env.SMTP_HOST ?? "",
   smtpPort: positiveInt("SMTP_PORT", 587),
   smtpUser: process.env.SMTP_USER ?? "",

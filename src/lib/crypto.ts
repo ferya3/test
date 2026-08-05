@@ -21,7 +21,7 @@ const VERSION = "v1";
  */
 function dealKey(dealId: string): Buffer {
   return Buffer.from(
-    hkdfSync("sha256", env.credentialMasterKey(), Buffer.from(dealId, "utf8"), Buffer.from("escrowbridge/credential/v1"), 32),
+    hkdfSync("sha256", env.credentialMasterKey(), Buffer.from(dealId, "utf8"), Buffer.from("sedo/credential/v1"), 32),
   );
 }
 
@@ -79,13 +79,13 @@ export function safeEqual(a: string, b: string): boolean {
   return timingSafeEqual(bufA, bufB);
 }
 
-/** Short, unambiguous, human-readable code such as `EB-7QK2M9`. */
+/** Short, unambiguous, human-readable code such as `SD-7QK2M9`. */
 export function referenceCode(): string {
   const alphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
   const bytes = randomBytes(6);
   let out = "";
   for (const byte of bytes) out += alphabet[byte % alphabet.length];
-  return `EB-${out}`;
+  return `SD-${out}`;
 }
 
 export function randomToken(): string {

@@ -106,7 +106,7 @@ export async function createDealAction(_prev: FormState, formData: FormData): Pr
 
   const seller = await prisma.user.findUnique({ where: { email: parsed.data.sellerEmail } });
   if (!seller) {
-    return { errors: { sellerEmail: "No EscrowBridge account uses that email. Ask the seller to register first." } };
+    return { errors: { sellerEmail: "No Sedo account uses that email. Ask the seller to register first." } };
   }
   if (seller.id === user.id) return { errors: { sellerEmail: "You cannot open a deal with yourself." } };
   if (seller.isBlocked) return { errors: { sellerEmail: "That seller cannot accept deals right now." } };

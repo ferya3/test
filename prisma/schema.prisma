@@ -1,4 +1,4 @@
-// EscrowBridge — escrow platform for digital goods paid in USDT.
+// Sedo — escrow platform for digital goods paid in USDT.
 //
 // Money is stored as integer "micro-USDT" (6 decimals, matching the USDT
 // contract) so no float rounding can ever creep into a balance.
@@ -79,7 +79,7 @@ model Listing {
 /// A single escrow transaction between one buyer and one seller.
 model Deal {
   id        String  @id @default(cuid())
-  reference String  @unique // human-friendly code shown in the UI, e.g. EB-7QK2M9
+  reference String  @unique // human-friendly code shown in the UI, e.g. SD-7QK2M9
 
   listingId String?
   listing   Listing? @relation(fields: [listingId], references: [id], onDelete: SetNull)

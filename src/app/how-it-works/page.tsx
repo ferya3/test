@@ -38,7 +38,7 @@ export default async function HowItWorksPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader
-        title="How EscrowBridge works"
+        title="How Sedo works"
         subtitle="A neutral third party holds both halves of the trade, so neither side has to go first."
       />
 
