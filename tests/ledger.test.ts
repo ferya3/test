@@ -10,7 +10,8 @@ import { test } from "node:test";
 
 import { prisma } from "../src/lib/db";
 import { postEntry, reconcile, totalLiability, LedgerError } from "../src/lib/ledger";
-import { runScheduledTransitions } from "../src/lib/deals";
+import { createDeal, runScheduledTransitions } from "../src/lib/deals";
+import { parseUsdt } from "../src/lib/money";
 
 let counter = 0;
 async function makeUser(balance = 0n) {
@@ -200,4 +201,58 @@ test("a rejected item stops the clock from paying the seller", async () => {
 
   const seller = await prisma.user.findUniqueOrThrow({ where: { id: sellerId } });
   assert.equal(seller.balanceMicro, 0n);
+});
+
+test("line items that do not add up to the price are refused", async () => {
+  const buyerId = await makeUser();
+  const sellerId = await makeUser();
+
+  await assert.rejects(
+    createDeal({
+      buyerId,
+      sellerId,
+      title: "Lot of three",
+      description: "Three assets sold together.",
+      priceMicro: parseUsdt("9000"),
+      inspectionHours: 48,
+      refundAddress: "0x3Ab5C7d9E1f2A4b6C8d0E2f4A6b8C0d2E4f6A8b0",
+      network: "BSC",
+      items: [
+        { label: "One", amountMicro: parseUsdt("5000") },
+        { label: "Two", amountMicro: parseUsdt("3000") },
+      ],
+    }),
+    /add up to 8,000 USDT but the sale price is 9,000 USDT/,
+  );
+});
+
+test("line items that reconcile are stored in the order given", async () => {
+  const buyerId = await makeUser();
+  const sellerId = await makeUser();
+
+  const deal = await createDeal({
+    buyerId,
+    sellerId,
+    title: "Lot of three",
+    description: "Three assets sold together.",
+    priceMicro: parseUsdt("9000"),
+    inspectionHours: 48,
+    refundAddress: "0x3Ab5C7d9E1f2A4b6C8d0E2f4A6b8C0d2E4f6A8b0",
+    network: "BSC",
+    items: [
+      { label: "Instagram @one", amountMicro: parseUsdt("5000") },
+      { label: "Instagram @two", amountMicro: parseUsdt("2500") },
+      { label: "Domain three.com", amountMicro: parseUsdt("1500") },
+    ],
+  });
+
+  const stored = await prisma.dealItem.findMany({
+    where: { dealId: deal.id },
+    orderBy: { position: "asc" },
+  });
+  assert.deepEqual(
+    stored.map((item) => item.label),
+    ["Instagram @one", "Instagram @two", "Domain three.com"],
+  );
+  assert.equal(stored.reduce((sum, item) => sum + item.amountMicro, 0n), deal.payoutMicro);
 });

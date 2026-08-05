@@ -125,6 +125,7 @@ model Deal {
   updatedAt DateTime @updatedAt
 
   credentials  Credential[]
+  items        DealItem[]
   payments     Payment[]
   messages     Message[]
   dispute      Dispute?
@@ -133,6 +134,23 @@ model Deal {
   @@index([buyerId, status])
   @@index([sellerId, status])
   @@index([status])
+}
+
+/// One priced line of what is being bought. Optional: a deal can be a single
+/// undifferentiated lot. When items are given they must add up to the sale
+/// price, so an invoice built from them cannot disagree with the escrow.
+model DealItem {
+  id       String @id @default(cuid())
+  dealId   String
+  deal     Deal   @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  /// Display order, so the invoice reads the way the buyer wrote it.
+  position Int
+  label    String
+  amountMicro BigInt
+
+  createdAt DateTime @default(now())
+
+  @@index([dealId, position])
 }
 
 /// A secret handed over by the seller (login, password, recovery code, note).
@@ -333,14 +351,14 @@ model Settings {
   showcaseDeals Int @default(1800)
 
   /// The operator's own details, printed on invoices and the imprint page.
-  /// Germany requires a complete, genuine business address on any commercial
-  /// site (§5 TMG), so these ship blank rather than pre-filled with something
-  /// invented — an address that is not really yours is worse than none.
+  /// Wherever the business sits, a commercial site is expected to name its
+  /// operator and give an address that reaches them, so these must be real —
+  /// an address that is not yours is worse than none at all.
   companyName         String @default("EscrowBridge")
   companyStreet       String @default("")
   companyPostalCode   String @default("")
-  companyCity         String @default("Berlin")
-  companyCountry      String @default("Germany")
+  companyCity         String @default("")
+  companyCountry      String @default("")
   companyEmail        String @default("")
   /// Handelsregister number, VAT ID, or whatever the jurisdiction requires.
   companyRegistration String @default("")

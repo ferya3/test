@@ -181,6 +181,34 @@ export const treasuryWalletSchema = z.object({
   note: z.string().trim().max(200).optional(),
 });
 
+/**
+ * Line items as they arrive from the deal form: two parallel arrays of inputs,
+ * with blank rows meaning "I did not use this one".
+ *
+ * Returns null when nothing was filled in — an unitemised deal is perfectly
+ * valid, and the invoice simply shows the lot as one line.
+ */
+export function parseDealItems(
+  labels: string[],
+  amounts: string[],
+): { label: string; amount: string }[] | null {
+  const items: { label: string; amount: string }[] = [];
+
+  for (let i = 0; i < Math.max(labels.length, amounts.length); i += 1) {
+    const label = (labels[i] ?? "").trim();
+    const amount = (amounts[i] ?? "").trim();
+    if (!label && !amount) continue;
+    if (!label) throw new Error(`Line ${items.length + 1} has an amount but no description.`);
+    if (!amount) throw new Error(`Line ${items.length + 1} has a description but no amount.`);
+    if (label.length > 200) throw new Error(`Line ${items.length + 1} description is too long.`);
+    items.push({ label, amount });
+  }
+
+  if (items.length === 0) return null;
+  if (items.length > 50) throw new Error("A deal cannot have more than 50 line items.");
+  return items;
+}
+
 /** Buyer's verdict on one item in the vault. */
 export const confirmItemSchema = z.object({
   credentialId: z.string().trim().min(1),

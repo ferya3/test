@@ -29,6 +29,7 @@ import {
   fieldErrors,
   listingSchema,
   messageSchema,
+  parseDealItems,
   withdrawalSchema,
   confirmItemSchema,
 } from "@/lib/validation";
@@ -116,6 +117,17 @@ export async function createDealAction(_prev: FormState, formData: FormData): Pr
     return { errors: { refundAddress: addressHint(network) } };
   }
 
+  let items: { label: string; amountMicro: bigint }[] | null;
+  try {
+    const raw = parseDealItems(
+      formData.getAll("itemLabel").map(String),
+      formData.getAll("itemAmount").map(String),
+    );
+    items = raw?.map((item) => ({ label: item.label, amountMicro: parseUsdt(item.amount) })) ?? null;
+  } catch (error) {
+    return { errors: { items: (error as Error).message } };
+  }
+
   let dealId: string;
   try {
     const deal = await createDeal({
@@ -128,6 +140,7 @@ export async function createDealAction(_prev: FormState, formData: FormData): Pr
       inspectionHours: parsed.data.inspectionHours,
       refundAddress: parsed.data.refundAddress,
       network,
+      items,
     });
     dealId = deal.id;
     await audit("deal.create", "Deal", deal.id, user.id, { amountMicro: deal.amountMicro.toString() });

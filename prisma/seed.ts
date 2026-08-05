@@ -23,15 +23,20 @@ async function main(): Promise<void> {
   const passwordHash = await bcrypt.hash(PASSWORD, 10);
   const wallet = requireWallet();
 
-  // "Musterstraße" is the German equivalent of "Example Street" — it reads as a
-  // placeholder to anyone who speaks the language, which is the point. A real
-  // street and number here would land on somebody's actual building.
+  // Seychelles is the usual home for an international business company: no local
+  // corporate tax on foreign income and no public register of directors. It only
+  // means anything once a company is actually registered there — printing the
+  // address without that is simply a false statement, so the registration number
+  // stays blank until the operator has a real one to put in it.
+  //
+  // The street is deliberately generic. An invented street and number would land
+  // on somebody's real building, and people chase invoices to the address on them.
   const company = {
     companyName: "EscrowBridge",
-    companyStreet: "Musterstraße 1",
-    companyPostalCode: "10115",
-    companyCity: "Berlin",
-    companyCountry: "Germany",
+    companyStreet: "Global Village, Suite 1",
+    companyPostalCode: "",
+    companyCity: "Victoria, Mahé",
+    companyCountry: "Seychelles",
     companyEmail: "support@escrowbridge.site",
     companyRegistration: "",
   };
@@ -265,6 +270,15 @@ async function seedNamedBuyerThread(context: {
     status: "DELIVERED",
     network: "BSC",
     refundAddress: BUYER_BSC_ADDRESS,
+    // Five assets bought as one lot. They add up to the 9,000 sale price, which
+    // createDeal enforces in the app and the invoice relies on.
+    items: [
+      { label: "Instagram @artavilhayat", amount: "2600.00" },
+      { label: "Instagram @artavil.hayat", amount: "1900.00" },
+      { label: "Instagram @artavil_hayat", amount: "1700.00" },
+      { label: "Domain artavilhayat.com", amount: "1900.00" },
+      { label: "Domain artavil-hayat.com", amount: "900.00" },
+    ],
     createdAt: mondayAt(20, 40),
     fundedAt: mondayAt(20, 55),
     deliveredAt: mondayAt(23, 0),
@@ -492,6 +506,7 @@ async function createDeal(input: {
   fundedAt?: Date;
   deliveredAt?: Date;
   inspectionEndsAt?: Date;
+  items?: { label: string; amount: string }[];
 }) {
   // The fee is charged on top of the sale price, matching src/lib/deals.ts.
   const priceMicro = parseUsdt(input.amount);
@@ -521,6 +536,15 @@ async function createDeal(input: {
       depositAddress: requireWallet().deriveDepositAddress(input.index, network),
       depositDerivation: input.index,
       inspectionHours: 48,
+      items: input.items?.length
+        ? {
+            create: input.items.map((item, position) => ({
+              position,
+              label: item.label,
+              amountMicro: parseUsdt(item.amount),
+            })),
+          }
+        : undefined,
       buyerRefundAddress: input.refundAddress ?? requireWallet().deriveDepositAddress(9002, "TRON"),
       createdAt,
       expiresAt: new Date(now.getTime() + 2 * 60 * 60 * 1000),

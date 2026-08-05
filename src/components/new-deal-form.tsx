@@ -6,6 +6,7 @@ import type { FormState } from "@/app/actions/auth";
 import { NETWORKS, type Network } from "@/lib/networks";
 import { Alert, Field } from "./ui";
 import { SubmitButton } from "./submit-button";
+import { DealItemsField } from "./deal-items-field";
 
 type Prefill = {
   listingId: string;
@@ -129,6 +130,8 @@ export function NewDealForm({
           </select>
         </Field>
       </div>
+
+      <DealItemsField price={price} error={state.errors?.items} />
 
       <Field
         label="Your refund address"

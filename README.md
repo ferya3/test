@@ -108,6 +108,11 @@ Every deal has one at `/deals/<id>/invoice`, reachable from the deal page and re
 buyer, the seller and an operator. It prints — the browser's own dialog covers "save as PDF" on every
 platform — and the page chrome drops away when it does.
 
+A deal can be **itemised**: name each thing being bought with its own amount when you open the deal,
+and the invoice lists them line by line. The amounts must add up to the sale price — `createDeal`
+refuses the deal otherwise, so an invoice can never disagree with what was escrowed. Leave the items
+blank and the lot is invoiced as one line.
+
 The split matters: the sale price is shown as **held in escrow, not a charge by the platform**, and
 only the fee is billed as a service. On a 9,000 USDT deal at 5% that reads 9,000 + 450 = 9,450, with
 a line saying the 9,000 goes to the seller on release. An invoice that claimed the whole 9,450 as
@@ -117,7 +122,9 @@ The document is dated from when the deal was funded rather than when the page wa
 reprinting it later does not change it. If the deal is not funded yet, it says so instead of implying
 payment.
 
-The issuer's name and address come from Admin → Settings, alongside the `/imprint` page.
+The issuer's name and address come from Admin → Settings, alongside the `/imprint` page. They ship
+mostly blank on purpose: an address on an invoice is where people turn up when something goes wrong,
+so it has to be one that actually reaches you.
 
 ## Time
 

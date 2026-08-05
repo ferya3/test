@@ -10,7 +10,7 @@ import {
   isValidEvmAddress,
 } from "../src/lib/wallet";
 import { isEvmNetwork, networkShort } from "../src/lib/networks";
-import { adjustBalanceSchema } from "../src/lib/validation";
+import { adjustBalanceSchema, parseDealItems } from "../src/lib/validation";
 import { formatDayTime, todayIn, zonedTime } from "../src/lib/time";
 
 test("parseUsdt converts decimal strings to micro-USDT", () => {
@@ -160,4 +160,24 @@ test("invoice amounts always carry two decimals", () => {
   assert.equal(formatUsdtFixed(parseUsdt("0.5")), "0.50");
   // More precision than two decimals is kept, not rounded away.
   assert.equal(formatUsdtFixed(parseUsdt("1.234567")), "1.234567");
+});
+
+test("blank line-item rows are ignored, filled ones are kept in order", () => {
+  const items = parseDealItems(
+    ["Instagram @one", "", "Domain two.com", ""],
+    ["2600", "", "1900", ""],
+  );
+  assert.deepEqual(items, [
+    { label: "Instagram @one", amount: "2600" },
+    { label: "Domain two.com", amount: "1900" },
+  ]);
+});
+
+test("an entirely blank itemisation means the deal is not itemised", () => {
+  assert.equal(parseDealItems(["", "  "], ["", ""]), null);
+});
+
+test("a half-filled line is refused rather than silently dropped", () => {
+  assert.throws(() => parseDealItems(["Instagram @one"], [""]), /no amount/);
+  assert.throws(() => parseDealItems([""], ["2600"]), /no description/);
 });

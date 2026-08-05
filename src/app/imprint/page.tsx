@@ -7,10 +7,11 @@ export const metadata = {
 };
 
 /**
- * Germany requires every commercial website to name its operator, with a
- * reachable postal address (§5 TMG). The details come from Admin → Settings
- * rather than the source, so the operator fills in their own — a page like
- * this is worse than useless if what it says is not true.
+ * Most jurisdictions require a commercial website to name its operator and give
+ * an address that reaches them — §5 TMG in Germany, the e-Commerce Regulations
+ * in the UK, and equivalents elsewhere. Which one applies depends on where the
+ * business actually sits, so the details come from Admin → Settings rather than
+ * the source. A page like this is worse than useless if what it says is untrue.
  */
 export default async function ImprintPage() {
   const settings = await getSettings();

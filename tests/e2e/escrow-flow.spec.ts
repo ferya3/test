@@ -631,7 +631,7 @@ test("a funded deal produces an invoice the buyer can open", async ({ page, brow
   await expect(page.getByText("40.00", { exact: true })).toBeVisible();
   await expect(page.getByText("840.00", { exact: true })).toBeVisible();
   await expect(page.getByText("Escrow service fee (5%)")).toBeVisible();
-  await expect(page.getByText("Berlin")).toBeVisible();
+  await expect(page.getByText("Seychelles")).toBeVisible();
   await expect(page.getByText(buyer.email)).toBeVisible();
   await expect(page.getByText("Payment received in full")).toBeVisible();
 
@@ -652,6 +652,6 @@ test("a funded deal produces an invoice the buyer can open", async ({ page, brow
 test("the imprint names the operator", async ({ page }) => {
   await page.goto("/imprint");
   await expect(page.getByRole("heading", { name: "Imprint" })).toBeVisible();
-  await expect(page.getByText("10115 Berlin")).toBeVisible();
-  await expect(page.getByText("Germany")).toBeVisible();
+  await expect(page.getByText("Victoria, Mahé")).toBeVisible();
+  await expect(page.getByText("Seychelles")).toBeVisible();
 });

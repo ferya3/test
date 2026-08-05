@@ -23,6 +23,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       buyer: { select: { id: true, displayName: true, email: true } },
       seller: { select: { id: true, displayName: true, email: true } },
       credentials: { orderBy: { createdAt: "asc" } },
+      items: { orderBy: { position: "asc" } },
       payments: { where: { status: "CONFIRMED" }, orderBy: { seenAt: "asc" } },
     },
   });
@@ -125,16 +126,37 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
               </tr>
             </thead>
             <tbody className="text-slate-700">
-              <tr className="border-b border-slate-200">
-                <td className="py-3 pr-4">
-                  <p className="font-medium text-slate-900">{deal.title}</p>
-                  <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                    Held in escrow and paid to the seller on release. This amount is not a charge by{" "}
-                    {settings.companyName}.
-                  </p>
-                </td>
-                <td className="py-3 text-right font-mono">{formatUsdtFixed(deal.payoutMicro)}</td>
-              </tr>
+              {deal.items.length > 0 ? (
+                <>
+                  {deal.items.map((item) => (
+                    <tr key={item.id} className="border-b border-slate-100">
+                      <td className="py-2 pr-4 pl-4">{item.label}</td>
+                      <td className="py-2 text-right font-mono">{formatUsdtFixed(item.amountMicro)}</td>
+                    </tr>
+                  ))}
+                  <tr className="border-b border-slate-200">
+                    <td className="py-3 pr-4">
+                      <p className="font-medium text-slate-900">Subtotal — {deal.title}</p>
+                      <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                        Held in escrow and paid to the seller on release. This amount is not a charge by{" "}
+                        {settings.companyName}.
+                      </p>
+                    </td>
+                    <td className="py-3 text-right font-mono">{formatUsdtFixed(deal.payoutMicro)}</td>
+                  </tr>
+                </>
+              ) : (
+                <tr className="border-b border-slate-200">
+                  <td className="py-3 pr-4">
+                    <p className="font-medium text-slate-900">{deal.title}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                      Held in escrow and paid to the seller on release. This amount is not a charge by{" "}
+                      {settings.companyName}.
+                    </p>
+                  </td>
+                  <td className="py-3 text-right font-mono">{formatUsdtFixed(deal.payoutMicro)}</td>
+                </tr>
+              )}
               <tr className="border-b border-slate-200">
                 <td className="py-3 pr-4">
                   <p className="font-medium text-slate-900">Escrow service fee ({feePercent}%)</p>

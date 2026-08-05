@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "./db";
 import { referenceCode } from "./crypto";
-import { feeFor } from "./money";
+import { feeFor, formatUsdt } from "./money";
 import { getWallet, type Network } from "./wallet";
 import { postEntry } from "./ledger";
 import { getTreasuryAddress } from "./treasury";
@@ -57,6 +57,8 @@ export type CreateDealInput = {
   inspectionHours: number;
   refundAddress: string;
   network?: Network;
+  /** Optional itemisation. When given, the amounts must sum to priceMicro. */
+  items?: { label: string; amountMicro: bigint }[] | null;
 };
 
 /**
@@ -71,6 +73,20 @@ export async function createDeal(input: CreateDealInput) {
   }
   if (input.buyerId === input.sellerId) {
     throw new DealError("You cannot open a deal with yourself.");
+  }
+
+  // An invoice whose lines do not add up to what was escrowed is worse than one
+  // with no lines at all, so the two are reconciled before the deal exists.
+  if (input.items?.length) {
+    const summed = input.items.reduce((total, item) => total + item.amountMicro, 0n);
+    if (summed !== input.priceMicro) {
+      throw new DealError(
+        `The line items add up to ${formatUsdt(summed)} USDT but the sale price is ${formatUsdt(input.priceMicro)} USDT.`,
+      );
+    }
+    if (input.items.some((item) => item.amountMicro <= 0n)) {
+      throw new DealError("Every line item needs an amount above zero.");
+    }
   }
 
   const network = input.network ?? "TRON";
@@ -102,6 +118,15 @@ export async function createDeal(input: CreateDealInput) {
       inspectionHours: input.inspectionHours,
       buyerRefundAddress: input.refundAddress,
       expiresAt: new Date(Date.now() + settings.paymentWindowMins * 60 * 1000),
+      items: input.items?.length
+        ? {
+            create: input.items.map((item, position) => ({
+              position,
+              label: item.label,
+              amountMicro: item.amountMicro,
+            })),
+          }
+        : undefined,
     },
   });
 }
