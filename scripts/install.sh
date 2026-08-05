@@ -90,11 +90,9 @@ cat <<'NEXT'
        WALLET_PROVIDER="tron"        # never leave this as "mock" in production
     then:  pm2 restart escrowbridge
 
- 2. Put a reverse proxy in front of it and get a certificate:
-       sudo apt install -y nginx certbot python3-certbot-nginx
-       # server_name your-domain;  proxy_pass http://127.0.0.1:3000;
-       # and forward X-Forwarded-For, or rate limits will see one IP
-       sudo certbot --nginx -d your-domain
+ 2. Put a reverse proxy in front of it and get a certificate, once the
+    domain's A record points at this server:
+       sudo bash scripts/setup-nginx.sh your-domain
 
  3. Survive a reboot:
        pm2 startup       # then run the line it prints

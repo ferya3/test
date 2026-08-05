@@ -157,8 +157,17 @@ production build, and pm2 — and is safe to re-run if a step fails:
 bash scripts/install.sh
 ```
 
-It deliberately stops before the domain, the reverse proxy and the certificate, and prints those as
-next steps instead of guessing. Set `SEED_DEMO_DATA=no` to skip the demo accounts.
+Set `SEED_DEMO_DATA=no` to skip the demo accounts.
+
+Then, once the domain's A record points at the server:
+
+```
+sudo bash scripts/setup-nginx.sh escrowbridge.site
+```
+
+That replaces nginx's default site — the one responsible for the "Welcome to nginx!" page — with a
+proxy to the app, forwards `X-Forwarded-For` so the per-IP rate limits see real visitors rather than
+`127.0.0.1`, and runs certbot. `SKIP_TLS=yes` leaves it on plain HTTP.
 
 **After pulling a change that touches `prisma/schema.prisma`, re-run `npm run db:push`.** Prisma 7
 does not regenerate its client as a side effect of applying the schema, and a stale client reports
