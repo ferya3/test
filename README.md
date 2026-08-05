@@ -39,7 +39,8 @@ The interface is in English throughout.
   address per network that the operator publishes — either works.
 * **Credentials encrypted at rest** with AES-256-GCM under a key derived per deal.
 * **The vault stays sealed** until the escrow is funded and the seller has delivered.
-* **Auto-release** protects sellers from a buyer who simply stops responding.
+* **Auto-release** protects sellers from a buyer who simply stops responding — but never fires on a
+  deal where the buyer rejected an item, because that buyer did not stop responding.
 * **The fee is added on top** of the sale price, so a seller receives exactly what they asked for.
 * **Disputes** freeze the deal for a moderator to release or refund.
 * **Append-only audit trail** for every payment, reveal, release and admin action.

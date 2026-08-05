@@ -271,7 +271,11 @@ export async function refundBuyer(dealId: string, note: string, actorId?: string
  * whose inspection window closed without the buyer acting. Without auto-release
  * a silent buyer could strand a seller's money indefinitely.
  */
-export async function runScheduledTransitions(): Promise<{ expired: number; released: number }> {
+export async function runScheduledTransitions(): Promise<{
+  expired: number;
+  released: number;
+  held: number;
+}> {
   const now = new Date();
 
   const expired = await prisma.deal.updateMany({
@@ -280,7 +284,15 @@ export async function runScheduledTransitions(): Promise<{ expired: number; rele
   });
 
   const dueForRelease = await prisma.deal.findMany({
-    where: { status: "DELIVERED", inspectionEndsAt: { lt: now } },
+    where: {
+      status: "DELIVERED",
+      inspectionEndsAt: { lt: now },
+      // Auto-release exists for a buyer who went silent. A buyer who marked an
+      // item as not working is the opposite of silent, and paying the seller in
+      // full because a timer ran out would be taking the money off the one
+      // person who did raise the problem. Those deals wait for a human.
+      credentials: { none: { rejectedAt: { not: null } } },
+    },
     select: { id: true },
   });
 
@@ -294,5 +306,16 @@ export async function runScheduledTransitions(): Promise<{ expired: number; rele
     }
   }
 
-  return { expired: expired.count, released };
+  const held = await prisma.deal.count({
+    where: {
+      status: "DELIVERED",
+      inspectionEndsAt: { lt: now },
+      credentials: { some: { rejectedAt: { not: null } } },
+    },
+  });
+  if (held > 0) {
+    console.warn(`[deals] ${held} deal(s) past inspection with a rejected item — awaiting an operator.`);
+  }
+
+  return { expired: expired.count, released, held };
 }

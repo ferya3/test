@@ -87,6 +87,12 @@ export function zonedTime(
   return new Date(naive - offsetMs(first, timeZone));
 }
 
+/** Day of the week in `timeZone`, 0 = Sunday, matching Date#getDay. */
+export function weekdayIn(timeZone: string = DISPLAY_TIME_ZONE): number {
+  const name = new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short" }).format(new Date());
+  return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(name);
+}
+
 /** Today's date as the calendar in `timeZone` sees it. */
 export function todayIn(timeZone: string = DISPLAY_TIME_ZONE): {
   year: number;

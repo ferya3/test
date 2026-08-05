@@ -10,6 +10,7 @@ import { test } from "node:test";
 
 import { prisma } from "../src/lib/db";
 import { postEntry, reconcile, totalLiability, LedgerError } from "../src/lib/ledger";
+import { runScheduledTransitions } from "../src/lib/deals";
 
 let counter = 0;
 async function makeUser(balance = 0n) {
@@ -139,4 +140,64 @@ test("total liability adds up every balance the platform owes", async () => {
   await makeUser(6_000_000n);
   await makeUser(4_000_000n);
   assert.equal(await totalLiability(), before + 10_000_000n);
+});
+
+/** A DELIVERED deal whose inspection window closed an hour ago. */
+async function lapsedDeal(opts: { rejectedItem: boolean }) {
+  const buyerId = await makeUser();
+  const sellerId = await makeUser();
+  const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
+
+  const deal = await prisma.deal.create({
+    data: {
+      reference: `EB-T${(counter += 1).toString().padStart(5, "0")}`,
+      buyerId,
+      sellerId,
+      title: "Lapsed inspection window",
+      description: "Delivered, window closed.",
+      status: "DELIVERED",
+      amountMicro: 105_000_000n,
+      feeMicro: 5_000_000n,
+      payoutMicro: 100_000_000n,
+      network: "BSC",
+      deliveredAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+      inspectionEndsAt: hourAgo,
+      expiresAt: hourAgo,
+    },
+  });
+
+  await prisma.credential.create({
+    data: {
+      dealId: deal.id,
+      label: "Domain transfer code",
+      kind: "SECRET",
+      ciphertext: "not-a-real-envelope",
+      rejectedAt: opts.rejectedItem ? hourAgo : null,
+      rejectedNote: opts.rejectedItem ? "The registrar will not accept this code." : null,
+      confirmedAt: opts.rejectedItem ? null : hourAgo,
+    },
+  });
+
+  return { dealId: deal.id, sellerId };
+}
+
+test("a lapsed window releases to the seller when nothing was rejected", async () => {
+  const { dealId } = await lapsedDeal({ rejectedItem: false });
+  await runScheduledTransitions();
+  const after = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
+  assert.equal(after.status, "COMPLETED");
+});
+
+test("a rejected item stops the clock from paying the seller", async () => {
+  // The buyer reported a problem. Releasing on a timer would take the money off
+  // the one person who spoke up, so the deal has to wait for an operator.
+  const { dealId, sellerId } = await lapsedDeal({ rejectedItem: true });
+  const result = await runScheduledTransitions();
+
+  const after = await prisma.deal.findUniqueOrThrow({ where: { id: dealId } });
+  assert.equal(after.status, "DELIVERED");
+  assert.ok(result.held >= 1, "the deal should be counted as held for review");
+
+  const seller = await prisma.user.findUniqueOrThrow({ where: { id: sellerId } });
+  assert.equal(seller.balanceMicro, 0n);
 });

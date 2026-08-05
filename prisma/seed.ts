@@ -10,7 +10,7 @@ import { encryptSecret, referenceCode } from "../src/lib/crypto";
 import { parseUsdt } from "../src/lib/money";
 import { requireWallet } from "../src/lib/wallet";
 import { postEntry } from "../src/lib/ledger";
-import { todayIn, zonedTime } from "../src/lib/time";
+import { todayIn, weekdayIn, zonedTime } from "../src/lib/time";
 
 const PASSWORD = "escrow-demo-1";
 // Override to seed the demo thread against a different account.
@@ -176,15 +176,31 @@ async function main(): Promise<void> {
 
 // These are wall-clock times as the operator experienced them, so they are
 // anchored to the display zone rather than to the server's. A VPS runs in UTC,
-// where "yesterday 22:40" is 02:10 tomorrow in Tehran — which moved the whole
+// where "Monday 23:00" is 02:30 on Tuesday in Tehran — which moved the whole
 // evening of this thread onto the wrong day.
-function yesterdayAt(hours: number, minutes: number): Date {
+//
+// The story runs Monday night into Tuesday afternoon, so it is anchored to a
+// Monday rather than to "yesterday": the buyer describes it by weekday, and a
+// thread that says Monday should not read as Thursday depending on when the
+// database happened to be seeded.
+function storyMonday(): { year: number; month: number; day: number } {
   const today = todayIn();
-  return zonedTime({ ...today, day: today.day - 1, hours, minutes });
+  let back = (weekdayIn() + 6) % 7; // days since the most recent Monday
+  // Seeded on a Monday or Tuesday, the most recent Monday would put the second
+  // day of the story in the future. Step back a week so both days are past.
+  if (back < 2) back += 7;
+  return { ...today, day: today.day - back };
 }
 
-function todayAt(hours: number, minutes: number): Date {
-  return zonedTime({ ...todayIn(), hours, minutes });
+/** Monday evening, when the Instagram handles changed hands. */
+function mondayAt(hours: number, minutes: number): Date {
+  return zonedTime({ ...storyMonday(), hours, minutes });
+}
+
+/** Tuesday, when the domains followed and one of them failed. */
+function tuesdayAt(hours: number, minutes: number): Date {
+  const monday = storyMonday();
+  return zonedTime({ ...monday, day: monday.day + 1, hours, minutes });
 }
 
 /**
@@ -236,10 +252,13 @@ async function seedNamedBuyerThread(context: {
     status: "DELIVERED",
     network: "BSC",
     refundAddress: BUYER_BSC_ADDRESS,
-    createdAt: yesterdayAt(20, 40),
-    fundedAt: yesterdayAt(20, 55),
-    deliveredAt: yesterdayAt(22, 40),
-    inspectionEndsAt: todayAt(22, 40),
+    createdAt: mondayAt(20, 40),
+    fundedAt: mondayAt(20, 55),
+    deliveredAt: mondayAt(23, 0),
+    // 48 hours from delivery, the platform default. It has lapsed by now, which
+    // is the point: the buyer rejected an item, so the deal must stay put
+    // rather than auto-releasing to the seller.
+    inspectionEndsAt: new Date(mondayAt(23, 0).getTime() + 48 * 60 * 60 * 1000),
   });
 
   // The buyer topped their wallet up with price + fee, then funded the deal
@@ -264,11 +283,11 @@ async function seedNamedBuyerThread(context: {
   // evening the money actually changed hands so the story reads straight.
   await prisma.ledgerEntry.update({
     where: { id: credit.id },
-    data: { createdAt: yesterdayAt(20, 42) },
+    data: { createdAt: mondayAt(20, 42) },
   });
   await prisma.ledgerEntry.update({
     where: { id: funding.id },
-    data: { createdAt: yesterdayAt(20, 55) },
+    data: { createdAt: mondayAt(20, 55) },
   });
 
   // The vault: three handles delivered at 22:40, both domains at 04:30.
@@ -277,43 +296,43 @@ async function seedNamedBuyerThread(context: {
       label: "Instagram @artavilhayat — password",
       kind: "PASSWORD",
       value: "Ar7v!l-Hayat-2019#one",
-      at: yesterdayAt(22, 40),
+      at: mondayAt(23, 0),
     },
     {
       label: "Instagram @artavil.hayat — password",
       kind: "PASSWORD",
       value: "Ar7v!l-Hayat-2019#two",
-      at: yesterdayAt(22, 40),
+      at: mondayAt(23, 0),
     },
     {
       label: "Instagram @artavil_hayat — password",
       kind: "PASSWORD",
       value: "Ar7v!l-Hayat-2019#three",
-      at: yesterdayAt(22, 40),
+      at: mondayAt(23, 0),
     },
     {
       label: "Recovery email bound to all three handles",
       kind: "EMAIL",
       value: "artavil.assets@mailbox.example",
-      at: yesterdayAt(22, 40),
+      at: mondayAt(23, 0),
     },
     {
       label: "Recovery email password",
       kind: "PASSWORD",
       value: "mailbox-9f21-recovery",
-      at: yesterdayAt(22, 40),
+      at: mondayAt(23, 0),
     },
     {
       label: "artavilhayat.com — transfer (EPP) code",
       kind: "SECRET",
       value: "EPP-8H2K-QW71-ZC44",
-      at: todayAt(4, 30),
+      at: tuesdayAt(4, 30),
     },
     {
       label: "artavil-hayat.com — transfer (EPP) code",
       kind: "SECRET",
       value: "EPP-3M9P-RT06-LD18",
-      at: todayAt(4, 30),
+      at: tuesdayAt(4, 30),
     },
     {
       label: "Registrar and handover notes",
@@ -321,7 +340,7 @@ async function seedNamedBuyerThread(context: {
       value:
         "Both domains sit at the same registrar. Unlock is already done on artavilhayat.com. " +
         "Change the Instagram passwords and rebind the recovery email as soon as you are in.",
-      at: todayAt(4, 30),
+      at: tuesdayAt(4, 30),
     },
   ];
 
@@ -336,7 +355,7 @@ async function seedNamedBuyerThread(context: {
         ciphertext: encryptSecret(deal.id, item.value),
         createdAt: item.at,
         confirmedAt: failing ? null : item.at,
-        rejectedAt: failing ? todayAt(12, 46) : null,
+        rejectedAt: failing ? tuesdayAt(12, 46) : null,
         rejectedNote: failing
           ? "The registrar rejects this EPP code and WHOIS still shows the domain as locked."
           : null,
@@ -346,7 +365,7 @@ async function seedNamedBuyerThread(context: {
 
   const thread: { at: Date; from: "BUYER" | "STAFF"; body: string }[] = [
     {
-      at: yesterdayAt(21, 0),
+      at: mondayAt(21, 0),
       from: "BUYER",
       body:
         "I have topped my wallet up with 9,450 USDT over BEP-20 and funded this deal — 9,000 for the five assets " +
@@ -354,7 +373,7 @@ async function seedNamedBuyerThread(context: {
         "I will confirm the release only once I have every username and password and I have checked all five myself.",
     },
     {
-      at: yesterdayAt(21, 8),
+      at: mondayAt(21, 8),
       from: "STAFF",
       body:
         "That is exactly right, Saeed. Your BEP-20 transfer landed and the 9,450 USDT is in escrow with us. The " +
@@ -362,7 +381,7 @@ async function seedNamedBuyerThread(context: {
         "them to start with the three Instagram handles.",
     },
     {
-      at: yesterdayAt(22, 40),
+      at: mondayAt(23, 0),
       from: "STAFF",
       body:
         "The seller has handed over the three Instagram accounts. Passwords for @artavilhayat, @artavil.hayat and " +
@@ -370,33 +389,33 @@ async function seedNamedBuyerThread(context: {
         "its password. Sign in to each one and change the password straight away.",
     },
     {
-      at: yesterdayAt(23, 12),
+      at: mondayAt(23, 32),
       from: "BUYER",
       body:
         "All three handles are in. I have changed every password and moved the recovery email over to my own " +
         "address. Instagram side confirmed — three of five done. Waiting on the two domains.",
     },
     {
-      at: yesterdayAt(23, 20),
+      at: mondayAt(23, 40),
       from: "STAFF",
       body: "Noted and logged. Passing it to the seller now to get the domain transfer codes moving.",
     },
     {
-      at: todayAt(4, 30),
+      at: tuesdayAt(4, 30),
       from: "STAFF",
       body:
         "The seller has provided the transfer codes for both domains — they are in the vault. They say both " +
         "domains are unlocked at the registrar and neither is inside a 60-day transfer lock.",
     },
     {
-      at: todayAt(12, 40),
+      at: tuesdayAt(12, 40),
       from: "BUYER",
       body:
         "artavilhayat.com has transferred. It is in my registrar account now, so that is four of the five " +
         "confirmed.",
     },
     {
-      at: todayAt(12, 46),
+      at: tuesdayAt(12, 46),
       from: "BUYER",
       body:
         "artavil-hayat.com will not transfer though. The registrar rejects the EPP code and the domain still " +
@@ -404,7 +423,7 @@ async function seedNamedBuyerThread(context: {
         "to unlock it and issue a fresh code — I am not releasing while one of the five is outstanding.",
     },
     {
-      at: todayAt(12, 58),
+      at: tuesdayAt(12, 58),
       from: "STAFF",
       body:
         "Understood, and nothing is released. The full 9,450 USDT stays with us. I have passed it to the seller " +

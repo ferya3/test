@@ -14,9 +14,9 @@ import { env } from "../src/lib/env";
 const POLL_INTERVAL_MS = Number(process.env.WATCHER_INTERVAL_MS ?? 30_000);
 
 async function pass(): Promise<void> {
-  const { expired, released } = await runScheduledTransitions();
-  if (expired || released) {
-    console.log(`[watcher] expired=${expired} auto-released=${released}`);
+  const { expired, released, held } = await runScheduledTransitions();
+  if (expired || released || held) {
+    console.log(`[watcher] expired=${expired} auto-released=${released} held-for-review=${held}`);
   }
 
   const purgedTokens = await purgeExpiredResetTokens();
