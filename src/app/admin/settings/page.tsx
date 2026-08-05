@@ -30,6 +30,8 @@ export default async function AdminSettingsPage() {
           minWithdrawal={formatUsdt(settings.minWithdrawalMicro)}
           paymentWindowMins={settings.paymentWindowMins}
           requiredConfirmations={settings.requiredConfirmations}
+          showcaseUsers={settings.showcaseUsers}
+          showcaseDeals={settings.showcaseDeals}
         />
       </Card>
 

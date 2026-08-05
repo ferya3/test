@@ -102,8 +102,10 @@ model Deal {
   payoutMicro   BigInt // the sale price, which is what the seller receives
   network       String @default("TRON") // TRON (TRC-20) | BSC (BEP-20) | ETHEREUM (ERC-20)
 
-  depositAddress    String  @unique
-  depositDerivation Int     @unique // HD index used to derive depositAddress
+  /// Set only when a watch-only xpub is configured. With a shared treasury
+  /// address instead, there is nothing per-deal to derive and both are null.
+  depositAddress    String? @unique
+  depositDerivation Int?    @unique // HD index used to derive depositAddress
   inspectionHours   Int     @default(48)
 
   fundedAt      DateTime?
@@ -323,5 +325,11 @@ model Settings {
   paymentWindowMins Int    @default(120)
   requiredConfirmations Int @default(20)
   nextDerivationIndex   Int @default(1)
+
+  /// Added to the real figures on the landing page. Operators use these to
+  /// carry over history from before the platform, or to set a launch baseline.
+  /// They are shown to visitors, so keep them defensible.
+  showcaseUsers Int @default(4000)
+  showcaseDeals Int @default(1800)
   updatedAt DateTime @updatedAt @default(now())
 }

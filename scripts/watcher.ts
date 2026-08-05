@@ -26,7 +26,9 @@ async function pass(): Promise<void> {
 
   const deals = await watchableDeals();
   for (const deal of deals) {
-    if (deal.network !== "TRON") continue;
+    // Only TRON is polled, and only deals that have an address of their own —
+    // a shared treasury address cannot be attributed to one deal.
+    if (deal.network !== "TRON" || !deal.depositAddress) continue;
     try {
       // Look slightly before the deal was created to tolerate clock skew.
       const since = deal.createdAt.getTime() - 10 * 60 * 1000;

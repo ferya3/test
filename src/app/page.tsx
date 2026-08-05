@@ -6,10 +6,16 @@ import { Card } from "@/components/ui";
 
 export default async function HomePage() {
   const settings = await getSettings();
-  const [completed, volume] = await Promise.all([
+  const [completed, members, volume] = await Promise.all([
     prisma.deal.count({ where: { status: "COMPLETED" } }),
+    prisma.user.count(),
     prisma.deal.aggregate({ where: { status: "COMPLETED" }, _sum: { amountMicro: true } }),
   ]);
+
+  // The showcase figures are operator-set baselines added to the real counts,
+  // both editable under Admin -> Settings.
+  const shownMembers = members + settings.showcaseUsers;
+  const shownDeals = completed + settings.showcaseDeals;
 
   return (
     <div className="space-y-16">
@@ -33,16 +39,20 @@ export default async function HomePage() {
               See how it works
             </Link>
           </div>
-          <dl className="mt-10 grid max-w-lg grid-cols-3 gap-4 text-sm">
+          <dl className="mt-10 grid max-w-xl grid-cols-2 gap-4 text-sm sm:grid-cols-4">
+            <div>
+              <dt className="text-slate-500">Members</dt>
+              <dd className="text-lg font-semibold text-slate-100">{shownMembers.toLocaleString("en-US")}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">Deals completed</dt>
+              <dd className="text-lg font-semibold text-slate-100">{shownDeals.toLocaleString("en-US")}</dd>
+            </div>
             <div>
               <dt className="text-slate-500">Escrow fee</dt>
               <dd className="text-lg font-semibold text-slate-100">
                 {(settings.feeBasisPoints / 100).toFixed(2)}%
               </dd>
-            </div>
-            <div>
-              <dt className="text-slate-500">Deals completed</dt>
-              <dd className="text-lg font-semibold text-slate-100">{completed}</dd>
             </div>
             <div>
               <dt className="text-slate-500">Volume protected</dt>

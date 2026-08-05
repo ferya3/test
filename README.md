@@ -35,7 +35,8 @@ The interface is in English throughout.
 
 * **A balance per user**, moved only through an append-only ledger that is reconciled on every visit to the treasury page.
 * **The buyer ticks off each vault item**, so a part-delivered lot shows exactly which asset is missing.
-* **One deposit address per deal**, derived from a watch-only extended public key.
+* **One deposit address per deal** derived from a watch-only extended public key, or one shared
+  address per network that the operator publishes — either works.
 * **Credentials encrypted at rest** with AES-256-GCM under a key derived per deal.
 * **The vault stays sealed** until the escrow is funded and the seller has delivered.
 * **Auto-release** protects sellers from a buyer who simply stops responding.
@@ -53,11 +54,14 @@ There are two ways to take deposits, and the platform supports both:
 
 * **Per-deal derived addresses.** Set a watch-only xpub and each deal gets its own address, derived
   for the right chain (base58 for TRON, `0x…` for the EVM chains). Payments match themselves and the
-  watcher funds the deal automatically.
+  watcher funds the deal automatically. Without an xpub, deals carry no address of their own.
 * **One shared address per network.** Set an address under Admin → Settings → Receiving wallets and
   buyers send there. A shared address cannot be matched to a deal on its own, so the buyer tells the
   operator and the operator credits it from the user's page. The deposit panel says so plainly rather
   than pretending the match is automatic.
+
+A deal cannot be opened on a network that has neither, so nobody is ever shown a deal with nowhere to
+pay into.
 
 ## Item-by-item confirmation
 
@@ -214,6 +218,13 @@ src/app/admin/            operations console: disputes, treasury, users, setting
 src/app/dashboard/wallet  the user's balance, history and withdrawals
 scripts/watcher.ts        long-running chain watcher
 ```
+
+## Landing page figures
+
+The home page shows members and completed deals as **an operator-set baseline plus the real count**,
+both under Admin → Settings. They ship at 4,000 and 1,800. Visitors read these as a claim about how
+established the platform is, which is exactly why they are a setting you can correct rather than a
+number buried in the source.
 
 ## Before taking real money
 

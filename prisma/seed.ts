@@ -8,7 +8,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "../src/lib/db";
 import { encryptSecret, referenceCode } from "../src/lib/crypto";
 import { parseUsdt } from "../src/lib/money";
-import { getWallet } from "../src/lib/wallet";
+import { requireWallet } from "../src/lib/wallet";
 import { postEntry } from "../src/lib/ledger";
 
 const PASSWORD = "escrow-demo-1";
@@ -20,7 +20,7 @@ const BUYER_BSC_ADDRESS = "0x3Ab5C7d9E1f2A4b6C8d0E2f4A6b8C0d2E4f6A8b0";
 
 async function main(): Promise<void> {
   const passwordHash = await bcrypt.hash(PASSWORD, 10);
-  const wallet = getWallet();
+  const wallet = requireWallet();
 
   const settings = await prisma.settings.upsert({
     where: { id: "singleton" },
@@ -486,10 +486,10 @@ async function createDeal(input: {
       feeMicro,
       payoutMicro: priceMicro,
       network,
-      depositAddress: getWallet().deriveDepositAddress(input.index, network),
+      depositAddress: requireWallet().deriveDepositAddress(input.index, network),
       depositDerivation: input.index,
       inspectionHours: 48,
-      buyerRefundAddress: input.refundAddress ?? getWallet().deriveDepositAddress(9002, "TRON"),
+      buyerRefundAddress: input.refundAddress ?? requireWallet().deriveDepositAddress(9002, "TRON"),
       createdAt,
       expiresAt: new Date(now.getTime() + 2 * 60 * 60 * 1000),
       fundedAt: funded ? fundedAt : null,

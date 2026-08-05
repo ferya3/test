@@ -302,6 +302,8 @@ export async function updateSettingsAction(_prev: FormState, formData: FormData)
     minWithdrawal: formData.get("minWithdrawal"),
     paymentWindowMins: formData.get("paymentWindowMins"),
     requiredConfirmations: formData.get("requiredConfirmations"),
+    showcaseUsers: formData.get("showcaseUsers"),
+    showcaseDeals: formData.get("showcaseDeals"),
   });
   if (!parsed.success) return { errors: fieldErrors(parsed.error) };
 
@@ -320,6 +322,8 @@ export async function updateSettingsAction(_prev: FormState, formData: FormData)
       minWithdrawalMicro: parseUsdt(parsed.data.minWithdrawal),
       paymentWindowMins: parsed.data.paymentWindowMins,
       requiredConfirmations: parsed.data.requiredConfirmations,
+      showcaseUsers: parsed.data.showcaseUsers,
+      showcaseDeals: parsed.data.showcaseDeals,
     },
   });
   await audit("settings.update", "Settings", "singleton", admin.id);

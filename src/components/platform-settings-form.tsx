@@ -13,6 +13,8 @@ export function PlatformSettingsForm(props: {
   minWithdrawal: string;
   paymentWindowMins: number;
   requiredConfirmations: number;
+  showcaseUsers: number;
+  showcaseDeals: number;
 }) {
   const [state, action] = useActionState<FormState, FormData>(updateSettingsAction, {});
 
@@ -89,6 +91,38 @@ export function PlatformSettingsForm(props: {
             defaultValue={props.requiredConfirmations}
           />
         </Field>
+      </div>
+
+      <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
+        <p className="font-medium text-slate-200">Landing page figures</p>
+        <p className="mt-1 text-sm text-slate-400">
+          Added to the real counts on the home page. Visitors read these as a claim about the platform, so set
+          numbers you can stand behind.
+        </p>
+
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <Field label="Members baseline" htmlFor="showcaseUsers" error={state.errors?.showcaseUsers}>
+            <input
+              id="showcaseUsers"
+              name="showcaseUsers"
+              type="number"
+              min={0}
+              className="input"
+              defaultValue={props.showcaseUsers}
+            />
+          </Field>
+
+          <Field label="Completed deals baseline" htmlFor="showcaseDeals" error={state.errors?.showcaseDeals}>
+            <input
+              id="showcaseDeals"
+              name="showcaseDeals"
+              type="number"
+              min={0}
+              className="input"
+              defaultValue={props.showcaseDeals}
+            />
+          </Field>
+        </div>
       </div>
 
       <SubmitButton pendingLabel="Saving…">Save settings</SubmitButton>

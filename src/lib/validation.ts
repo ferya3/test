@@ -131,6 +131,8 @@ export const settingsSchema = z.object({
   minWithdrawal: usdtAmount,
   paymentWindowMins: z.coerce.number().int().min(15).max(10080),
   requiredConfirmations: z.coerce.number().int().min(1).max(200),
+  showcaseUsers: z.coerce.number().int().min(0).max(10_000_000),
+  showcaseDeals: z.coerce.number().int().min(0).max(10_000_000),
 });
 
 /**

@@ -4,6 +4,7 @@ import { referenceCode } from "./crypto";
 import { feeFor } from "./money";
 import { getWallet, type Network } from "./wallet";
 import { postEntry } from "./ledger";
+import { getTreasuryAddress } from "./treasury";
 
 export {
   STATUS_LABELS,
@@ -25,8 +26,12 @@ export async function getSettings() {
  * bumped inside a transaction so two concurrent deals can never share an
  * address — which would make it impossible to tell whose money arrived.
  */
-async function reserveDepositAddress(network: Network): Promise<{ index: number; address: string }> {
+async function reserveDepositAddress(
+  network: Network,
+): Promise<{ index: number; address: string } | null> {
   const wallet = getWallet();
+  if (!wallet) return null; // deposits go to the shared treasury address instead
+
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const settings = await getSettings();
     const index = settings.nextDerivationIndex;
@@ -70,7 +75,15 @@ export async function createDeal(input: CreateDealInput) {
 
   const network = input.network ?? "TRON";
   const fee = feeFor(input.priceMicro, settings.feeBasisPoints);
-  const { index, address } = await reserveDepositAddress(network);
+  const derived = await reserveDepositAddress(network);
+
+  // A deal the buyer cannot pay into is worse than no deal at all, so refuse
+  // rather than create one with nowhere to send the money.
+  if (!derived && !(await getTreasuryAddress(network))) {
+    throw new DealError(
+      "No deposit address is configured for that network yet. Ask an administrator to set one.",
+    );
+  }
 
   return prisma.deal.create({
     data: {
@@ -84,8 +97,8 @@ export async function createDeal(input: CreateDealInput) {
       feeMicro: fee,
       payoutMicro: input.priceMicro,
       network,
-      depositAddress: address,
-      depositDerivation: index,
+      depositAddress: derived?.address ?? null,
+      depositDerivation: derived?.index ?? null,
       inspectionHours: input.inspectionHours,
       buyerRefundAddress: input.refundAddress,
       expiresAt: new Date(Date.now() + settings.paymentWindowMins * 60 * 1000),

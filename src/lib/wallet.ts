@@ -116,22 +116,36 @@ class MockWallet implements WalletProvider {
   }
 }
 
-let cached: WalletProvider | undefined;
+let cached: WalletProvider | null | undefined;
 
-export function getWallet(): WalletProvider {
-  if (cached) return cached;
+/**
+ * The wallet that derives a fresh address per deal, or `null` when there is
+ * none — which is a perfectly good way to run the platform: deposits then go to
+ * the shared treasury address the operator publishes, and are credited by hand.
+ *
+ * The mock wallet is never handed out in production. Rather than crashing the
+ * request, this returns null there and the caller falls back to the treasury
+ * address, refusing the deal only if neither exists.
+ */
+export function getWallet(): WalletProvider | null {
+  if (cached !== undefined) return cached;
+
   if (env.walletProvider === "tron") {
     if (!env.tronAccountXpub) {
       throw new Error("WALLET_PROVIDER=tron requires TRON_ACCOUNT_XPUB");
     }
     cached = new XpubWallet(env.tronAccountXpub);
   } else {
-    if (env.isProduction) {
-      throw new Error("WALLET_PROVIDER=mock must never be used in production");
-    }
-    cached = new MockWallet();
+    cached = env.isProduction ? null : new MockWallet();
   }
   return cached;
+}
+
+/** Throws where a derived address is genuinely required, such as the seed. */
+export function requireWallet(): WalletProvider {
+  const wallet = getWallet();
+  if (!wallet) throw new Error("No derived-address wallet is configured (set TRON_ACCOUNT_XPUB)");
+  return wallet;
 }
 
 const EXPLORERS: Record<Network, { tx: string; address: string }> = {

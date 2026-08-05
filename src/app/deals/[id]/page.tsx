@@ -42,6 +42,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
   // When the operator has published an address for this network, that is where
   // buyers send; the derived per-deal address is the fallback.
   const treasuryAddress = await getTreasuryAddress(deal.network as Network);
+  const depositAddress = treasuryAddress ?? deal.depositAddress;
 
   const isBuyer = deal.buyerId === user.id;
   const isSeller = deal.sellerId === user.id;
@@ -84,10 +85,10 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
             </dl>
           </Card>
 
-          {deal.status === "AWAITING_PAYMENT" && (
+          {deal.status === "AWAITING_PAYMENT" && depositAddress && (
             <PaymentPanel
               amount={formatUsdt(deal.amountMicro)}
-              address={treasuryAddress ?? deal.depositAddress}
+              address={depositAddress!}
               shared={Boolean(treasuryAddress)}
               reference={deal.reference}
               network={network}
@@ -214,17 +215,19 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
               <Row label="Seller receives" value={`${formatUsdt(deal.payoutMicro)} USDT`} strong />
               <Row label="Network" value={networkLabel(network)} />
             </dl>
+            {depositAddress && (
             <div className="mt-4 border-t border-slate-800 pt-4 text-xs text-slate-500">
               <p className="mb-1">Deposit address</p>
               <a
                 className="break-all font-mono text-[11px] text-slate-300 hover:text-emerald-300"
-                href={explorerAddressUrl(network, treasuryAddress ?? deal.depositAddress)}
+                href={explorerAddressUrl(network, depositAddress ?? "")}
                 target="_blank"
                 rel="noreferrer noopener"
               >
-                {treasuryAddress ?? deal.depositAddress}
+                {depositAddress}
               </a>
             </div>
+            )}
           </Card>
 
           <Card title="Timeline">
