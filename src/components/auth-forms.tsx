@@ -44,12 +44,15 @@ export function RegisterForm() {
   );
 }
 
-export function LoginForm({ next }: { next?: string }) {
+export function LoginForm({ next, justReset }: { next?: string; justReset?: boolean }) {
   const [state, action] = useActionState(loginAction, initial);
 
   return (
     <form action={action} className="space-y-4">
       {next && <input type="hidden" name="next" value={next} />}
+      {justReset && !state.errors && (
+        <Alert tone="success">Your password has been changed. Sign in with the new one.</Alert>
+      )}
       {state.errors?.form && <Alert tone="error">{state.errors.form}</Alert>}
 
       <Field label="Email" htmlFor="email" error={state.errors?.email}>
@@ -59,6 +62,12 @@ export function LoginForm({ next }: { next?: string }) {
       <Field label="Password" htmlFor="password" error={state.errors?.password}>
         <input id="password" name="password" type="password" className="input" autoComplete="current-password" required />
       </Field>
+
+      <div className="flex justify-end">
+        <Link className="text-sm text-slate-400 hover:text-emerald-300" href="/forgot-password">
+          Forgot your password?
+        </Link>
+      </div>
 
       <SubmitButton pendingLabel="Signing in…">Sign in</SubmitButton>
 

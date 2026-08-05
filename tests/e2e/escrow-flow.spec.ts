@@ -36,6 +36,27 @@ async function signIn(page: Page, email: string, password: string) {
   await expect(page).toHaveURL(/\/dashboard/);
 }
 
+/**
+ * Reads the reset link out of the dev server's log, which is where the
+ * "console" mail provider writes it.
+ */
+async function waitForResetLink(email: string): Promise<string> {
+  const logPath = process.env.E2E_DEV_LOG ?? "";
+  if (!logPath) throw new Error("Set E2E_DEV_LOG to the dev server log to run this test");
+
+  const { readFileSync } = await import("node:fs");
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const log = readFileSync(logPath, "utf8");
+    const section = log.lastIndexOf(`To:      ${email}`);
+    if (section !== -1) {
+      const match = log.slice(section).match(/http:\/\/\S+\/reset-password\?token=\S+/);
+      if (match) return match[0];
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error(`No reset link for ${email} appeared in ${logPath}`);
+}
+
 async function signOut(page: Page) {
   await page.click('button:has-text("Sign out")');
   await expect(page).toHaveURL("/");
@@ -403,6 +424,72 @@ test("an operator resets a password and the user is signed out everywhere", asyn
 
   await signOut(page);
   await signIn(page, account.email, issued);
+});
+
+test("a forgotten password can be reset through the emailed link", async ({ page, browser }) => {
+  test.slow();
+
+  const account = {
+    email: `forgot-${STAMP}@example.test`,
+    name: "Forgetful User",
+    password: "escrow-test-1",
+  };
+  const newPassword = "recovered-access-88";
+
+  await register(page, account);
+
+  // A second context stands in for a device left signed in elsewhere.
+  const otherContext = await browser.newContext();
+  const other = await otherContext.newPage();
+  await signIn(other, account.email, account.password);
+  await expect(other.getByRole("heading", { name: /Welcome back/ })).toBeVisible();
+
+  await signOut(page);
+  await page.goto("/login");
+  await page.getByRole("link", { name: "Forgot your password?" }).click();
+  await expect(page).toHaveURL(/\/forgot-password/);
+
+  // An unknown address gets exactly the same answer, so the form cannot be
+  // used to discover who has an account here.
+  await page.fill("#email", "definitely-not-registered@example.test");
+  await page.click('button:has-text("Send reset link")');
+  const reassurance = /If that email belongs to an account/;
+  await expect(page.getByText(reassurance)).toBeVisible();
+
+  await page.goto("/forgot-password");
+  await page.fill("#email", account.email);
+  await page.click('button:has-text("Send reset link")');
+  await expect(page.getByText(reassurance)).toBeVisible();
+
+  // The console mail provider prints the link; pull it from the server log.
+  // The link is built from APP_URL, which points at the normal dev port; the
+  // test server runs on its own, so only the path and token are reused.
+  const emailed = new URL(await waitForResetLink(account.email));
+  const link = `${emailed.pathname}${emailed.search}`;
+  await page.goto(link);
+  await expect(page.getByRole("heading", { name: "Set a new password" })).toBeVisible();
+
+  await page.fill("#newPassword", newPassword);
+  await page.fill("#confirmPassword", "not-the-same-11");
+  await page.click('button:has-text("Set new password")');
+  await expect(page.getByText("The two passwords do not match")).toBeVisible();
+
+  await page.fill("#newPassword", newPassword);
+  await page.fill("#confirmPassword", newPassword);
+  await page.click('button:has-text("Set new password")');
+  await expect(page).toHaveURL(/\/login\?reset=1/);
+  await expect(page.getByText("Your password has been changed.")).toBeVisible();
+
+  // The device that was left signed in is now out.
+  await other.goto("/dashboard");
+  await expect(other).toHaveURL(/\/login/);
+  await otherContext.close();
+
+  // The link is single use.
+  await page.goto(link);
+  await expect(page.getByText("This link is no longer valid.")).toBeVisible();
+
+  await signIn(page, account.email, newPassword);
 });
 
 test("a stranger cannot open someone else's deal", async ({ page }) => {

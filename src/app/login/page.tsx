@@ -8,16 +8,16 @@ export const metadata = { title: "Sign in" };
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>;
+  searchParams: Promise<{ next?: string; reset?: string }>;
 }) {
-  const { next } = await searchParams;
+  const { next, reset } = await searchParams;
   if (await getCurrentUser()) redirect("/dashboard");
 
   return (
     <div className="mx-auto max-w-md py-8">
       <h1 className="mb-6 text-2xl font-semibold text-slate-50">Sign in</h1>
       <Card>
-        <LoginForm next={next} />
+        <LoginForm next={next} justReset={reset === "1"} />
       </Card>
     </div>
   );

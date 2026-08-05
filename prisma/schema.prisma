@@ -36,6 +36,7 @@ model User {
   disputes       Dispute[]     @relation("DisputeOpener")
   auditLogs      AuditLog[]
   sessions       Session[]
+  resetTokens    PasswordResetToken[]
   ledgerEntries  LedgerEntry[] @relation("LedgerOwner")
   ledgerActions  LedgerEntry[] @relation("LedgerActor")
   withdrawals    Withdrawal[]  @relation("WithdrawalOwner")
@@ -278,6 +279,24 @@ model AuditLog {
 
   @@index([entity, entityId])
   @@index([createdAt])
+}
+
+/// A single-use link that lets someone who has lost their password set a new
+/// one. Only the hash is stored, so a database dump cannot be used to reset
+/// anybody's account.
+model PasswordResetToken {
+  id        String @id @default(cuid())
+  userId    String
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String @unique
+
+  expiresAt DateTime
+  usedAt    DateTime?
+  requestIp String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 /// The platform's own receiving address for one network. Buyers send here when

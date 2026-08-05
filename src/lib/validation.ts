@@ -37,6 +37,21 @@ export const registerSchema = z.object({
   password: strongPassword,
 });
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().trim().toLowerCase().email("Enter a valid email address").max(255),
+});
+
+export const resetPasswordSchema = z
+  .object({
+    token: z.string().trim().min(10),
+    newPassword: strongPassword,
+    confirmPassword: z.string().min(1, "Repeat the new password"),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "The two passwords do not match",
+    path: ["confirmPassword"],
+  });
+
 export const changePasswordSchema = z
   .object({
     currentPassword: z.string().min(1, "Enter your current password"),

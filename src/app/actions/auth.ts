@@ -18,10 +18,13 @@ import { env } from "@/lib/env";
 import {
   changePasswordSchema,
   fieldErrors,
+  forgotPasswordSchema,
   loginSchema,
   payoutAddressSchema,
   registerSchema,
+  resetPasswordSchema,
 } from "@/lib/validation";
+import { consumePasswordReset, requestPasswordReset, ResetError } from "@/lib/password-reset";
 import { addressHint, isValidAddress, type Network } from "@/lib/wallet";
 
 export type FormState = { errors?: Record<string, string>; message?: string; ok?: boolean };
@@ -95,6 +98,57 @@ function safeNext(value: FormDataEntryValue | null): string {
   const next = typeof value === "string" ? value : "";
   if (!next.startsWith("/") || next.startsWith("//")) return "/dashboard";
   return next;
+}
+
+/**
+ * Starts a password reset. Always reports success, whether or not the address
+ * belongs to an account — otherwise the form would be a way to find out who is
+ * registered here.
+ */
+export async function forgotPasswordAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const parsed = forgotPasswordSchema.safeParse({ email: formData.get("email") });
+  if (!parsed.success) return { errors: fieldErrors(parsed.error) };
+
+  const ip = clientIp(await headers());
+  const done = {
+    ok: true,
+    message:
+      "If that email belongs to an account, a reset link is on its way. It expires in an hour, and it only works once.",
+  };
+
+  // Rate-limited per address as well as per IP, so the endpoint cannot be used
+  // to flood one person's inbox.
+  if (!rateLimit(`forgot:${ip ?? "unknown"}`, 10, 60 * 60 * 1000)) return done;
+  if (!rateLimit(`forgot:${parsed.data.email}`, 3, 60 * 60 * 1000)) return done;
+
+  await requestPasswordReset(parsed.data.email, ip);
+  return done;
+}
+
+/** Finishes a reset: sets the new password and signs the account out everywhere. */
+export async function resetPasswordAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const parsed = resetPasswordSchema.safeParse({
+    token: formData.get("token"),
+    newPassword: formData.get("newPassword"),
+    confirmPassword: formData.get("confirmPassword"),
+  });
+  if (!parsed.success) return { errors: fieldErrors(parsed.error) };
+
+  const ip = clientIp(await headers()) ?? "unknown";
+  if (!rateLimit(`reset:${ip}`, 20, 60 * 60 * 1000)) {
+    return { errors: { form: "Too many attempts. Try again later." } };
+  }
+
+  let userId: string;
+  try {
+    userId = await consumePasswordReset(parsed.data.token, parsed.data.newPassword);
+  } catch (error) {
+    if (error instanceof ResetError) return { errors: { form: error.message } };
+    throw error;
+  }
+  await audit("user.password_reset_self", "User", userId, userId);
+
+  redirect("/login?reset=1");
 }
 
 export async function logoutAction(): Promise<void> {

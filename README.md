@@ -42,7 +42,7 @@ The interface is in English throughout.
 * **The fee is added on top** of the sale price, so a seller receives exactly what they asked for.
 * **Disputes** freeze the deal for a moderator to release or refund.
 * **Append-only audit trail** for every payment, reveal, release and admin action.
-* **Password management**: users change their own, operators can reset one for a locked-out user.
+* **Password management**: self-service reset by email, plus an audited operator reset.
 
 ## Receiving addresses
 
@@ -77,7 +77,25 @@ against the admin who did it. It is a real power — knowing a password means be
 user's credential vault — so treat it as a support action of last resort, verify who you are talking
 to first, and tell them to change it immediately.
 
-There is no self-service "forgot password" yet; that needs email delivery.
+**Forgot password** sends a link that works once and expires in an hour. The form answers the same
+way whether or not the address is registered, so it cannot be used to discover who has an account
+here, and it is rate-limited per address as well as per IP. Only the hash of the link is stored;
+using it signs the account out on every device, which evicts anyone who locked the owner out. A
+blocked account cannot be reset — the operator has to lift the block first.
+
+## Email
+
+`MAIL_PROVIDER=console` (the default) prints messages to the server log instead of sending them, so
+you can follow a reset link straight from the terminal in development. For real delivery:
+
+```
+MAIL_PROVIDER=smtp
+MAIL_FROM="EscrowBridge <no-reply@yourdomain>"
+SMTP_HOST=…   SMTP_PORT=587   SMTP_USER=…   SMTP_PASSWORD=…
+```
+
+Also set `APP_URL` to the address users actually reach — it is what the links in emails are built
+from.
 
 ## Balances and the ledger
 
@@ -173,6 +191,9 @@ records the transaction hash after broadcasting it from the offline wallet.
 | `npm test`          | Unit and ledger tests (money, encryption, balances)       |
 | `npm run test:e2e`  | Playwright walk-through of the full escrow lifecycle      |
 | `npm run typecheck` | `tsc --noEmit`                                            |
+
+The password-reset spec reads the emailed link out of the dev server log, so point `E2E_DEV_LOG` at
+it: `E2E_DEV_LOG=dev.log npm run test:e2e`.
 
 The e2e suite drives the mock wallet, so it runs against a development server (see
 `playwright.config.ts`); it expects `npm run db:seed` to have been run for the admin account.

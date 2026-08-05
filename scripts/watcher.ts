@@ -6,6 +6,7 @@
  * Run alongside the web server:  npm run watcher
  */
 import { runScheduledTransitions } from "../src/lib/deals";
+import { purgeExpiredResetTokens } from "../src/lib/password-reset";
 import { recordPayment, watchableDeals } from "../src/lib/payments";
 import { fetchIncomingUsdt } from "../src/lib/tron";
 import { env } from "../src/lib/env";
@@ -17,6 +18,9 @@ async function pass(): Promise<void> {
   if (expired || released) {
     console.log(`[watcher] expired=${expired} auto-released=${released}`);
   }
+
+  const purgedTokens = await purgeExpiredResetTokens();
+  if (purgedTokens) console.log(`[watcher] purged ${purgedTokens} expired reset links`);
 
   if (env.walletProvider === "mock") return; // no chain to read in mock mode
 
