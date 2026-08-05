@@ -68,7 +68,7 @@ test("encryption is randomised per call", () => {
 test("reference codes are unique and readable", () => {
   const codes = new Set(Array.from({ length: 500 }, () => referenceCode()));
   assert.equal(codes.size, 500);
-  for (const code of codes) assert.match(code, /^SD-[2-9A-HJ-NP-Z]{6}$/);
+  for (const code of codes) assert.match(code, /^EB-[2-9A-HJ-NP-Z]{6}$/);
 });
 
 test("tron addresses derive and validate", () => {

@@ -43,7 +43,7 @@ export default async function ListingPage({ params }: { params: Promise<{ id: st
         <div className="space-y-4">
           <Card>
             <p className="text-3xl font-semibold text-emerald-300">{formatUsdt(listing.priceMicro)} USDT</p>
-            <p className="mt-1 text-sm text-slate-400">Settled through Sedo</p>
+            <p className="mt-1 text-sm text-slate-400">Settled through EscrowBridge</p>
 
             <div className="mt-5">
               {listing.status === "SOLD" ? (

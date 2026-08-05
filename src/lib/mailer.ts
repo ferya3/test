@@ -67,7 +67,7 @@ export function passwordResetMail(to: string, displayName: string, link: string,
   const text = [
     `Hello ${displayName},`,
     "",
-    "Someone asked to reset the password on your Sedo account.",
+    "Someone asked to reset the password on your EscrowBridge account.",
     "Open this link to choose a new one:",
     "",
     link,
@@ -75,13 +75,13 @@ export function passwordResetMail(to: string, displayName: string, link: string,
     `The link works once and expires in ${minutes} minutes.`,
     "",
     "If this was not you, ignore this email — your password has not changed.",
-    "Sedo will never ask you for your password or your recovery codes.",
+    "EscrowBridge will never ask you for your password or your recovery codes.",
   ].join("\n");
 
   const html = `
     <div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;line-height:1.6;color:#111">
       <p>Hello ${escapeHtml(displayName)},</p>
-      <p>Someone asked to reset the password on your Sedo account.</p>
+      <p>Someone asked to reset the password on your EscrowBridge account.</p>
       <p>
         <a href="${escapeHtml(link)}"
            style="display:inline-block;background:#10b981;color:#04231a;padding:10px 18px;
@@ -97,11 +97,11 @@ export function passwordResetMail(to: string, displayName: string, link: string,
       <hr style="border:none;border-top:1px solid #ddd;margin:24px 0" />
       <p style="color:#555;font-size:13px">
         If this was not you, ignore this email — your password has not changed.
-        Sedo will never ask you for your password or your recovery codes.
+        EscrowBridge will never ask you for your password or your recovery codes.
       </p>
     </div>`;
 
-  return { to, subject: "Reset your Sedo password", text, html };
+  return { to, subject: "Reset your EscrowBridge password", text, html };
 }
 
 function escapeHtml(value: string): string {

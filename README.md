@@ -1,4 +1,4 @@
-# Sedo
+# EscrowBridge
 
 An escrow platform for trading digital accounts and other digital goods, settled in **USDT (TRC-20)**.
 
@@ -94,12 +94,12 @@ you can follow a reset link straight from the terminal in development. For real 
 
 ```
 MAIL_PROVIDER=smtp
-MAIL_FROM="Sedo <no-reply@yourdomain>"
+MAIL_FROM="EscrowBridge <no-reply@escrowbridge.site>"
 SMTP_HOST=…   SMTP_PORT=587   SMTP_USER=…   SMTP_PASSWORD=…
 ```
 
-Also set `APP_URL` to the address users actually reach — it is what the links in emails are built
-from.
+Also set `APP_URL` to the address users actually reach — `https://escrowbridge.site` in production. It
+is what the links in emails are built from.
 
 ## Balances and the ledger
 
@@ -159,7 +159,7 @@ permanently unreadable.
 The **first account to register becomes the administrator**. After that, everyone signs up as a
 regular user who can both buy and sell.
 
-Seeded demo accounts (password `escrow-demo-1`): `admin@`, `seller@`, `buyer@sedo.test`, plus a
+Seeded demo accounts (password `escrow-demo-1`): `admin@`, `seller@`, `buyer@escrowbridge.test`, plus a
 named buyer whose deal carries a worked example of the operator relaying the seller's answers. Point
 that account at a different address with `DEMO_BUYER_EMAIL=you@example.com npm run db:seed`.
 

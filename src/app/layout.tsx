@@ -6,11 +6,11 @@ import { SignOutButton } from "@/components/sign-out-button";
 
 export const metadata: Metadata = {
   title: {
-    default: "Sedo — USDT escrow for digital goods",
-    template: "%s · Sedo",
+    default: "EscrowBridge — USDT escrow for digital goods",
+    template: "%s · EscrowBridge",
   },
   description:
-    "Sedo holds the buyer's USDT and the seller's account credentials until both sides of the trade are satisfied.",
+    "EscrowBridge holds the buyer's USDT and the seller's account credentials until both sides of the trade are satisfied.",
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -24,9 +24,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <nav className="mx-auto flex w-full max-w-6xl items-center gap-4 px-4 py-3">
               <Link href="/" className="flex items-center gap-2 font-semibold text-slate-50">
                 <span className="grid h-8 w-8 place-items-center rounded-lg bg-emerald-400 text-sm font-bold text-emerald-950">
-                  SD
+                  EB
                 </span>
-                Sedo
+                EscrowBridge
               </Link>
 
               <div className="ml-auto flex items-center gap-1 text-sm">
@@ -66,7 +66,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
           <footer className="border-t border-slate-800/80 py-8">
             <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-4 text-sm text-slate-500">
-              <p>© {new Date().getFullYear()} Sedo. Escrow settled in USDT.</p>
+              <p>© {new Date().getFullYear()} EscrowBridge. Escrow settled in USDT.</p>
               <div className="flex gap-4">
                 <Link className="hover:text-slate-300" href="/how-it-works">
                   How it works

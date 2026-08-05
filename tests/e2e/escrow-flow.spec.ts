@@ -12,7 +12,7 @@ import { test, expect, type Page } from "@playwright/test";
 const STAMP = Date.now();
 const BUYER = { email: `buyer-${STAMP}@example.test`, name: "E2E Buyer", password: "escrow-test-1" };
 const SELLER = { email: `seller-${STAMP}@example.test`, name: "E2E Seller", password: "escrow-test-1" };
-const ADMIN = { email: "admin@sedo.test", password: "escrow-demo-1" };
+const ADMIN = { email: "admin@escrowbridge.test", password: "escrow-demo-1" };
 
 // Deterministic TRON addresses used for the refund and payout destinations.
 const BUYER_REFUND_ADDRESS = "TJRabPrwbZy45sbavfcjinPJC18kjpRTv8";

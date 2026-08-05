@@ -105,7 +105,7 @@ function uncompress(compressed: Uint8Array): Uint8Array {
  */
 class MockWallet implements WalletProvider {
   deriveDepositAddress(index: number, network: Network): string {
-    const digest = createHash("sha256").update(`sedo-mock-${network}-${index}`).digest();
+    const digest = createHash("sha256").update(`escrowbridge-mock-${network}-${index}`).digest();
     if (isEvmNetwork(network)) {
       return `0x${digest.subarray(0, 20).toString("hex")}`;
     }

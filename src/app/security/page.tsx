@@ -32,7 +32,7 @@ export default function SecurityPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <PageHeader title="Security" subtitle="How Sedo protects the money and the secrets it holds." />
+      <PageHeader title="Security" subtitle="How EscrowBridge protects the money and the secrets it holds." />
       {items.map((item) => (
         <Card key={item.title}>
           <h2 className="font-semibold text-slate-100">{item.title}</h2>
