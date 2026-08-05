@@ -148,6 +148,18 @@ npm run dev          http://localhost:3000
 Optional: `npm run db:seed` for demo data, and `npm run watcher` in a second terminal for the chain
 watcher and the expiry / auto-release timers.
 
+### On an Ubuntu server
+
+`scripts/install.sh` does the whole sequence — Node 22, dependencies, `.env`, the database, the
+production build, and pm2 — and is safe to re-run if a step fails:
+
+```
+bash scripts/install.sh
+```
+
+It deliberately stops before the domain, the reverse proxy and the certificate, and prints those as
+next steps instead of guessing. Set `SEED_DEMO_DATA=no` to skip the demo accounts.
+
 **After pulling a change that touches `prisma/schema.prisma`, re-run `npm run db:push`.** Prisma 7
 does not regenerate its client as a side effect of applying the schema, and a stale client reports
 newly added fields as unknown.
