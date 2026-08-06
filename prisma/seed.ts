@@ -276,14 +276,14 @@ async function seedNamedBuyerThread(context: {
     status: "DELIVERED",
     network: "BSC",
     refundAddress: BUYER_BSC_ADDRESS,
-    // Five assets bought as one lot. They add up to the 9,000 sale price, which
-    // createDeal enforces in the app and the invoice relies on.
+    // Five assets bought as one lot for one price. They carry no individual
+    // amounts because none were agreed — the deal was "these five for 9,000".
     items: [
-      { label: "Instagram @artavilhayat", amount: "2600.00" },
-      { label: "Instagram @artavil.hayat", amount: "1900.00" },
-      { label: "Instagram @artavil_hayat", amount: "1700.00" },
-      { label: "Domain artavilhayat.com", amount: "1900.00" },
-      { label: "Domain artavil-hayat.com", amount: "900.00" },
+      { label: "Instagram @artavilhayat" },
+      { label: "Instagram @artavil.hayat" },
+      { label: "Instagram @artavil_hayat" },
+      { label: "Domain artavilhayat.com" },
+      { label: "Domain artavil-hayat.com" },
     ],
     createdAt: mondayAt(20, 40),
     fundedAt: mondayAt(20, 55),
@@ -512,7 +512,7 @@ async function createDeal(input: {
   fundedAt?: Date;
   deliveredAt?: Date;
   inspectionEndsAt?: Date;
-  items?: { label: string; amount: string }[];
+  items?: { label: string; amount?: string }[];
 }) {
   // The fee is charged on top of the sale price, matching src/lib/deals.ts.
   const priceMicro = parseUsdt(input.amount);
@@ -547,7 +547,7 @@ async function createDeal(input: {
             create: input.items.map((item, position) => ({
               position,
               label: item.label,
-              amountMicro: parseUsdt(item.amount),
+              amountMicro: item.amount ? parseUsdt(item.amount) : null,
             })),
           }
         : undefined,

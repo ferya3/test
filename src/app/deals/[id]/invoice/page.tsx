@@ -47,11 +47,14 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   ].filter((line) => line.trim().length > 0);
   const addressIncomplete = !settings.companyStreet.trim() || !settings.companyPostalCode.trim();
 
+  // createDeal enforces all-or-nothing pricing, so the first item decides.
+  const itemsArePriced = deal.items.length > 0 && deal.items[0].amountMicro != null;
+
   const confirmed = deal.credentials.filter((item) => item.confirmedAt).length;
   const rejected = deal.credentials.filter((item) => item.rejectedAt).length;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="invoice-page mx-auto max-w-3xl space-y-4">
       <div className="flex flex-wrap items-center gap-3 print:hidden">
         <Link href={`/deals/${deal.id}`} className="text-sm text-slate-400 hover:text-emerald-300">
           ← Back to the deal
@@ -126,43 +129,38 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
               </tr>
             </thead>
             <tbody className="text-slate-700">
-              {deal.items.length > 0 ? (
-                <>
-                  {deal.items.map((item) => (
-                    <tr key={item.id} className="border-b border-slate-100">
-                      <td className="py-2 pr-4 pl-4">{item.label}</td>
-                      <td className="py-2 text-right font-mono">{formatUsdtFixed(item.amountMicro)}</td>
-                    </tr>
-                  ))}
-                  <tr className="border-b border-slate-200">
-                    <td className="py-3 pr-4">
-                      <p className="font-medium text-slate-900">Subtotal — {deal.title}</p>
-                      <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                        Held in escrow and paid to the seller on release. This amount is not a charge by{" "}
-                        {settings.companyName}.
-                      </p>
-                    </td>
-                    <td className="py-3 text-right font-mono">{formatUsdtFixed(deal.payoutMicro)}</td>
+              {/* Priced items get a row each. Unpriced ones sit under the lot's
+                  single price, because that is how the lot was actually sold —
+                  splitting 9,000 five ways would invent figures nobody agreed. */}
+              {itemsArePriced &&
+                deal.items.map((item) => (
+                  <tr key={item.id} className="border-b border-slate-100">
+                    <td className="py-2 pr-4 pl-4">{item.label}</td>
+                    <td className="py-2 text-right font-mono">{formatUsdtFixed(item.amountMicro!)}</td>
                   </tr>
-                </>
-              ) : (
-                <tr className="border-b border-slate-200">
-                  <td className="py-3 pr-4">
-                    <p className="font-medium text-slate-900">{deal.title}</p>
-                    <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                      Held in escrow and paid to the seller on release. This amount is not a charge by{" "}
-                      {settings.companyName}.
-                    </p>
-                  </td>
-                  <td className="py-3 text-right font-mono">{formatUsdtFixed(deal.payoutMicro)}</td>
-                </tr>
-              )}
+                ))}
+
+              <tr className="border-b border-slate-200">
+                <td className="py-3 pr-4">
+                  <p className="font-medium text-slate-900">
+                    {itemsArePriced ? `Subtotal — ${deal.title}` : deal.title}
+                  </p>
+                  {!itemsArePriced && deal.items.length > 0 && (
+                    <ul className="mt-2 space-y-1 text-sm text-slate-600">
+                      {deal.items.map((item) => (
+                        <li key={item.id} className="flex gap-2">
+                          <span aria-hidden>•</span>
+                          <span>{item.label}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </td>
+                <td className="py-3 text-right align-top font-mono">{formatUsdtFixed(deal.payoutMicro)}</td>
+              </tr>
               <tr className="border-b border-slate-200">
                 <td className="py-3 pr-4">
                   <p className="font-medium text-slate-900">Escrow service fee ({feePercent}%)</p>
-                  <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                    Charged on top of the sale price, so the seller receives the full amount agreed.
-                  </p>
                 </td>
                 <td className="py-3 text-right font-mono">{formatUsdtFixed(deal.feeMicro)}</td>
               </tr>

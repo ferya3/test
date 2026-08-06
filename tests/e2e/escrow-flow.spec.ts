@@ -631,6 +631,9 @@ test("a funded deal produces an invoice the buyer can open", async ({ page, brow
   await expect(page.getByText("40.00", { exact: true })).toBeVisible();
   await expect(page.getByText("840.00", { exact: true })).toBeVisible();
   await expect(page.getByText("Escrow service fee (5%)")).toBeVisible();
+  // The site chrome is hidden by CSS so the page reads as the document alone.
+  // It stays in the DOM, so this is a visibility check, not a count.
+  await expect(page.locator("header").filter({ hasText: "Marketplace" })).not.toBeVisible();
   await expect(page.getByText("Seychelles")).toBeVisible();
   await expect(page.getByText(buyer.email)).toBeVisible();
 

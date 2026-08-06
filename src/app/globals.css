@@ -135,6 +135,14 @@ body {
   box-shadow: 0 20px 45px -20px rgba(0, 0, 0, 0.6);
 }
 
+/* An invoice is a document, so the site's own header and footer have no place
+   around it — on screen as well as on paper. Scoped to the layout's own chrome
+   so the invoice's internal <footer> is untouched. */
+body:has(.invoice-page) > div > header,
+body:has(.invoice-page) > div > footer {
+  display: none;
+}
+
 @media print {
   /* Everything except the sheet is navigation, and navigation does not print. */
   body {

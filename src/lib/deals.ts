@@ -57,8 +57,11 @@ export type CreateDealInput = {
   inspectionHours: number;
   refundAddress: string;
   network?: Network;
-  /** Optional itemisation. When given, the amounts must sum to priceMicro. */
-  items?: { label: string; amountMicro: bigint }[] | null;
+  /**
+   * Optional itemisation. Amounts are optional too: price every item and they
+   * must sum to priceMicro, or price none and the lot carries one price.
+   */
+  items?: { label: string; amountMicro?: bigint | null }[] | null;
 };
 
 /**
@@ -75,17 +78,28 @@ export async function createDeal(input: CreateDealInput) {
     throw new DealError("You cannot open a deal with yourself.");
   }
 
-  // An invoice whose lines do not add up to what was escrowed is worse than one
-  // with no lines at all, so the two are reconciled before the deal exists.
   if (input.items?.length) {
-    const summed = input.items.reduce((total, item) => total + item.amountMicro, 0n);
-    if (summed !== input.priceMicro) {
-      throw new DealError(
-        `The line items add up to ${formatUsdt(summed)} USDT but the sale price is ${formatUsdt(input.priceMicro)} USDT.`,
-      );
+    const priced = input.items.filter((item) => item.amountMicro != null);
+
+    // Half-priced lines would render an invoice that neither adds up nor reads
+    // as a single lot, so it is all of them or none.
+    if (priced.length > 0 && priced.length !== input.items.length) {
+      throw new DealError("Either give every line item an amount, or leave them all blank.");
     }
-    if (input.items.some((item) => item.amountMicro <= 0n)) {
-      throw new DealError("Every line item needs an amount above zero.");
+
+    if (priced.length > 0) {
+      // An invoice whose lines do not add up to what was escrowed is worse than
+      // one with no lines at all, so the two are reconciled before the deal
+      // exists.
+      const summed = priced.reduce((total, item) => total + item.amountMicro!, 0n);
+      if (summed !== input.priceMicro) {
+        throw new DealError(
+          `The line items add up to ${formatUsdt(summed)} USDT but the sale price is ${formatUsdt(input.priceMicro)} USDT.`,
+        );
+      }
+      if (priced.some((item) => item.amountMicro! <= 0n)) {
+        throw new DealError("Every line item needs an amount above zero.");
+      }
     }
   }
 
@@ -123,7 +137,7 @@ export async function createDeal(input: CreateDealInput) {
             create: input.items.map((item, position) => ({
               position,
               label: item.label,
-              amountMicro: item.amountMicro,
+              amountMicro: item.amountMicro ?? null,
             })),
           }
         : undefined,

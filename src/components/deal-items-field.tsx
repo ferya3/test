@@ -24,7 +24,9 @@ export function DealItemsField({ price, error }: { price: number; error?: string
     return sum + (Number.isFinite(value) ? value : 0);
   }, 0);
 
-  const used = rows.some((row) => row.label.trim() || row.amount.trim());
+  const used = rows.some((row) => row.label.trim());
+  const priced = rows.filter((row) => row.amount.trim()).length;
+  const labelled = rows.filter((row) => row.label.trim()).length;
   // Sub-cent drift from decimal input is not a mismatch worth shouting about.
   const matches = Math.abs(total - price) < 0.000001;
 
@@ -32,8 +34,9 @@ export function DealItemsField({ price, error }: { price: number; error?: string
     <fieldset className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
       <legend className="px-2 text-sm font-semibold text-slate-300">Line items (optional)</legend>
       <p className="mb-3 text-xs text-slate-500">
-        List what makes up this deal and it appears on the invoice, item by item. Leave blank to invoice it as one
-        lot. The amounts must add up to the sale price.
+        List what makes up this deal and it appears on the invoice. Amounts are optional — leave them blank for a
+        lot sold at one price. If you do price them, every line needs an amount and they must add up to the sale
+        price.
       </p>
 
       <div className="space-y-2">
@@ -52,7 +55,7 @@ export function DealItemsField({ price, error }: { price: number; error?: string
               name="itemAmount"
               className="input w-32"
               inputMode="decimal"
-              placeholder="0.00"
+              placeholder="optional"
               value={row.amount}
               onChange={(event) => update(row.key, { amount: event.target.value })}
               aria-label={`Item ${index + 1} amount`}
@@ -74,7 +77,17 @@ export function DealItemsField({ price, error }: { price: number; error?: string
           Add a line
         </button>
 
-        {used && (
+        {used && priced === 0 && (
+          <span className="text-sm text-slate-500">Sold as one lot at {price.toFixed(2)} USDT</span>
+        )}
+
+        {used && priced > 0 && priced < labelled && (
+          <span className="text-sm text-amber-400">
+            {labelled - priced} line{labelled - priced === 1 ? "" : "s"} still {labelled - priced === 1 ? "needs" : "need"} an amount
+          </span>
+        )}
+
+        {used && priced > 0 && priced === labelled && (
           <span className={`text-sm ${matches ? "text-emerald-400" : "text-amber-400"}`}>
             Lines total {total.toFixed(2)} USDT
             {matches ? " — matches the sale price" : ` · sale price is ${price.toFixed(2)}`}

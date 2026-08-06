@@ -108,10 +108,13 @@ Every deal has one at `/deals/<id>/invoice`, reachable from the deal page and re
 buyer, the seller and an operator. It prints — the browser's own dialog covers "save as PDF" on every
 platform — and the page chrome drops away when it does.
 
-A deal can be **itemised**: name each thing being bought with its own amount when you open the deal,
-and the invoice lists them line by line. The amounts must add up to the sale price — `createDeal`
-refuses the deal otherwise, so an invoice can never disagree with what was escrowed. Leave the items
-blank and the lot is invoiced as one line.
+A deal can be **itemised**: name each thing being bought when you open the deal, and the invoice
+lists them. Per-item amounts are optional and usually wrong to give — most lots are sold as "these
+five for 9,000", and splitting that would put figures on the invoice nobody agreed to. Unpriced
+items appear beneath the lot's single price.
+
+If you do price them it is all or nothing, and they must sum to the sale price; `createDeal` refuses
+the deal otherwise, so an invoice can never disagree with what was escrowed.
 
 The split matters: the sale price is shown as **held in escrow, not a charge by the platform**, and
 only the fee is billed as a service. On a 9,000 USDT deal at 5% that reads 9,000 + 450 = 9,450, with

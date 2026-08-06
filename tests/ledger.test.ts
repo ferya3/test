@@ -254,5 +254,52 @@ test("line items that reconcile are stored in the order given", async () => {
     stored.map((item) => item.label),
     ["Instagram @one", "Instagram @two", "Domain three.com"],
   );
-  assert.equal(stored.reduce((sum, item) => sum + item.amountMicro, 0n), deal.payoutMicro);
+  assert.equal(stored.reduce((sum, item) => sum + (item.amountMicro ?? 0n), 0n), deal.payoutMicro);
+});
+
+test("a lot can be itemised without pricing each item", async () => {
+  // "These five for 9,000" — the items describe the lot, they do not divide it.
+  const buyerId = await makeUser();
+  const sellerId = await makeUser();
+
+  const deal = await createDeal({
+    buyerId,
+    sellerId,
+    title: "Three handles and two domains",
+    description: "One lot of five assets.",
+    priceMicro: parseUsdt("9000"),
+    inspectionHours: 48,
+    refundAddress: "0x3Ab5C7d9E1f2A4b6C8d0E2f4A6b8C0d2E4f6A8b0",
+    network: "BSC",
+    items: [
+      { label: "Instagram @one" },
+      { label: "Instagram @two" },
+      { label: "Domain three.com" },
+    ],
+  });
+
+  const stored = await prisma.dealItem.findMany({ where: { dealId: deal.id } });
+  assert.equal(stored.length, 3);
+  assert.ok(stored.every((item) => item.amountMicro === null));
+  assert.equal(deal.payoutMicro, parseUsdt("9000"));
+});
+
+test("pricing only some items is refused", async () => {
+  const buyerId = await makeUser();
+  const sellerId = await makeUser();
+
+  await assert.rejects(
+    createDeal({
+      buyerId,
+      sellerId,
+      title: "Mixed",
+      description: "Half priced.",
+      priceMicro: parseUsdt("9000"),
+      inspectionHours: 48,
+      refundAddress: "0x3Ab5C7d9E1f2A4b6C8d0E2f4A6b8C0d2E4f6A8b0",
+      network: "BSC",
+      items: [{ label: "One", amountMicro: parseUsdt("9000") }, { label: "Two" }],
+    }),
+    /every line item an amount, or leave them all blank/,
+  );
 });
