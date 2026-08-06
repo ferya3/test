@@ -1,3 +1,10 @@
 name = "coming-soon"
 main = "src/index.js"
 compatibility_date = "2025-01-01"
+
+# دامین را به Worker وصل می‌کند. زون باید روی همین اکانت Cloudflare باشد.
+# wrangler خودش رکورد DNS را می‌سازد.
+routes = [
+  { pattern = "artaleca.ir", custom_domain = true },
+  { pattern = "www.artaleca.ir", custom_domain = true },
+]
