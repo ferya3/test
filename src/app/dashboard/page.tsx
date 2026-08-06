@@ -38,7 +38,7 @@ export default async function DashboardPage() {
         title={`Welcome back, ${user.displayName}`}
         subtitle="Everything you are buying and selling through escrow."
         action={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Link className="btn btn-ghost" href="/dashboard/wallet">
               Wallet
             </Link>
@@ -82,7 +82,7 @@ export default async function DashboardPage() {
                 <li key={deal.id}>
                   <Link href={`/deals/${deal.id}`} className="flex flex-wrap items-center gap-3 py-3 hover:opacity-90">
                     <span className="font-mono text-xs text-slate-500">{deal.reference}</span>
-                    <span className="min-w-0 flex-1 truncate font-medium text-slate-200">{deal.title}</span>
+                    <span className="min-w-0 basis-full truncate sm:basis-0 sm:flex-1 font-medium text-slate-200">{deal.title}</span>
                     <span className="text-xs text-slate-500">
                       {isBuyer ? `from ${deal.seller.displayName}` : `to ${deal.buyer.displayName}`}
                     </span>

@@ -129,6 +129,15 @@ The issuer's name and address come from Admin → Settings, alongside the `/impr
 mostly blank on purpose: an address on an invoice is where people turn up when something goes wrong,
 so it has to be one that actually reaches you.
 
+## Mobile
+
+The layout is responsive down to 375px. The one thing worth knowing: a single
+non-wrapping element anywhere makes a phone browser zoom the *whole page* out to fit it, so the site
+looks shrunken rather than broken and the cause is easy to miss. The navigation used to do exactly
+that. An e2e test now asserts that no page's `scrollWidth` exceeds the viewport on a 375px screen.
+
+Above `sm` the navigation is the usual row of links; below it they collapse behind a toggle.
+
 ## Time
 
 Every displayed timestamp is rendered in one fixed zone, `NEXT_PUBLIC_DISPLAY_TIMEZONE`

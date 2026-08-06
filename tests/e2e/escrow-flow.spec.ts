@@ -657,3 +657,45 @@ test("the imprint names the operator", async ({ page }) => {
   await expect(page.getByText("Victoria, Mahé")).toBeVisible();
   await expect(page.getByText("Seychelles")).toBeVisible();
 });
+
+test.describe("on a phone", () => {
+  // 375×667 is the smallest screen still worth supporting.
+  test.use({ viewport: { width: 375, height: 667 } });
+
+  test("no page scrolls sideways and the menu reaches everything", async ({ page }) => {
+    test.slow();
+
+    const phoneUser = { email: `phone-${STAMP}@example.test`, name: "Phone User", password: "escrow-test-1" };
+
+    // Signed out: the marketing pages are the ones strangers land on.
+    for (const url of ["/", "/login", "/register", "/how-it-works", "/listings", "/imprint"]) {
+      await page.goto(url);
+      await expect
+        .poll(() => page.evaluate(() => document.documentElement.scrollWidth), {
+          message: `${url} overflows the viewport`,
+        })
+        .toBeLessThanOrEqual(375);
+    }
+
+    await register(page, phoneUser);
+    for (const url of ["/dashboard", "/deals", "/deals/new", "/dashboard/wallet", "/dashboard/settings"]) {
+      await page.goto(url);
+      await expect
+        .poll(() => page.evaluate(() => document.documentElement.scrollWidth), {
+          message: `${url} overflows the viewport`,
+        })
+        .toBeLessThanOrEqual(375);
+    }
+
+    // The links collapse behind the toggle, so they must still be reachable.
+    await page.goto("/dashboard");
+    await expect(page.getByRole("link", { name: "Marketplace" })).toBeHidden();
+    await page.getByRole("button", { name: "Open menu" }).click();
+    await expect(page.getByRole("link", { name: "Marketplace" })).toBeVisible();
+
+    await page.getByRole("link", { name: "Marketplace" }).click();
+    await expect(page).toHaveURL(/\/listings/);
+    // Navigating closes it, rather than leaving it over the page just opened.
+    await expect(page.getByRole("link", { name: "Marketplace" })).toBeHidden();
+  });
+});

@@ -61,7 +61,7 @@ export default async function AdminOverviewPage() {
                 <Link href={`/deals/${deal.id}`} className="font-mono text-xs text-emerald-300 hover:underline">
                   {deal.reference}
                 </Link>
-                <span className="min-w-0 flex-1 truncate text-sm text-slate-300">{deal.title}</span>
+                <span className="min-w-0 basis-full truncate sm:basis-0 sm:flex-1 text-sm text-slate-300">{deal.title}</span>
                 <span className="text-xs text-slate-500">
                   {deal.buyer.email} → {deal.seller.email}
                 </span>

@@ -92,7 +92,7 @@ export function AdminSetPasswordForm({ userId, email }: { userId: string; email:
         error={state.errors?.newPassword}
         hint="At least 10 characters, with a letter and a number."
       >
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <input
             id="resetPassword"
             name="newPassword"

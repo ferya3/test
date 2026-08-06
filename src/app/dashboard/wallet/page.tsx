@@ -93,7 +93,7 @@ export default async function WalletPage() {
                 <span className="badge border-slate-700 bg-slate-800/40 text-slate-400">
                   {LEDGER_LABELS[entry.kind as LedgerKind] ?? entry.kind}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-sm text-slate-400">{entry.note ?? "—"}</span>
+                <span className="min-w-0 basis-full truncate sm:basis-0 sm:flex-1 text-sm text-slate-400">{entry.note ?? "—"}</span>
                 <span
                   className={`text-sm font-semibold ${entry.amountMicro > 0n ? "text-emerald-300" : "text-red-300"}`}
                 >

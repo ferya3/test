@@ -77,7 +77,7 @@ export default async function AdminSettingsPage() {
               <span className="text-xs text-slate-500">
                 {log.entity}/{log.entityId.slice(0, 10)}…
               </span>
-              <span className="min-w-0 flex-1 truncate text-xs text-slate-500">{log.actor?.email ?? "system"}</span>
+              <span className="min-w-0 basis-full truncate sm:basis-0 sm:flex-1 text-xs text-slate-500">{log.actor?.email ?? "system"}</span>
               <span className="text-xs text-slate-600">{log.ip ?? "—"}</span>
               <span className="w-32 text-right text-xs text-slate-500">{formatDate(log.createdAt)}</span>
             </li>

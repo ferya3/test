@@ -93,7 +93,7 @@ export default async function AdminUsersPage({
                   className="flex flex-wrap items-center gap-3 py-3 hover:opacity-90"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="flex flex-wrap items-center gap-2 truncate font-medium text-slate-200">
+                    <p className="flex flex-wrap items-center gap-2 font-medium break-words text-slate-200">
                       {user.displayName}
                       {user.role === "ADMIN" && (
                         <span className="badge border-amber-500/40 bg-amber-500/10 text-amber-200">Admin</span>
@@ -132,7 +132,7 @@ export default async function AdminUsersPage({
           <span className="text-slate-500">
             Page {pageNumber} of {pageCount}
           </span>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {pageNumber > 1 && (
               <Link className="btn btn-ghost" href={query({ page: pageNumber - 1 })}>
                 Previous

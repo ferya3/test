@@ -40,7 +40,7 @@ export function DisputeForm({ dealId }: { dealId: string }) {
             required
           />
         </Field>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <SubmitButton className="btn btn-danger" pendingLabel="Submitting…">
             Open dispute
           </SubmitButton>

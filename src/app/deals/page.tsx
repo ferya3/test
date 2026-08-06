@@ -76,7 +76,7 @@ export default async function DealsPage({
               <li key={deal.id}>
                 <Link href={`/deals/${deal.id}`} className="flex flex-wrap items-center gap-3 py-3 hover:opacity-90">
                   <span className="font-mono text-xs text-slate-500">{deal.reference}</span>
-                  <span className="min-w-0 flex-1 truncate font-medium text-slate-200">{deal.title}</span>
+                  <span className="min-w-0 basis-full truncate sm:basis-0 sm:flex-1 font-medium text-slate-200">{deal.title}</span>
                   <span className="badge border-slate-700 bg-slate-800/40 text-slate-400">
                     {deal.buyerId === user.id ? "Buying" : "Selling"}
                   </span>

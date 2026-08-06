@@ -39,7 +39,7 @@ export function WithdrawalRow(props: {
   return (
     <li className="py-3">
       <div className="flex flex-wrap items-center gap-3">
-        <Link href={`/admin/users/${props.userId}`} className="min-w-0 flex-1 truncate text-sm text-slate-300 hover:text-emerald-300">
+        <Link href={`/admin/users/${props.userId}`} className="min-w-0 basis-full truncate sm:basis-0 sm:flex-1 text-sm text-slate-300 hover:text-emerald-300">
           {props.userLabel}
         </Link>
         <span className="text-sm font-semibold text-slate-100">{props.amount} USDT</span>

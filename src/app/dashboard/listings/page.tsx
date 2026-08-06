@@ -36,7 +36,7 @@ export default async function MyListingsPage() {
           <ul className="divide-y divide-slate-800">
             {listings.map((listing) => (
               <li key={listing.id} className="flex flex-wrap items-center gap-3 py-3">
-                <Link href={`/listings/${listing.id}`} className="min-w-0 flex-1 truncate font-medium text-slate-200 hover:text-emerald-300">
+                <Link href={`/listings/${listing.id}`} className="min-w-0 basis-full truncate sm:basis-0 sm:flex-1 font-medium text-slate-200 hover:text-emerald-300">
                   {listing.title}
                 </Link>
                 <span className="text-sm font-semibold text-slate-100">{formatUsdt(listing.priceMicro)} USDT</span>
@@ -44,7 +44,7 @@ export default async function MyListingsPage() {
                 <span className="w-28 text-right text-xs text-slate-500">{formatDate(listing.createdAt)}</span>
 
                 {listing.status !== "SOLD" && (
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <form action={setListingStatusAction}>
                       <input type="hidden" name="listingId" value={listing.id} />
                       <input type="hidden" name="status" value={listing.status === "ACTIVE" ? "PAUSED" : "ACTIVE"} />

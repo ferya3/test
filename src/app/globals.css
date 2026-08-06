@@ -50,6 +50,8 @@ body {
     transition: filter 0.15s ease, background 0.15s ease, border-color 0.15s ease;
     cursor: pointer;
     border: 1px solid transparent;
+    /* A button label broken across two lines reads as two buttons on a phone. */
+    white-space: nowrap;
   }
   .btn:disabled {
     opacity: 0.5;

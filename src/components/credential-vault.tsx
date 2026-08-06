@@ -148,7 +148,9 @@ function VaultRow({
     <li className={`rounded-xl border ${border} bg-slate-900/50 p-4`}>
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
-          <p className="flex flex-wrap items-center gap-2 truncate font-medium text-slate-200">
+          {/* `truncate` sets white-space: nowrap, which cancelled the wrapping
+              and pushed long labels past the viewport on a phone. */}
+          <p className="flex flex-wrap items-center gap-2 font-medium break-words text-slate-200">
             {credential.label}
             {credential.confirmed && (
               <span className="badge border-emerald-500/40 bg-emerald-500/10 text-emerald-200">Confirmed</span>
@@ -172,7 +174,7 @@ function VaultRow({
             {pending ? "Decrypting…" : "Reveal"}
           </button>
         ) : (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button type="button" className="btn btn-ghost" onClick={copy}>
               {copied ? "Copied" : "Copy"}
             </button>
