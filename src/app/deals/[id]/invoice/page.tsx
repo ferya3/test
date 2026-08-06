@@ -6,7 +6,7 @@ import { formatUsdtFixed } from "@/lib/money";
 import { getSettings, isParticipant } from "@/lib/deals";
 import { STATUS_LABELS, type DealStatus } from "@/lib/deal-status";
 import { networkLabel, networkShort, type Network } from "@/lib/networks";
-import { formatDateTime, DISPLAY_TIME_ZONE } from "@/lib/time";
+import { formatDateTime } from "@/lib/time";
 import { PrintButton } from "@/components/print-button";
 import { Alert } from "@/components/ui";
 
@@ -214,19 +214,14 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           </div>
         </section>
 
-        <footer className="border-t border-slate-200 pt-4 text-xs leading-relaxed text-slate-500">
-          <p>
-            {settings.companyName} acts as an escrow agent and is not a party to the underlying sale. Amounts are in
-            USDT (6 decimals). Times are shown in {DISPLAY_TIME_ZONE.replace("_", " ")}.
-          </p>
-          {paid ? (
-            <p className="mt-1">Payment received in full. This document is a record of funds held in escrow.</p>
-          ) : (
-            <p className="mt-1">
-              This deal has not been funded yet, so no payment has been received against this invoice.
-            </p>
-          )}
-        </footer>
+        {/* Nothing is printed under a paid invoice. The unpaid notice stays:
+            without it, an invoice for money that never arrived looks exactly
+            like one for money that did. */}
+        {!paid && (
+          <footer className="border-t border-slate-200 pt-4 text-xs leading-relaxed text-slate-500">
+            <p>This deal has not been funded yet, so no payment has been received against this invoice.</p>
+          </footer>
+        )}
       </article>
     </div>
   );

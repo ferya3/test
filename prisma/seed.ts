@@ -15,6 +15,13 @@ import { todayIn, weekdayIn, zonedTime } from "../src/lib/time";
 const PASSWORD = "escrow-demo-1";
 // Override to seed the demo thread against a different account.
 const DEMO_BUYER_EMAIL = process.env.DEMO_BUYER_EMAIL ?? "saeed.raminfar@gmail.com";
+// The seller appears on the buyer's invoice, so this wants to be the real
+// counterparty. It defaults to the platform's own domain rather than an invented
+// address at gmail or outlook, which could belong to a stranger who would then
+// find themselves named on somebody's invoice.
+//   DEMO_SELLER_EMAIL=them@example.com npm run db:seed
+const DEMO_SELLER_EMAIL = process.env.DEMO_SELLER_EMAIL ?? "nadia.sells@escrowbridge.site";
+const DEMO_SELLER_NAME = process.env.DEMO_SELLER_NAME ?? "Nadia Sells";
 // Placeholder addresses for the demo. Replace them in Admin → Settings.
 const TREASURY_BSC_ADDRESS = "0x9f1a4C7b3E5d8A2f6B0c1D4e7F8a9B0c1D2e3F44";
 const BUYER_BSC_ADDRESS = "0x3Ab5C7d9E1f2A4b6C8d0E2f4A6b8C0d2E4f6A8b0";
@@ -60,7 +67,7 @@ async function main(): Promise<void> {
 
   const [admin, seller, buyer] = await Promise.all([
     upsertUser("admin@escrowbridge.test", "Platform Admin", passwordHash, "ADMIN", null),
-    upsertUser("seller@escrowbridge.test", "Nadia Sells", passwordHash, "USER", wallet.deriveDepositAddress(9001, "TRON")),
+    upsertUser(DEMO_SELLER_EMAIL, DEMO_SELLER_NAME, passwordHash, "USER", wallet.deriveDepositAddress(9001, "TRON")),
     upsertUser("buyer@escrowbridge.test", "Omar Buys", passwordHash, "USER", wallet.deriveDepositAddress(9002, "TRON")),
   ]);
 

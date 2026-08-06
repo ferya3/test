@@ -633,7 +633,6 @@ test("a funded deal produces an invoice the buyer can open", async ({ page, brow
   await expect(page.getByText("Escrow service fee (5%)")).toBeVisible();
   await expect(page.getByText("Seychelles")).toBeVisible();
   await expect(page.getByText(buyer.email)).toBeVisible();
-  await expect(page.getByText("Payment received in full")).toBeVisible();
 
   // An invoice carries both parties' names and amounts, so it must not be
   // readable by anyone who is not on the deal.
