@@ -240,7 +240,7 @@ The **first account to register becomes the administrator**. After that, everyon
 regular user who can both buy and sell.
 
 Seeded demo accounts all share the password `escrow-demo-1`: `admin@escrowbridge.test`,
-`buyer@escrowbridge.test`, `nadia.sells@escrowbridge.site`, plus a named buyer whose deal carries a
+`buyer@escrowbridge.test`, the demo seller, plus a named buyer whose deal carries a
 worked example of the operator relaying the seller's answers.
 
 Both sides of that deal appear on its invoice, so point them at the real addresses:

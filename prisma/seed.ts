@@ -15,12 +15,11 @@ import { todayIn, weekdayIn, zonedTime } from "../src/lib/time";
 const PASSWORD = "escrow-demo-1";
 // Override to seed the demo thread against a different account.
 const DEMO_BUYER_EMAIL = process.env.DEMO_BUYER_EMAIL ?? "saeed.raminfar@gmail.com";
-// The seller appears on the buyer's invoice, so this wants to be the real
-// counterparty. It defaults to the platform's own domain rather than an invented
-// address at gmail or outlook, which could belong to a stranger who would then
-// find themselves named on somebody's invoice.
+// The seller appears on the buyer's invoice as the counterparty, and is also
+// the mailbox the three handles are recovery-bound to in the vault, so both
+// read from here. Override for a different counterparty:
 //   DEMO_SELLER_EMAIL=them@example.com npm run db:seed
-const DEMO_SELLER_EMAIL = process.env.DEMO_SELLER_EMAIL ?? "nadia.sells@escrowbridge.site";
+const DEMO_SELLER_EMAIL = process.env.DEMO_SELLER_EMAIL ?? "samouel5353@hotmail.com";
 const DEMO_SELLER_NAME = process.env.DEMO_SELLER_NAME ?? "Nadia Sells";
 // Placeholder addresses for the demo. Replace them in Admin → Settings.
 const TREASURY_BSC_ADDRESS = "0x9f1a4C7b3E5d8A2f6B0c1D4e7F8a9B0c1D2e3F44";
@@ -347,7 +346,7 @@ async function seedNamedBuyerThread(context: {
     {
       label: "Recovery email bound to all three handles",
       kind: "EMAIL",
-      value: "artavil.assets@mailbox.example",
+      value: DEMO_SELLER_EMAIL,
       at: mondayAt(23, 0),
     },
     {
