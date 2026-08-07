@@ -19,10 +19,12 @@ const DEMO_BUYER_EMAIL = process.env.DEMO_BUYER_EMAIL ?? "saeed.raminfar@gmail.c
 // the mailbox the three handles are recovery-bound to in the vault, so both
 // read from here. Override for a different counterparty:
 //   DEMO_SELLER_EMAIL=them@example.com npm run db:seed
-const DEMO_SELLER_EMAIL = process.env.DEMO_SELLER_EMAIL ?? "samouel5353@hotmail.com";
+const DEMO_SELLER_EMAIL = process.env.DEMO_SELLER_EMAIL ?? "edi73639@hotmail.com";
 const DEMO_SELLER_NAME = process.env.DEMO_SELLER_NAME ?? "Nadia Sells";
-// Placeholder addresses for the demo. Replace them in Admin → Settings.
-const TREASURY_BSC_ADDRESS = "0x9f1a4C7b3E5d8A2f6B0c1D4e7F8a9B0c1D2e3F44";
+// The BEP-20 address buyers deposit into. Editable at runtime under
+// Admin → Settings → Receiving wallets; this is only the seeded default.
+const TREASURY_BSC_ADDRESS =
+  process.env.TREASURY_BSC_ADDRESS ?? "0xaC1c1313c3DdA00855810DE7117EF4Afd4c17647";
 const BUYER_BSC_ADDRESS = "0x3Ab5C7d9E1f2A4b6C8d0E2f4A6b8C0d2E4f6A8b0";
 
 async function main(): Promise<void> {
