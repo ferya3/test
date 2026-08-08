@@ -113,10 +113,47 @@ class ImageOptimizer
 
     private function decode(string $contents): ImageInterface
     {
+        $this->assertWithinPixelBudget($contents);
+
         try {
             return $this->manager->decodeBinary($contents);
         } catch (Throwable $exception) {
             throw new RuntimeException('The file could not be read as an image.', previous: $exception);
+        }
+    }
+
+    /**
+     * Reject a decompression bomb before GD is asked to allocate for it.
+     *
+     * The upload size cap measures compressed bytes, which is the wrong
+     * dimension: a 65-byte PNG can declare 30000x30000 in its IHDR and cost
+     * ~3.4 GB to decode. getimagesizefromstring() reads only the header, so
+     * the dimensions are known without allocating the bitmap.
+     *
+     * Enforced here rather than at the upload boundary because every decode in
+     * this class funnels through this method — including the ones the queued
+     * conversion job makes, where an exhausted worker is nobody's HTTP error.
+     */
+    private function assertWithinPixelBudget(string $contents): void
+    {
+        $info = @getimagesizefromstring($contents);
+
+        if ($info === false) {
+            throw new RuntimeException('The file could not be read as an image.');
+        }
+
+        [$width, $height] = $info;
+        $megapixels = ($width * $height) / 1_000_000;
+        $budget = (float) config('media.max_megapixels', 50);
+
+        if ($megapixels > $budget) {
+            throw new RuntimeException(sprintf(
+                'The image is %.1f megapixels (%dx%d), above the %.0f megapixel limit.',
+                $megapixels,
+                $width,
+                $height,
+                $budget,
+            ));
         }
     }
 

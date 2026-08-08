@@ -189,6 +189,16 @@ else
         warn "Set it to true in .env once a TLS certificate is installed."
     fi
 
+    # Security headers. HSTS only ever goes out over TLS (the middleware checks
+    # the connection), so enabling it here is safe on a plain-HTTP install too.
+    set_env CSP_ENABLED true
+    set_env CSP_REPORT_ONLY false
+    set_env HSTS_ENABLED true
+
+    # Empty: nginx reaches PHP-FPM over FastCGI, which already carries the real
+    # client address. Set this only if a CDN or load balancer is added later.
+    set_env TRUSTED_PROXIES ""
+
     php artisan key:generate --force
 fi
 
@@ -229,11 +239,11 @@ server {
     charset utf-8;
     client_max_body_size 24M;
 
-    # Security headers; the full CSP is emitted by application middleware so it
-    # can carry a per-request nonce.
-    add_header X-Content-Type-Options    "nosniff"        always;
-    add_header X-Frame-Options           "SAMEORIGIN"     always;
-    add_header Referrer-Policy           "strict-origin-when-cross-origin" always;
+    # Security headers on PHP responses come from App\\Http\\Middleware\\SecurityHeaders,
+    # so they are not repeated here: nginx add_header appends unconditionally and
+    # cannot see what FastCGI already returned, which would emit each header
+    # twice. The static locations below set their own, because those responses
+    # are served by nginx alone and never reach the application.
 
     gzip on;
     gzip_types text/css text/javascript application/javascript application/json
@@ -248,13 +258,19 @@ server {
     location /build/ {
         expires 1y;
         add_header Cache-Control "public, immutable";
+        add_header X-Content-Type-Options "nosniff" always;
         access_log off;
         try_files \$uri =404;
     }
 
+    # Uploaded images. nosniff matters most here: these bytes came from an
+    # upload form, and a browser that decides to sniff one as HTML would be
+    # rendering attacker-influenced content from our own origin.
     location ~ ^/(storage|images)/ {
         expires 30d;
         add_header Cache-Control "public";
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Content-Disposition "inline" always;
         access_log off;
         try_files \$uri =404;
     }

@@ -385,12 +385,24 @@ straight to `<x-layouts.app :seo="…">`. A controller never assembles its own
   non-production so N+1 fails loudly in CI.
 - Nginx: gzip + brotli, immutable far-future caching for hashed Vite assets.
 
-## 11. Security plan
+## 11. Security
 
-CSRF, hashed passwords (bcrypt cost 12), Form Request validation on every write,
-policies on every admin resource, rate limiting on all public forms and login,
-TOTP 2FA required for admin roles, strict security headers + CSP with per-request
-nonces, HTTPS-only / `SameSite=Lax` / httpOnly cookies, encrypted sessions,
-upload validation by real MIME + extension allow-list + size caps with
-executable uploads rejected outright, and files stored outside the webroot and
-streamed through a controller. Detail in `docs/SECURITY.md` (Stage 7).
+CSRF, hashed passwords (bcrypt cost 12, pinned in `config/hashing.php`), Form
+Request validation on every write, policies on every admin resource, rate
+limiting on all public forms and login, TOTP 2FA required for admin roles,
+`SameSite=Lax` / httpOnly / TLS-only cookies, encrypted sessions, upload
+validation by real MIME + extension allow-list + size caps with executable
+uploads rejected outright, and gated documents stored on a private disk and
+streamed through a controller.
+
+Response headers are set by `SecurityHeaders` and `ContentSecurityPolicy`
+(configured in `config/security.php`) rather than left to the web server, so
+they do not depend on one deployment's nginx file being the thing serving the
+app. The CSP carries the per-request nonce `Vite::useCspNonce()` generates,
+which every script tag the application emits also carries.
+
+**Stage 7 audit findings and their resolution — including the image
+decompression bomb that the byte-size cap could not see, and the reasoning
+behind the two directives in the CSP that are looser than the rest — are in
+`docs/SECURITY.md`.** That document also carries the residual risks and the
+pre-launch operator checklist.

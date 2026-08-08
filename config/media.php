@@ -63,6 +63,25 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Decoded pixel budget
+    |--------------------------------------------------------------------------
+    |
+    | max_size above measures *compressed* bytes, which says nothing about what
+    | a file costs to decode: a 65-byte PNG can legally declare 30000x30000 and
+    | ask GD for ~3.4 GB of memory. That is a decompression bomb, and the byte
+    | cap cannot see it.
+    |
+    | So dimensions are read from the file header (no allocation) and checked
+    | against this budget before anything is decoded. GD holds roughly 4 bytes
+    | per pixel for a truecolor image, so 50 MP is about 200 MB peak — generous
+    | beside any real camera upload, and well inside a normal memory_limit.
+    |
+    */
+
+    'max_megapixels' => env('MEDIA_MAX_MEGAPIXELS', 50),
+
+    /*
+    |--------------------------------------------------------------------------
     | Conversions
     |--------------------------------------------------------------------------
     |
