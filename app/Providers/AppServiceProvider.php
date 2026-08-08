@@ -6,8 +6,11 @@ namespace App\Providers;
 
 use App\Services\Localization\LocaleManager;
 use App\Services\SettingsRepository;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
 
@@ -40,6 +43,29 @@ class AppServiceProvider extends ServiceProvider
         Paginator::defaultView('vendor.pagination.design-system');
 
         $this->configureModels();
+        $this->configureRateLimiting();
+    }
+
+    private function configureRateLimiting(): void
+    {
+        /*
+         * Public enquiry forms. Keyed by IP, which is the only stable
+         * identifier for an anonymous visitor — deliberately generous enough
+         * that a shared office NAT does not lock a real customer out, and
+         * tight enough that a script cannot flood the sales inbox.
+         */
+        RateLimiter::for('forms', static fn (Request $request): Limit => Limit::perMinutes(
+            decayMinutes: 10,
+            maxAttempts: 5,
+        )->by($request->ip() ?? 'unknown'));
+
+        /*
+         * Search and filtering are read-only but hit the database on every
+         * request, so a crawler walking every filter permutation is throttled
+         * well above what a person browsing could reach.
+         */
+        RateLimiter::for('search', static fn (Request $request): Limit => Limit::perMinute(60)
+            ->by($request->ip() ?? 'unknown'));
     }
 
     private function configureModels(): void

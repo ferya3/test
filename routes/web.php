@@ -44,7 +44,7 @@ $pages = function (): void {
 
     Route::get('/colors-and-decor', ColorDecorController::class)->name('colors-and-decor');
 
-    Route::get('/search', SearchController::class)->name('search');
+    Route::get('/search', SearchController::class)->middleware('throttle:search')->name('search');
     Route::get('/compare', CompareController::class)->name('compare');
 
     // Editorial pages, driven by the pages table
@@ -61,6 +61,7 @@ $pages = function (): void {
 
     Route::get('/catalog', [CatalogController::class, 'index'])->name('catalog.index');
     Route::post('/catalog/{catalog:slug}/request', [CatalogController::class, 'request'])
+        ->middleware('throttle:forms')
         ->name('catalog.request');
     Route::get('/catalog/{catalog:slug}/download', [CatalogController::class, 'download'])
         ->name('catalog.download');
@@ -72,7 +73,9 @@ $pages = function (): void {
 
     // Enquiries
     Route::get('/contact', [ContactController::class, 'create'])->name('contact');
-    Route::post('/contact', [ContactController::class, 'store'])->name('contact.store');
+    Route::post('/contact', [ContactController::class, 'store'])
+        ->middleware('throttle:forms')
+        ->name('contact.store');
 
     if (! app()->isProduction()) {
         // Development and review surface, never part of the live site.

@@ -8,17 +8,21 @@ use App\Casts\TranslatedJson;
 use App\Models\Concerns\GeneratesSlug;
 use App\Models\Concerns\HasTranslations;
 use App\Models\Concerns\Orderable;
+use App\Observers\InvalidatesCatalogCache;
 use Database\Factories\SurfaceFactory;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+#[ObservedBy(InvalidatesCatalogCache::class)]
 class Surface extends Model
 {
     use GeneratesSlug;
 
     /** @use HasFactory<SurfaceFactory> */
     use HasFactory;
+
     use HasTranslations;
     use Orderable;
 

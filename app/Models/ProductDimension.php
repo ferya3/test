@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Observers\InvalidatesCatalogCache;
 use Database\Factories\ProductDimensionFactory;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * A stocked sheet size for a product.
  */
+#[ObservedBy(InvalidatesCatalogCache::class)]
 class ProductDimension extends Model
 {
     /** @use HasFactory<ProductDimensionFactory> */

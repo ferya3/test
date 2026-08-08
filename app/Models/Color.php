@@ -8,19 +8,23 @@ use App\Casts\TranslatedJson;
 use App\Models\Concerns\GeneratesSlug;
 use App\Models\Concerns\HasTranslations;
 use App\Models\Concerns\Orderable;
+use App\Observers\InvalidatesCatalogCache;
 use App\Support\Enums\ColorFamily;
 use Database\Factories\ColorFactory;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+#[ObservedBy(InvalidatesCatalogCache::class)]
 class Color extends Model
 {
     use GeneratesSlug;
 
     /** @use HasFactory<ColorFactory> */
     use HasFactory;
+
     use HasTranslations;
     use Orderable;
 

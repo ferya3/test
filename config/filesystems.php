@@ -47,6 +47,41 @@ return [
             'report' => false,
         ],
 
+        /*
+         * Images. Public so Nginx serves them directly with a far-future cache
+         * header, rather than every request paying for a PHP process.
+         */
+        'media' => [
+            'driver' => 'local',
+            'root' => storage_path('app/public/media'),
+
+            /*
+             * Host-relative on purpose. An absolute URL baked from APP_URL
+             * breaks whenever the site is reached on another host — a staging
+             * domain, an IP, or behind a proxy — and risks mixed content.
+             * Absolute URLs are needed only for Open Graph tags and the
+             * sitemap, which build them explicitly via Media::absoluteUrl().
+             */
+            'url' => '/storage/media',
+
+            'visibility' => 'public',
+            'throw' => false,
+            'report' => false,
+        ],
+
+        /*
+         * Catalogues, datasheets and certificate scans. Private and streamed
+         * through a controller: gating the catalogue behind a lead form is
+         * pointless if the file is also reachable at a guessable public path.
+         */
+        'documents' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/documents'),
+            'serve' => false,
+            'throw' => false,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

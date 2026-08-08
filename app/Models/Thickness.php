@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Models\Concerns\Orderable;
+use App\Observers\InvalidatesCatalogCache;
 use Database\Factories\ThicknessFactory;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -14,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 /**
  * @property numeric-string $value_mm
  */
+#[ObservedBy(InvalidatesCatalogCache::class)]
 class Thickness extends Model
 {
     /** @use HasFactory<ThicknessFactory> */

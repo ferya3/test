@@ -6,7 +6,7 @@ namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Public\StoreContactRequest;
-use App\Models\ContactRequest;
+use App\Services\Inquiry\ContactService;
 use App\Support\Enums\ContactRequestType;
 use App\Support\IranProvinces;
 use Illuminate\Contracts\View\View;
@@ -27,13 +27,10 @@ class ContactController extends Controller
         ]);
     }
 
-    public function store(StoreContactRequest $request): RedirectResponse
+    public function store(StoreContactRequest $request, ContactService $enquiries): RedirectResponse
     {
-        // Request metadata is recorded here rather than accepted from input.
-        $enquiry = new ContactRequest($request->safe()->except('website'));
-        $enquiry->ip_address = $request->ip();
-        $enquiry->user_agent = substr((string) $request->userAgent(), 0, 512);
-        $enquiry->save();
+        // The honeypot field is validated but never persisted.
+        $enquiries->record($request->safe()->except('website'), $request);
 
         return redirect()
             ->to(lroute('contact').'#contact-form')

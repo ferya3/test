@@ -8,17 +8,21 @@ use App\Casts\TranslatedJson;
 use App\Models\Concerns\GeneratesSlug;
 use App\Models\Concerns\HasTranslations;
 use App\Models\Concerns\Orderable;
+use App\Observers\InvalidatesCatalogCache;
 use Database\Factories\MaterialFactory;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+#[ObservedBy(InvalidatesCatalogCache::class)]
 class Material extends Model
 {
     use GeneratesSlug;
 
     /** @use HasFactory<MaterialFactory> */
     use HasFactory;
+
     use HasTranslations;
     use Orderable;
 

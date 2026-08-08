@@ -6,6 +6,7 @@ namespace App\Queries;
 
 use App\Models\Category;
 use App\Models\Product;
+use App\Services\Cache\CatalogCache;
 use App\Support\Data\ProductFilters;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -21,6 +22,8 @@ use Illuminate\Support\Facades\DB;
  */
 class ProductQuery
 {
+    public function __construct(private readonly CatalogCache $cache) {}
+
     /**
      * Everything a product card renders. Kept in one place so the grid, the
      * search page and the comparison page cannot drift apart.
@@ -114,6 +117,21 @@ class ProductQuery
      * @return array<string, array<string, int>>
      */
     public function facets(ProductFilters $filters): array
+    {
+        // Seven grouped aggregate queries per request, over data that changes
+        // only when an editor touches the catalogue. Keyed by the exact filter
+        // combination and by locale.
+        return $this->cache->remember(
+            "facets:{$filters->fingerprint()}",
+            CatalogCache::FACET_TTL,
+            fn (): array => $this->computeFacets($filters),
+        );
+    }
+
+    /**
+     * @return array<string, array<string, int>>
+     */
+    private function computeFacets(ProductFilters $filters): array
     {
         return [
             'category' => $this->facetCounts($filters, 'category', fn (Builder $q) => $q

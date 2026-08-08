@@ -8,6 +8,7 @@ use App\Casts\TranslatedJson;
 use App\Models\Concerns\GeneratesSlug;
 use App\Models\Concerns\HasSeoMetadata;
 use App\Models\Concerns\HasTranslations;
+use App\Observers\InvalidatesCatalogCache;
 use App\Observers\ProductObserver;
 use Database\Factories\ProductFactory;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
@@ -29,7 +30,7 @@ use Illuminate\Support\Carbon;
  * @property bool $is_active
  * @property Carbon|null $published_at
  */
-#[ObservedBy(ProductObserver::class)]
+#[ObservedBy([ProductObserver::class, InvalidatesCatalogCache::class])]
 class Product extends Model
 {
     use GeneratesSlug;

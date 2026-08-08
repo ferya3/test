@@ -106,9 +106,22 @@ class Media extends Model
         return $this->mime_type === 'application/pdf';
     }
 
+    /**
+     * Host-relative URL, which is what <img src> and srcset should use so the
+     * markup works on any host the site is served from.
+     */
     public function url(): string
     {
         return Storage::disk($this->disk)->url($this->path);
+    }
+
+    /**
+     * Absolute URL, required by Open Graph tags and the sitemap — both are
+     * consumed off-site, where a relative path means nothing.
+     */
+    public function absoluteUrl(): string
+    {
+        return url($this->url());
     }
 
     /**

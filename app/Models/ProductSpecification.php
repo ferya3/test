@@ -6,7 +6,9 @@ namespace App\Models;
 
 use App\Casts\TranslatedJson;
 use App\Models\Concerns\HasTranslations;
+use App\Observers\InvalidatesCatalogCache;
 use Database\Factories\ProductSpecificationFactory;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * One row of a product's technical specification table.
  */
+#[ObservedBy(InvalidatesCatalogCache::class)]
 class ProductSpecification extends Model
 {
     /** @use HasFactory<ProductSpecificationFactory> */

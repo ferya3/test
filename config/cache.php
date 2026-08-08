@@ -32,6 +32,18 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Catalogue cache
+    |--------------------------------------------------------------------------
+    |
+    | Turns off the facet and listing caches without changing the cache driver.
+    | Useful while diagnosing a stale-count report on a live site.
+    |
+    */
+
+    'catalog_enabled' => env('CACHE_CATALOG_ENABLED', true),
+
     'stores' => [
 
         'array' => [

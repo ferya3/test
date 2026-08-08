@@ -7,7 +7,7 @@ namespace App\Http\Controllers\Public;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Public\StoreCatalogRequest;
 use App\Models\Catalog;
-use App\Models\CatalogRequest;
+use App\Services\Inquiry\CatalogRequestService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -31,29 +31,26 @@ class CatalogController extends Controller
     /**
      * Records the lead, then releases the download for this session only.
      */
-    public function request(StoreCatalogRequest $request, Catalog $catalog): RedirectResponse
-    {
+    public function request(
+        StoreCatalogRequest $request,
+        Catalog $catalog,
+        CatalogRequestService $leads,
+    ): RedirectResponse {
         $this->assertDownloadable($catalog);
 
-        $lead = new CatalogRequest($request->safe()->except('website'));
-        $lead->catalog_id = $catalog->getKey();
-        $lead->ip_address = $request->ip();
-        $lead->user_agent = substr((string) $request->userAgent(), 0, 512);
-        $lead->save();
+        $leads->record($catalog, $request->safe()->except('website'), $request);
 
-        // Session-scoped grant: the download URL is not guessable into a
-        // bypass of the lead form.
-        $request->session()->push('catalog.granted', $catalog->getKey());
-
-        return redirect()
-            ->to(lroute('catalog.download', ['catalog' => $catalog->slug]));
+        return redirect()->to(lroute('catalog.download', ['catalog' => $catalog->slug]));
     }
 
-    public function download(Request $request, Catalog $catalog): StreamedResponse
-    {
+    public function download(
+        Request $request,
+        Catalog $catalog,
+        CatalogRequestService $leads,
+    ): StreamedResponse {
         $this->assertDownloadable($catalog);
 
-        if ($catalog->requires_registration && ! $this->hasBeenGranted($request, $catalog)) {
+        if ($catalog->requires_registration && ! $leads->hasBeenGranted($request, $catalog)) {
             throw new NotFoundHttpException;
         }
 
@@ -74,14 +71,5 @@ class CatalogController extends Controller
         if (! $catalog->is_active || ! $catalog->isDownloadable()) {
             throw new NotFoundHttpException;
         }
-    }
-
-    private function hasBeenGranted(Request $request, Catalog $catalog): bool
-    {
-        return in_array(
-            $catalog->getKey(),
-            (array) $request->session()->get('catalog.granted', []),
-            strict: true,
-        );
     }
 }

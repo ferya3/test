@@ -8,7 +8,9 @@ use App\Casts\TranslatedJson;
 use App\Models\Concerns\GeneratesSlug;
 use App\Models\Concerns\HasTranslations;
 use App\Models\Concerns\Orderable;
+use App\Observers\InvalidatesCatalogCache;
 use Database\Factories\ApplicationFactory;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -16,12 +18,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 /**
  * Where a panel is used: kitchen cabinet, wardrobe, wall panel, commercial fit-out.
  */
+#[ObservedBy(InvalidatesCatalogCache::class)]
 class Application extends Model
 {
     use GeneratesSlug;
 
     /** @use HasFactory<ApplicationFactory> */
     use HasFactory;
+
     use HasTranslations;
     use Orderable;
 
