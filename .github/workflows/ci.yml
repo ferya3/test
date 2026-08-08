@@ -1,0 +1,152 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Fast feedback: SQLite in memory, no services to wait on. This is the job
+  # that fails within a minute when something is plainly broken.
+  tests:
+    name: Tests (sqlite)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: gd, intl, pdo_sqlite, redis, zip
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache composer packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer/files
+          key: composer-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-
+
+      - run: composer install --no-interaction --prefer-dist --no-progress
+
+      - run: cp .env.example .env && php artisan key:generate
+
+      # The views are compiled by the suite anyway, but building the assets
+      # first means a broken Vite config fails here rather than as a confusing
+      # ViteManifestNotFoundException inside a feature test.
+      - name: Build assets
+        run: npm ci --ignore-scripts && npm run build
+
+      - run: php artisan test
+
+  # The job that exists because of what stages 8 and 9 found: the test
+  # environment is not the production environment, and every place they differ
+  # is a branch nothing verifies.
+  #
+  #   - MySQL     ProductQuery::applySearch() takes the FULLTEXT branch here,
+  #               and the migration creating that index actually runs.
+  #   - Redis     cached payloads and queued jobs are serialised, which is how
+  #               the stage-8 __PHP_Incomplete_Class bug would have been caught
+  #               before it shipped.
+  #   - caching   left ON, unlike phpunit.xml's default.
+  production-shaped:
+    name: Tests (mysql + redis)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: testing
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          # igbinary is the point: it is what turned a cached Collection into
+          # __PHP_Incomplete_Class in production while the array-driver suite
+          # stayed green.
+          extensions: gd, intl, pdo_mysql, redis, igbinary, zip
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache composer packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer/files
+          key: composer-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-
+
+      - run: composer install --no-interaction --prefer-dist --no-progress
+
+      - run: cp .env.example .env && php artisan key:generate
+
+      - name: Build assets
+        run: npm ci --ignore-scripts && npm run build
+
+      - name: Run the suite against production-shaped services
+        env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: testing
+          DB_USERNAME: root
+          DB_PASSWORD: root
+          CACHE_STORE: redis
+          SESSION_DRIVER: redis
+          QUEUE_CONNECTION: redis
+          REDIS_HOST: 127.0.0.1
+          REDIS_CLIENT: phpredis
+          # phpunit.xml turns catalogue caching off so a stale facet count
+          # cannot confuse a failure. Here it is on, because the cached read
+          # path is exactly what this job exists to exercise.
+          CACHE_CATALOG_ENABLED: 'true'
+        run: php artisan test
+
+  static-analysis:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+          tools: composer:v2
+
+      - run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Check formatting
+        run: ./vendor/bin/pint --test

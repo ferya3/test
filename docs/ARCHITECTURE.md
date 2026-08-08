@@ -18,7 +18,7 @@ panels and decorative panels. Persian-first (RTL), English as second language.
 | Containers | Docker Compose |
 | Images | Intervention Image v4 (GD driver) → WebP/AVIF |
 | RBAC | spatie/laravel-permission |
-| Tests | Pest 4 |
+| Tests | Pest 4 (see `docs/TESTING.md`) |
 
 ## 2. Layered architecture
 
