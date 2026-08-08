@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
 use App\Queries\ProductQuery;
+use App\Services\Seo\SeoManager;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 
@@ -17,7 +18,7 @@ class CompareController extends Controller
      * products themselves are always resolved server-side and re-checked for
      * publication.
      */
-    public function __invoke(Request $request, ProductQuery $query): View
+    public function __invoke(Request $request, ProductQuery $query, SeoManager $seo): View
     {
         $slugs = array_values(array_filter(
             explode(',', (string) $request->query('products', '')),
@@ -26,6 +27,13 @@ class CompareController extends Controller
 
         return view('pages.compare', [
             'products' => $query->bySlugs($slugs),
+            // A shareable URL is still not one worth indexing: the content is
+            // entirely a function of the ?products= query string.
+            'seo' => $seo->forUnindexedPage(
+                routeName: 'compare',
+                title: __('compare.heading'),
+                description: __('compare.lead'),
+            ),
         ]);
     }
 }

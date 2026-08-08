@@ -8,6 +8,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Public\StoreCatalogRequest;
 use App\Models\Catalog;
 use App\Services\Inquiry\CatalogRequestService;
+use App\Services\Seo\SchemaGenerator;
+use App\Services\Seo\SeoManager;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,7 +19,7 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class CatalogController extends Controller
 {
-    public function index(): View
+    public function index(SeoManager $seo, SchemaGenerator $schema): View
     {
         return view('pages.catalog', [
             'catalogs' => Catalog::query()
@@ -25,6 +27,12 @@ class CatalogController extends Controller
                 ->with(['cover', 'file'])
                 ->ordered()
                 ->get(),
+            'seo' => $seo->forPage(
+                routeName: 'catalog.index',
+                title: __('pages.catalog.heading'),
+                description: __('pages.catalog.lead'),
+                structuredData: $schema->graph([$schema->organization(), $schema->website()]),
+            ),
         ]);
     }
 

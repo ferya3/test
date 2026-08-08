@@ -329,7 +329,51 @@ link that leads straight to a 403 is worse than no link.
 - An **Admin cannot administer users.** An Admin who could grant roles could
   grant themselves Super Admin, which would make the distinction meaningless.
 
-## 9. Performance plan
+## 9. SEO
+
+`App\Services\Seo\SeoManager` resolves one `SeoData` view model per page —
+title, description, canonical, robots, Open Graph, Twitter Card — and hands it
+straight to `<x-layouts.app :seo="…">`. A controller never assembles its own
+`<head>` by hand, so none can ship a page missing a canonical tag.
+
+- **Precedence.** An entity's `seo_metadata` row (via `HasSeoMetadata`) wins
+  field-by-field over the caller's derived default (a product's own name and
+  description), which wins over the site-wide `seo_default_*` settings. A
+  hand-authored title is used exactly as written; a derived one gets the
+  `— Site Name` suffix a raw heading needs.
+- **Structured data.** `App\Services\Seo\SchemaGenerator` builds Organization
+  and WebSite nodes on every page, plus a `Product`/`Article` node on detail
+  pages, combined by `graph()` into one `@graph` document. `seo_metadata.structured_data`
+  — hand-authored in the admin — replaces the generated graph outright rather
+  than merging into it. Breadcrumb schema is emitted separately, alongside the
+  visual breadcrumbs each page already builds, via `<x-seo.schema :data="…">`.
+  JSON-LD is written with `Js::encode()` (HEX-escaped, not `Js::from()`'s
+  `JSON.parse('…')` wrapper) — `application/ld+json` is parsed as raw JSON, not
+  executed, so a JS expression there is unparsable by crawlers.
+- **hreflang.** `<x-seo.hreflang>` reads `LocaleManager::alternates()` off the
+  current request path, independent of any page-specific data — every page
+  gets fa/en + `x-default` alternates for free, with no controller wiring.
+- **Canonical over query strings.** Canonical URLs are built from the route
+  name and path parameters alone, never the query string — a filtered
+  `/products?surface=high-gloss` and a `?province=`-scoped representative
+  list canonicalise to their bare listing page rather than fragmenting into
+  separate indexed variants. `/search` and `/compare` go further and carry
+  `noindex,follow`: the same URL shape renders different content on every
+  query, which is exactly what should not be indexed.
+- **Sitemap.** `App\Services\Seo\SitemapBuilder` (spatie/laravel-sitemap)
+  walks products, categories, articles, projects and the four editorial
+  pages, emitting one `<url>` per locale an entity actually has content in —
+  `HasTranslations::translatedLocales()` decides that per row, so a
+  Persian-only product does not get an English sitemap entry that silently
+  falls back to Persian. Cached by `SitemapCache` on the same version-bump
+  scheme as `CatalogCache`, invalidated by `InvalidatesSitemapCache` on the
+  models that contribute a URL.
+- **robots.txt** is generated (`RobotsController`), not a static file, so its
+  `Sitemap:` line carries the deploying environment's real `APP_URL`; `deploy/install-ubuntu.sh`'s
+  `location = /robots.txt { try_files $uri /index.php?$query_string; }` only
+  falls through to the route when no static file shadows it.
+
+## 10. Performance plan
 
 - AVIF + WebP + fallback, responsive `srcset`, explicit dimensions, `fetchpriority`
   on the LCP image, `loading="lazy"` everywhere below the fold.
@@ -341,7 +385,7 @@ link that leads straight to a 403 is worse than no link.
   non-production so N+1 fails loudly in CI.
 - Nginx: gzip + brotli, immutable far-future caching for hashed Vite assets.
 
-## 10. Security plan
+## 11. Security plan
 
 CSRF, hashed passwords (bcrypt cost 12), Form Request validation on every write,
 policies on every admin resource, rate limiting on all public forms and login,

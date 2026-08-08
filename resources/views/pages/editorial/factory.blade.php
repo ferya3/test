@@ -7,9 +7,13 @@
     ];
 
     $features = $page->sectionsOfType(PageSectionType::Feature);
+
+    $schema = app(\App\Services\Seo\SchemaGenerator::class);
 @endphp
 
-<x-layouts.app :title="$page->title">
+<x-layouts.app :title="$page->title" :seo="$seo">
+    <x-seo.schema :data="$schema->graph([$schema->breadcrumbs($breadcrumbs)])" />
+
     <x-content.hero
         :media="$page->hero"
         :overline="__('nav.factory')"

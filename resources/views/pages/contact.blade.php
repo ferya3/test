@@ -5,11 +5,13 @@
     ];
 
     $settings = app(App\Services\SettingsRepository::class);
+    $schema = app(\App\Services\Seo\SchemaGenerator::class);
 @endphp
 
-<x-layouts.app :title="__('pages.contact.heading')">
+<x-layouts.app :title="__('pages.contact.heading')" :seo="$seo">
     <x-layout.section size="sm" tone="subtle">
         <x-ui.breadcrumbs :items="$breadcrumbs" class="mb-5" />
+        <x-seo.schema :data="$schema->graph([$schema->breadcrumbs($breadcrumbs)])" />
         <x-layout.section-header
             :heading="__('pages.contact.heading')"
             :lead="__('pages.contact.lead')"

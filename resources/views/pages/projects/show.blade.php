@@ -11,9 +11,13 @@
         $project->year ? ['label' => __('pages.projects.year'), 'value' => (string) $project->year, 'ltr' => true] : null,
         $project->area_sqm ? ['label' => __('pages.projects.area'), 'value' => number_format($project->area_sqm), 'unit' => __('units.sqm'), 'ltr' => true] : null,
     ]));
+
+    $schema = app(\App\Services\Seo\SchemaGenerator::class);
 @endphp
 
-<x-layouts.app :title="$project->title">
+<x-layouts.app :title="$project->title" :seo="$seo">
+    <x-seo.schema :data="$schema->graph([$schema->breadcrumbs($breadcrumbs)])" />
+
     <x-content.hero
         :media="$project->cover"
         :overline="$project->project_type?->label()"

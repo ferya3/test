@@ -7,9 +7,13 @@
             : null,
         ['label' => $category->name],
     ]));
+
+    $schema = app(\App\Services\Seo\SchemaGenerator::class);
 @endphp
 
-<x-layouts.app :title="$category->name">
+<x-layouts.app :title="$category->name" :seo="$seo">
+    <x-seo.schema :data="$schema->graph([$schema->breadcrumbs($breadcrumbs)])" />
+
     <x-content.hero
         :media="$category->cover"
         :overline="__('nav.categories')"

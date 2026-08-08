@@ -1,4 +1,4 @@
-<x-layouts.app :title="config('app.name')">
+<x-layouts.app :title="config('app.name')" :seo="$seo">
     <x-content.hero
         :overline="__('pages.home.hero_overline')"
         :heading="__('pages.home.hero_heading')"

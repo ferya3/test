@@ -8,9 +8,11 @@ use App\Casts\TranslatedJson;
 use App\Models\Concerns\HasSeoMetadata;
 use App\Models\Concerns\HasTranslations;
 use App\Models\Concerns\Orderable;
+use App\Observers\InvalidatesSitemapCache;
 use App\Support\Enums\PageSectionType;
 use App\Support\Enums\PageTemplate;
 use Database\Factories\PageFactory;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,6 +23,7 @@ use Illuminate\Support\Collection;
  * An editorial page (About Factory, Factory & Production, Production Process,
  * Quality Control). Its body is an ordered list of typed sections.
  */
+#[ObservedBy(InvalidatesSitemapCache::class)]
 class Page extends Model
 {
     /** @use HasFactory<PageFactory> */

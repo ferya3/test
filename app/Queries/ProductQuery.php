@@ -51,7 +51,7 @@ class ProductQuery
         'specifications',
         'gallery',
         'datasheet',
-        'seo',
+        'seo.ogImage',
     ];
 
     public function paginate(ProductFilters $filters): LengthAwarePaginator

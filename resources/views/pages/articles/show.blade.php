@@ -7,11 +7,14 @@
             : null,
         ['label' => $article->title],
     ]));
+
+    $schema = app(\App\Services\Seo\SchemaGenerator::class);
 @endphp
 
-<x-layouts.app :title="$article->title">
+<x-layouts.app :title="$article->title" :seo="$seo">
     <x-layout.section size="sm" tone="subtle">
         <x-ui.breadcrumbs :items="$breadcrumbs" class="mb-5" />
+        <x-seo.schema :data="$schema->graph([$schema->breadcrumbs($breadcrumbs)])" />
 
         <article>
             <header class="flex max-w-content flex-col gap-4">

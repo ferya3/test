@@ -10,6 +10,9 @@ use App\Models\Certificate;
 use App\Queries\ArticleQuery;
 use App\Queries\ProductQuery;
 use App\Queries\ProjectQuery;
+use App\Services\Seo\SchemaGenerator;
+use App\Services\Seo\SeoManager;
+use App\Services\SettingsRepository;
 use Illuminate\Contracts\View\View;
 
 class HomeController extends Controller
@@ -18,6 +21,9 @@ class HomeController extends Controller
         ProductQuery $products,
         ProjectQuery $projects,
         ArticleQuery $articles,
+        SeoManager $seo,
+        SchemaGenerator $schema,
+        SettingsRepository $settings,
     ): View {
         return view('pages.home', [
             'featuredProducts' => $products->featured(6),
@@ -37,6 +43,13 @@ class HomeController extends Controller
                 ->ordered()
                 ->limit(6)
                 ->get(),
+            'seo' => $seo->forPage(
+                routeName: 'home',
+                title: $settings->translated('seo_default_title') ?? config('app.name'),
+                description: $settings->translated('seo_default_description') ?? '',
+                structuredData: $schema->graph([$schema->organization(), $schema->website()]),
+                suffixTitle: false,
+            ),
         ]);
     }
 }

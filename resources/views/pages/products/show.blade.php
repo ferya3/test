@@ -16,11 +16,14 @@
         $product->color ? ['label' => __('product.color'), 'value' => $product->color->name] : null,
         $product->material ? ['label' => __('product.material'), 'value' => $product->material->name] : null,
     ]));
+
+    $schema = app(\App\Services\Seo\SchemaGenerator::class);
 @endphp
 
-<x-layouts.app :title="$product->name">
+<x-layouts.app :title="$product->name" :seo="$seo">
     <x-layout.section size="sm" tone="subtle">
         <x-ui.breadcrumbs :items="$breadcrumbs" />
+        <x-seo.schema :data="$schema->graph([$schema->breadcrumbs($breadcrumbs)])" />
     </x-layout.section>
 
     <x-layout.section size="sm">

@@ -1,4 +1,4 @@
-<x-layouts.app :title="__('pages.search.heading')">
+<x-layouts.app :title="__('pages.search.heading')" :seo="$seo">
     <x-layout.section size="sm" tone="subtle">
         <x-layout.section-header
             :heading="__('pages.search.heading')"

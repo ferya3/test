@@ -15,7 +15,7 @@
     ];
 @endphp
 
-<x-layouts.app :title="__('compare.heading')">
+<x-layouts.app :title="__('compare.heading')" :seo="$seo">
     <x-layout.section size="sm" tone="subtle">
         <x-layout.section-header
             :heading="__('compare.heading')"

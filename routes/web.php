@@ -14,7 +14,9 @@ use App\Http\Controllers\Public\PageController;
 use App\Http\Controllers\Public\ProductController;
 use App\Http\Controllers\Public\ProjectController;
 use App\Http\Controllers\Public\RepresentativeController;
+use App\Http\Controllers\Public\RobotsController;
 use App\Http\Controllers\Public\SearchController;
+use App\Http\Controllers\Public\SitemapController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -88,3 +90,8 @@ Route::name('fa.')->group($pages);
 
 // English: mounted under /en.
 Route::prefix('en')->name('en.')->group($pages);
+
+// Locale-independent: one canonical file each, covering every locale via the
+// hreflang alternates embedded in the sitemap itself.
+Route::get('/sitemap.xml', SitemapController::class)->name('sitemap');
+Route::get('/robots.txt', RobotsController::class)->name('robots');

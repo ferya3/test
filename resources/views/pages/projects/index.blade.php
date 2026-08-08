@@ -3,11 +3,13 @@
         ['label' => __('ui.home'), 'url' => lroute('home')],
         ['label' => __('nav.projects')],
     ];
+    $schema = app(\App\Services\Seo\SchemaGenerator::class);
 @endphp
 
-<x-layouts.app :title="__('pages.projects.heading')">
+<x-layouts.app :title="__('pages.projects.heading')" :seo="$seo">
     <x-layout.section size="sm" tone="subtle">
         <x-ui.breadcrumbs :items="$breadcrumbs" class="mb-5" />
+        <x-seo.schema :data="$schema->graph([$schema->breadcrumbs($breadcrumbs)])" />
         <x-layout.section-header
             :heading="__('pages.projects.heading')"
             :lead="__('pages.projects.lead')"

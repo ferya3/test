@@ -8,8 +8,10 @@ use App\Casts\TranslatedJson;
 use App\Models\Concerns\GeneratesSlug;
 use App\Models\Concerns\HasSeoMetadata;
 use App\Models\Concerns\HasTranslations;
+use App\Observers\InvalidatesSitemapCache;
 use App\Support\Enums\ArticleStatus;
 use Database\Factories\ArticleFactory;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -21,12 +23,14 @@ use Illuminate\Support\Carbon;
  * @property ArticleStatus $status
  * @property Carbon|null $published_at
  */
+#[ObservedBy(InvalidatesSitemapCache::class)]
 class Article extends Model
 {
     use GeneratesSlug;
 
     /** @use HasFactory<ArticleFactory> */
     use HasFactory;
+
     use HasSeoMetadata;
     use HasTranslations;
     use SoftDeletes;
