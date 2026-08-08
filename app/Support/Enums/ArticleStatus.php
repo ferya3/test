@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Enums;
 
-enum ArticleStatus: string
+enum ArticleStatus: string implements HasLabel
 {
     case Draft = 'draft';
     case Published = 'published';

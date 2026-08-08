@@ -28,6 +28,17 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'is_active' => true,
+
+            // Declared explicitly rather than left to the column defaults, so a
+            // factory-built instance carries the same attributes as the row it
+            // creates. Without them, preventAccessingMissingAttributes throws
+            // the first time anything reads $user->two_factor_secret.
+            'two_factor_secret' => null,
+            'two_factor_recovery_codes' => null,
+            'two_factor_confirmed_at' => null,
+            'last_login_at' => null,
+            'last_login_ip' => null,
+
             'remember_token' => Str::random(10),
         ];
     }

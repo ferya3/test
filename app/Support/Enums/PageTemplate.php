@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Enums;
 
-enum PageTemplate: string
+enum PageTemplate: string implements HasLabel
 {
     case Default = 'default';
     case About = 'about';

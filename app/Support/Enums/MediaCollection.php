@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Enums;
 
-enum MediaCollection: string
+enum MediaCollection: string implements HasLabel
 {
     case Products = 'products';
     case Categories = 'categories';

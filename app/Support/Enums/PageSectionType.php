@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Enums;
 
-enum PageSectionType: string
+enum PageSectionType: string implements HasLabel
 {
     case Text = 'text';
     case Step = 'step';

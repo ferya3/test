@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Enums;
 
-enum ProjectType: string
+enum ProjectType: string implements HasLabel
 {
     case Residential = 'residential';
     case Commercial = 'commercial';

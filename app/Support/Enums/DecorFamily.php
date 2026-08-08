@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Enums;
 
-enum DecorFamily: string
+enum DecorFamily: string implements HasLabel
 {
     case Wood = 'wood';
     case Stone = 'stone';

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Enums;
 
-enum ColorFamily: string
+enum ColorFamily: string implements HasLabel
 {
     case Neutral = 'neutral';
     case Wood = 'wood';

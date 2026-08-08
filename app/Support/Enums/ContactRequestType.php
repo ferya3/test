@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Enums;
 
-enum ContactRequestType: string
+enum ContactRequestType: string implements HasLabel
 {
     /** تماس با کارخانه */
     case Contact = 'contact';

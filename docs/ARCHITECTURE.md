@@ -270,7 +270,66 @@ See `docs/DESIGN-SYSTEM.md` (Stage 2) for tokens. Summary:
 - **Motion** — transform/opacity only, ≤300ms, all wrapped in
   `prefers-reduced-motion` guards.
 
-## 8. Performance plan
+## 8. Admin panel
+
+Mounted at `/admin` from `routes/admin.php`, outside the public locale routing:
+the back office is single-language (Persian) and never carries an `/en` prefix.
+
+### 8.1 Three concentric gates
+
+| layer | middleware | what it stops |
+| --- | --- | --- |
+| guest | `guest` | the sign-in form itself |
+| access | `auth` + `EnsureCanAccessAdmin` | signed-out, deactivated, or non-admin accounts |
+| second factor | `RequireTwoFactor` | privileged roles that have not cleared TOTP |
+
+`EnsureCanAccessAdmin` answers **404, not 403**, to an authenticated user with no
+admin role — an ordinary customer account learns nothing about what lives behind
+the prefix. It also re-checks `is_active` on every request, so revoking an
+account takes effect immediately rather than whenever its session expires.
+
+Enrolment and the challenge are registered *outside* the two-factor gate; inside
+it, there would be no way through it. The confirmation is session-scoped with an
+8-hour TTL, so a long-lived "remember me" cookie cannot stand in for the second
+factor indefinitely.
+
+### 8.2 Field-driven CRUD
+
+Twenty hand-written index/form view pairs drift apart within a month, and a
+field added to a form but forgotten in the validation rules is precisely how
+mass-assignment bugs arrive. So each resource declares its fields **once**:
+
+```php
+Field::translated('title', __('admin.field.title'), required: true)->listed(),
+Field::enum('status', __('admin.field.status'), ArticleStatus::class, required: true)->listed(),
+Field::relation('applications', __('admin.field.applications'), $options, 'applications'),
+```
+
+`CrudController` derives the list table, the edit form, the validation rules and
+the relation sync from that one declaration. Relations are synced explicitly
+after validation rather than mass assigned. `Field::enum()` takes options *and*
+validation from the enum itself, so a case cannot be offered without being
+accepted — nor accepted without being offered.
+
+Authorisation is never hand-rolled per action: every resource has a policy
+extending `ResourcePolicy`, which maps the action onto the permission matrix in
+`App\Support\Permissions`. Navigation is filtered through the same policies — a
+link that leads straight to a 403 is worse than no link.
+
+### 8.3 Deliberately not editable
+
+- **`page_sections`** — the ordered blocks composing About/Factory/Process/
+  Quality are seeded *structure*, not free-form content. Pages themselves are
+  editable; their section skeleton is a migration concern.
+- **Page creation and deletion** — each page backs a fixed route, so deleting
+  one would turn a linked page into a 404.
+- **Roles and permissions** — the matrix is code, reviewed in version control.
+  Role *assignment* is available in the user screen; inventing new roles at
+  runtime is not.
+- An **Admin cannot administer users.** An Admin who could grant roles could
+  grant themselves Super Admin, which would make the distinction meaningless.
+
+## 9. Performance plan
 
 - AVIF + WebP + fallback, responsive `srcset`, explicit dimensions, `fetchpriority`
   on the LCP image, `loading="lazy"` everywhere below the fold.
@@ -282,7 +341,7 @@ See `docs/DESIGN-SYSTEM.md` (Stage 2) for tokens. Summary:
   non-production so N+1 fails loudly in CI.
 - Nginx: gzip + brotli, immutable far-future caching for hashed Vite assets.
 
-## 9. Security plan
+## 10. Security plan
 
 CSRF, hashed passwords (bcrypt cost 12), Form Request validation on every write,
 policies on every admin resource, rate limiting on all public forms and login,

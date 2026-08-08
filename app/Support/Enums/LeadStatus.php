@@ -7,7 +7,7 @@ namespace App\Support\Enums;
 /**
  * Triage state shared by contact requests and catalog requests.
  */
-enum LeadStatus: string
+enum LeadStatus: string implements HasLabel
 {
     case New = 'new';
     case InProgress = 'in_progress';

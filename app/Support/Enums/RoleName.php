@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Enums;
 
-enum RoleName: string
+enum RoleName: string implements HasLabel
 {
     case SuperAdmin = 'super-admin';
     case Admin = 'admin';
