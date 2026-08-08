@@ -61,12 +61,19 @@ apt-get update -qq
 log "Installing PHP $PHP_VER and extensions"
 # gd is required for image conversions; redis for cache/queue; intl for locale
 # aware formatting of Persian content.
+#
+# igbinary is deliberate rather than incidental: it is the faster serialiser for
+# everything going into Redis, and it is also the configuration in which a
+# cached object comes back as __PHP_Incomplete_Class. Stage 8 shipped exactly
+# that bug. Installing it here means the servers, the CI job that guards
+# against it (tests/Feature/Catalog/CachedPayloadTest.php) and the docs all
+# describe the same machine.
 apt-get install -y -qq \
     "php${PHP_VER}-fpm" "php${PHP_VER}-cli" "php${PHP_VER}-common" \
     "php${PHP_VER}-mysql" "php${PHP_VER}-redis" "php${PHP_VER}-mbstring" \
     "php${PHP_VER}-xml" "php${PHP_VER}-curl" "php${PHP_VER}-zip" \
     "php${PHP_VER}-intl" "php${PHP_VER}-gd" "php${PHP_VER}-bcmath" \
-    "php${PHP_VER}-opcache"
+    "php${PHP_VER}-opcache" "php${PHP_VER}-igbinary"
 
 log "Installing Nginx, MySQL and Redis"
 apt-get install -y -qq nginx mysql-server redis-server
