@@ -1,0 +1,35 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    'skip_to_content' => 'رفتن به محتوای اصلی',
+    'home' => 'صفحه اصلی',
+    'primary_navigation' => 'ناوبری اصلی',
+    'breadcrumb' => 'مسیر صفحه',
+    'language' => 'زبان',
+    'open_menu' => 'باز کردن منو',
+    'close_menu' => 'بستن منو',
+    'dismiss' => 'بستن',
+    'optional' => '(اختیاری)',
+    'required' => 'الزامی',
+    'view_details' => 'مشاهده جزئیات',
+    'image_unavailable' => 'تصویری موجود نیست',
+    'switch_to_dark' => 'تغییر به حالت تاریک',
+    'switch_to_light' => 'تغییر به حالت روشن',
+    'loading' => 'در حال بارگذاری…',
+    'search' => 'جستجو',
+    'search_products' => 'جستجوی محصولات',
+    'filters' => 'فیلترها',
+    'clear_filters' => 'حذف فیلترها',
+    'results_count' => ':count محصول',
+    'no_results' => 'موردی یافت نشد',
+    'compare' => 'مقایسه',
+    'compare_add' => 'افزودن به مقایسه',
+    'compare_remove' => 'حذف از مقایسه',
+    'compare_full' => 'حداکثر :limit محصول قابل مقایسه است',
+    'previous' => 'قبلی',
+    'next' => 'بعدی',
+    'share' => 'اشتراک‌گذاری',
+    'copied' => 'کپی شد',
+];

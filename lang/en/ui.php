@@ -1,0 +1,35 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    'skip_to_content' => 'Skip to main content',
+    'home' => 'Home',
+    'primary_navigation' => 'Primary navigation',
+    'breadcrumb' => 'Breadcrumb',
+    'language' => 'Language',
+    'open_menu' => 'Open menu',
+    'close_menu' => 'Close menu',
+    'dismiss' => 'Dismiss',
+    'optional' => '(optional)',
+    'required' => 'Required',
+    'view_details' => 'View details',
+    'image_unavailable' => 'No image available',
+    'switch_to_dark' => 'Switch to dark mode',
+    'switch_to_light' => 'Switch to light mode',
+    'loading' => 'Loading…',
+    'search' => 'Search',
+    'search_products' => 'Search products',
+    'filters' => 'Filters',
+    'clear_filters' => 'Clear filters',
+    'results_count' => ':count products',
+    'no_results' => 'Nothing found',
+    'compare' => 'Compare',
+    'compare_add' => 'Add to comparison',
+    'compare_remove' => 'Remove from comparison',
+    'compare_full' => 'You can compare up to :limit products',
+    'previous' => 'Previous',
+    'next' => 'Next',
+    'share' => 'Share',
+    'copied' => 'Copied',
+];
