@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Observers\SettingObserver;
 use Database\Factories\SettingFactory;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,6 +15,7 @@ use Illuminate\Database\Eloquent\Model;
  * Site-wide configuration. Read through App\Services\SettingsRepository, which
  * caches the whole table as one blob — never queried row by row from a view.
  */
+#[ObservedBy(SettingObserver::class)]
 class Setting extends Model
 {
     /** @use HasFactory<SettingFactory> */

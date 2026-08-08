@@ -100,12 +100,13 @@ it('does not register the reference page in production', function (): void {
     // Routes are registered at boot, so flipping the environment afterwards
     // cannot affect an already-built collection. Re-evaluating the routes file
     // under a production environment exercises the guard directly.
-    expect(Route::has('design-system'))->toBeTrue();
+    expect(Route::has('fa.design-system'))->toBeTrue()
+        ->and(Route::has('en.design-system'))->toBeTrue();
 
     app()->detectEnvironment(fn (): string => 'production');
     Route::setRoutes(new RouteCollection);
     require base_path('routes/web.php');
 
-    expect(Route::has('design-system'))->toBeFalse()
-        ->and(Route::has('design-system.en'))->toBeFalse();
+    expect(Route::has('fa.design-system'))->toBeFalse()
+        ->and(Route::has('en.design-system'))->toBeFalse();
 });

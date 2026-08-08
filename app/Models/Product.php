@@ -8,7 +8,9 @@ use App\Casts\TranslatedJson;
 use App\Models\Concerns\GeneratesSlug;
 use App\Models\Concerns\HasSeoMetadata;
 use App\Models\Concerns\HasTranslations;
+use App\Observers\ProductObserver;
 use Database\Factories\ProductFactory;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -27,12 +29,14 @@ use Illuminate\Support\Carbon;
  * @property bool $is_active
  * @property Carbon|null $published_at
  */
+#[ObservedBy(ProductObserver::class)]
 class Product extends Model
 {
     use GeneratesSlug;
 
     /** @use HasFactory<ProductFactory> */
     use HasFactory;
+
     use HasSeoMetadata;
     use HasTranslations;
     use SoftDeletes;

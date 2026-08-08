@@ -6,15 +6,18 @@
     Every specification value, sheet dimension, product code and phone number
     goes through this component rather than being interpolated directly.
 
-    The unit is isolated as LTR separately from the value, because a unit like
-    "°C" begins with a neutral character that the algorithm otherwise reorders
-    into "C°" — even when the value around it is correctly placed.
+    The unit is isolated separately from the value, because a unit beginning
+    with a neutral character ("°C") is otherwise reordered into "C°" even when
+    the value around it is correctly placed. Its direction is always resolved
+    from its own content, so a latin unit ("kg/m³") reads LTR and a Persian one
+    ("میلی‌متر") reads RTL.
 
     `dir` controls the value only:
-      'auto' (default) resolves from the content, which is what mixed values
-             such as "تا 180" need — forcing LTR would move the Persian word.
-      'ltr'  for content that is latin in every locale: phone numbers, emails,
-             URLs, product codes, dimensions.
+      'auto' (default) resolves from the content. Correct for anything mixed —
+             "تا 180", or a dimension whose unit is a Persian word — where
+             forcing LTR would place the Persian text on the wrong side.
+      'ltr'  for content that is latin in every locale and has no Persian in it:
+             phone numbers, emails, URLs, product codes, hex values.
 --}}
 @props([
     'value',
@@ -24,4 +27,4 @@
     'tabular' => true,
 ])
 
-<span {{ $attributes->class(['bidi-isolate', 'tabular' => $tabular]) }} dir="{{ $dir === 'ltr' ? 'ltr' : 'auto' }}"><span dir="{{ $dir }}" class="{{ $dir === 'ltr' ? 'ltr-isolate' : 'bidi-isolate' }}">{{ $value }}</span>@if ($unit)&nbsp;<span dir="ltr" class="ltr-isolate">{{ $unit }}</span>@endif</span>
+<span {{ $attributes->class(['bidi-isolate', 'tabular' => $tabular]) }} dir="{{ $dir === 'ltr' ? 'ltr' : 'auto' }}"><span dir="{{ $dir }}" class="{{ $dir === 'ltr' ? 'ltr-isolate' : 'bidi-isolate' }}">{{ $value }}</span>@if ($unit)&nbsp;<span dir="auto" class="bidi-isolate">{{ $unit }}</span>@endif</span>

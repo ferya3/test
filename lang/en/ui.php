@@ -28,6 +28,7 @@ return [
     'compare_add' => 'Add to comparison',
     'compare_remove' => 'Remove from comparison',
     'compare_full' => 'You can compare up to :limit products',
+    'pagination' => 'Pagination',
     'previous' => 'Previous',
     'next' => 'Next',
     'share' => 'Share',

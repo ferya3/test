@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Services\Localization\LocaleManager;
+use App\Services\SettingsRepository;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
 
@@ -16,6 +18,10 @@ class AppServiceProvider extends ServiceProvider
         // One instance per request: the manager is stateless config reading, and
         // the language switcher, hreflang tags and sitemap all consult it.
         $this->app->singleton(LocaleManager::class);
+
+        // Singleton so the per-request memo inside it actually holds; a fresh
+        // instance per injection would re-enter the cache driver each time.
+        $this->app->singleton(SettingsRepository::class);
     }
 
     public function boot(): void
@@ -28,6 +34,10 @@ class AppServiceProvider extends ServiceProvider
         // Prefetch built assets on idle so navigating from the first page does
         // not pay for chunks the browser could already have.
         Vite::prefetch(concurrency: 3);
+
+        // Pagination uses the design system's own markup rather than the
+        // framework default, so RTL chevrons and focus rings match everything else.
+        Paginator::defaultView('vendor.pagination.design-system');
 
         $this->configureModels();
     }

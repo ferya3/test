@@ -84,11 +84,27 @@
 
         <div class="ms-auto flex items-center gap-1 lg:ms-0">
             <x-layout.theme-toggle />
-            <x-layout.language-switcher class="hidden sm:flex" />
 
-            <x-ui.button :href="$locales->url('/catalog')" size="sm" class="hidden lg:inline-flex">
-                {{ __('cta.download_catalog') }}
-            </x-ui.button>
+            {{--
+                Visibility is controlled by a wrapper, never by passing display
+                utilities into these components.
+
+                $attributes->class() merges the caller's classes with the
+                component's own, so `class="hidden sm:flex"` on a component that
+                already sets `flex` emits both — and which one wins depends on
+                their order in the compiled stylesheet, not on the markup. That
+                left the switcher visible on mobile and pushed the header 9px
+                past the viewport in LTR.
+            --}}
+            <div class="hidden sm:block">
+                <x-layout.language-switcher />
+            </div>
+
+            <div class="hidden lg:block">
+                <x-ui.button :href="$locales->url('/catalog')" size="sm">
+                    {{ __('cta.download_catalog') }}
+                </x-ui.button>
+            </div>
 
             {{-- Mobile menu trigger --}}
             <button

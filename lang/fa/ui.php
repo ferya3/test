@@ -28,6 +28,7 @@ return [
     'compare_add' => 'افزودن به مقایسه',
     'compare_remove' => 'حذف از مقایسه',
     'compare_full' => 'حداکثر :limit محصول قابل مقایسه است',
+    'pagination' => 'صفحه‌بندی',
     'previous' => 'قبلی',
     'next' => 'بعدی',
     'share' => 'اشتراک‌گذاری',
