@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Services\Cache\CatalogCache;
 use App\Services\Localization\LocaleManager;
 use App\Services\SettingsRepository;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -25,6 +26,11 @@ class AppServiceProvider extends ServiceProvider
         // Singleton so the per-request memo inside it actually holds; a fresh
         // instance per injection would re-enter the cache driver each time.
         $this->app->singleton(SettingsRepository::class);
+
+        // Same reason: CatalogCache memoises the cache version, and the version
+        // is read once per cached lookup. Injected into ProductQuery and the
+        // controllers, which would otherwise each get their own memo.
+        $this->app->singleton(CatalogCache::class);
     }
 
     public function boot(): void

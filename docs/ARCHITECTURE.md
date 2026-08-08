@@ -373,17 +373,29 @@ straight to `<x-layouts.app :seo="…">`. A controller never assembles its own
   `location = /robots.txt { try_files $uri /index.php?$query_string; }` only
   falls through to the route when no static file shadows it.
 
-## 10. Performance plan
+## 10. Performance
 
 - AVIF + WebP + fallback, responsive `srcset`, explicit dimensions, `fetchpriority`
   on the LCP image, `loading="lazy"` everywhere below the fold.
 - Self-hosted, subset, preloaded variable fonts with `font-display: swap`.
-- Redis for cache + queue; long-lived tagged caches for navigation, settings,
-  filter facets, and homepage blocks, invalidated by model observers.
+- Redis for cache + queue. Version-keyed caches (`CatalogCache`) for filter
+  facets and filter options, plus the settings blob and the sitemap,
+  invalidated by model observers.
 - Image conversions generated **off-request** via queued jobs.
 - Query objects own eager loading; a `PreventLazyLoading` guard is enabled in
   non-production so N+1 fails loudly in CI.
-- Nginx: gzip + brotli, immutable far-future caching for hashed Vite assets.
+- Nginx: gzip, immutable far-future caching for hashed Vite assets.
+
+**A cached payload contains arrays and scalars, never objects.** A cached
+`Collection` survives the array driver the tests use and returns
+`__PHP_Incomplete_Class` under phpredis with igbinary — the production
+configuration — taking the page down with a TypeError. `CachedPayloadTest`
+enforces this on a serialising store.
+
+**Stage 8 measurements, findings and the things deliberately left alone are in
+`docs/PERFORMANCE.md`.** Two items planned above were dropped on evidence:
+homepage-block caching (the homepage spends 1.3ms in SQL, so there is nothing
+to win) and navigation caching (navigation is static config and never queries).
 
 ## 11. Security
 

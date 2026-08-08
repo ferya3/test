@@ -31,9 +31,17 @@ class CatalogCache
 
     public const int NAVIGATION_TTL = 86400;
 
+    /**
+     * Resolved once per request. Every key() call needs the version, and key()
+     * is called once per remember() — so without this the products page paid a
+     * second cache round-trip for each of its cached reads just to re-read a
+     * number that cannot change mid-request.
+     */
+    private ?int $version = null;
+
     public function version(): int
     {
-        return (int) Cache::rememberForever(self::VERSION_KEY, static fn (): int => 1);
+        return $this->version ??= (int) Cache::rememberForever(self::VERSION_KEY, static fn (): int => 1);
     }
 
     /**
@@ -45,6 +53,10 @@ class CatalogCache
         // silently reuse keys written under a previous version.
         Cache::add(self::VERSION_KEY, 1);
         Cache::increment(self::VERSION_KEY);
+
+        // The memo would otherwise hand out the pre-flush version for the rest
+        // of this request, writing new values under keys just orphaned.
+        $this->version = null;
     }
 
     /**

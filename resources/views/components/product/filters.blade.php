@@ -107,7 +107,20 @@
 
                             <span class="flex-1">{{ $option['label'] }}</span>
 
-                            <x-ui.measure :value="$count" class="text-caption text-text-muted" />
+                            {{--
+                                The markup <x-ui.measure> would emit for this,
+                                inlined. That component earns its cost on mixed
+                                latin/Persian runs — a value with a unit, a
+                                dimension, a product code — where the bidi
+                                algorithm would otherwise reorder the parts. A
+                                facet count is a bare integer with no unit and
+                                nothing to reorder, and this is the single
+                                hottest line on the site: one render per option
+                                per attribute, which measured 874 component
+                                renders and ~100ms of the products page before
+                                it was inlined.
+                            --}}
+                            <span class="bidi-isolate tabular text-caption text-text-muted" dir="auto">{{ $count }}</span>
                         </a>
                     </li>
                 @endforeach

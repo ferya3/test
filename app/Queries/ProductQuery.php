@@ -4,8 +4,14 @@ declare(strict_types=1);
 
 namespace App\Queries;
 
+use App\Models\Application;
 use App\Models\Category;
+use App\Models\Color;
+use App\Models\Decor;
+use App\Models\Material;
 use App\Models\Product;
+use App\Models\Surface;
+use App\Models\Thickness;
 use App\Services\Cache\CatalogCache;
 use App\Support\Data\ProductFilters;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -126,6 +132,80 @@ class ProductQuery
             CatalogCache::FACET_TTL,
             fn (): array => $this->computeFacets($filters),
         );
+    }
+
+    /**
+     * The options the filter panel offers, per attribute.
+     *
+     * Lives beside facets() because the two are halves of the same panel — the
+     * options and the counts against them — and share an invalidation trigger:
+     * every model read here carries the InvalidatesCatalogCache observer.
+     *
+     * Cached because it was seven queries on every products page view for data
+     * an editor changes a few times a year. Keyed by locale through
+     * CatalogCache::key(), since the labels are translated.
+     *
+     * **Plain arrays only — never objects.** A cached Collection survives the
+     * array driver used in tests and comes back as __PHP_Incomplete_Class under
+     * phpredis with the igbinary extension loaded, which is the production
+     * configuration. Iterating that yields raw property strings instead of the
+     * option arrays, and the filter panel dies with a TypeError on a page that
+     * passed every local test. facets() has always returned plain scalars,
+     * which is why it never met this; the same rule applies here.
+     *
+     * @return array<string, array{label: string, options: list<array{value: string, label: string, hex?: string|null}>}>
+     */
+    public function filterGroups(): array
+    {
+        return $this->cache->remember(
+            'filter-groups',
+            CatalogCache::NAVIGATION_TTL,
+            fn (): array => $this->computeFilterGroups(),
+        );
+    }
+
+    /**
+     * @return array<string, array{label: string, options: list<array{value: string, label: string, hex?: string|null}>}>
+     */
+    private function computeFilterGroups(): array
+    {
+        return [
+            'category' => [
+                'label' => __('nav.categories'),
+                'options' => Category::query()->active()->ordered()->get()
+                    ->map(fn (Category $c): array => ['value' => $c->slug, 'label' => $c->name])->all(),
+            ],
+            'surface' => [
+                'label' => __('product.surface'),
+                'options' => Surface::query()->active()->ordered()->get()
+                    ->map(fn (Surface $s): array => ['value' => $s->slug, 'label' => $s->name])->all(),
+            ],
+            'color' => [
+                'label' => __('product.color'),
+                'options' => Color::query()->active()->ordered()->get()
+                    ->map(fn (Color $c): array => ['value' => $c->slug, 'label' => $c->name, 'hex' => $c->hex])->all(),
+            ],
+            'decor' => [
+                'label' => __('product.decor'),
+                'options' => Decor::query()->active()->ordered()->get()
+                    ->map(fn (Decor $d): array => ['value' => $d->slug, 'label' => $d->name])->all(),
+            ],
+            'material' => [
+                'label' => __('product.material'),
+                'options' => Material::query()->active()->ordered()->get()
+                    ->map(fn (Material $m): array => ['value' => $m->slug, 'label' => $m->name])->all(),
+            ],
+            'thickness' => [
+                'label' => __('product.thickness'),
+                'options' => Thickness::query()->active()->ordered()->get()
+                    ->map(fn (Thickness $t): array => ['value' => $t->trimmedValue(), 'label' => $t->displayLabel()])->all(),
+            ],
+            'application' => [
+                'label' => __('product.application'),
+                'options' => Application::query()->active()->ordered()->get()
+                    ->map(fn (Application $a): array => ['value' => $a->slug, 'label' => $a->name])->all(),
+            ],
+        ];
     }
 
     /**
