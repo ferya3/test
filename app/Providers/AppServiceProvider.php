@@ -9,6 +9,7 @@ use App\Services\Localization\LocaleManager;
 use App\Services\SettingsRepository;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\RateLimiter;
@@ -50,6 +51,26 @@ class AppServiceProvider extends ServiceProvider
 
         $this->configureModels();
         $this->configureRateLimiting();
+        $this->configureTrustedProxies();
+    }
+
+    /**
+     * Applied here rather than in bootstrap/app.php's withMiddleware closure,
+     * which runs before configuration is loaded — where an env() read returns
+     * null as soon as `php artisan optimize` has cached the config, silently
+     * disabling the setting in production and nowhere else. Provider boot runs
+     * after configuration is available and before any middleware handles a
+     * request.
+     */
+    private function configureTrustedProxies(): void
+    {
+        $proxies = config('security.trusted_proxies');
+
+        if (! is_string($proxies) || $proxies === '') {
+            return;
+        }
+
+        TrustProxies::at($proxies === '*' ? '*' : array_map('trim', explode(',', $proxies)));
     }
 
     private function configureRateLimiting(): void

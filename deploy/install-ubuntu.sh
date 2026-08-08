@@ -162,6 +162,12 @@ else
     set_env APP_LOCALE fa
     set_env APP_FALLBACK_LOCALE fa
 
+    # .env.example ships single/debug, which is right for development and wrong
+    # here on both counts: one file that grows without bound, filled with
+    # everything the framework has to say. daily keeps 14 rotated files.
+    set_env LOG_STACK daily
+    set_env LOG_LEVEL warning
+
     set_env DB_CONNECTION mysql
     set_env DB_HOST 127.0.0.1
     set_env DB_PORT 3306
@@ -201,6 +207,14 @@ else
 
     php artisan key:generate --force
 fi
+
+# A re-run arrives with the previous run's caches still in place. Migrating or
+# seeding against a stale cached config is a good way to write to yesterday's
+# database, and the seeder refuses to run at all while config is cached because
+# it would silently ignore the SEED_* credentials and invent a second set of
+# admin accounts. Cleared here; `optimize` puts it all back below.
+log "Clearing cached config from any previous run"
+php artisan optimize:clear
 
 log "Running migrations"
 # First real MySQL run: the products FULLTEXT index only applies on MySQL.
@@ -379,9 +393,16 @@ cat <<'NEXT'
     1. Point DNS at this server, then enable TLS:
          sudo apt-get install -y certbot python3-certbot-nginx
          sudo certbot --nginx -d your-domain
-       APP_URL in .env is already https; cookies are TLS-only, so the site
-       will not log anyone in until a certificate is installed.
-    2. Only the database layer is built so far, so "/" still serves the
-       default Laravel page. Public pages arrive in stage 3.
+       Then set SESSION_SECURE_COOKIE=true in .env and re-run
+       `php artisan optimize`. Until a certificate exists the site runs on
+       plain HTTP with non-TLS-only cookies.
+    2. Sign in at /admin with the credentials above and enrol TOTP. Privileged
+       roles cannot reach the panel until they have.
+    3. Work through the pre-launch checklist in docs/DEPLOYMENT.md section 5 —
+       it covers the settings this script cannot decide for you, and backups,
+       which it does not configure at all.
+
+  Shipping a change later uses the other script, not this one:
+    sudo bash deploy/deploy.sh
 
 NEXT

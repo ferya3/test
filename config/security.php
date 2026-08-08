@@ -111,4 +111,27 @@ return [
         'preload' => env('HSTS_PRELOAD', false),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Trusted proxies
+    |--------------------------------------------------------------------------
+    |
+    | Empty by default. Nginx reaches PHP-FPM over FastCGI, which passes the
+    | real client address in REMOTE_ADDR, so nothing needs trusting. Put a CDN
+    | or a load balancer in front and that stops being true: every request would
+    | appear to come from the proxy, collapsing all the IP-keyed rate limits
+    | into one bucket a single client could exhaust for everybody. Set
+    | TRUSTED_PROXIES then — a comma-separated list of proxy addresses, or '*'
+    | when the proxy is the only possible ingress.
+    |
+    | This lives in config rather than being read from env at boot: production
+    | runs `php artisan optimize`, and once configuration is cached Laravel
+    | stops parsing .env altogether, so an env() call outside a config file
+    | quietly returns null. Applied in AppServiceProvider::boot(), which runs
+    | after configuration is loaded and before any middleware sees a request.
+    |
+    */
+
+    'trusted_proxies' => env('TRUSTED_PROXIES'),
+
 ];

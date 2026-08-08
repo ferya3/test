@@ -9,6 +9,7 @@ use App\Support\Enums\RoleName;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 /**
  * Creates one account per role.
@@ -21,6 +22,8 @@ class AdminUserSeeder extends Seeder
 {
     public function run(): void
     {
+        $this->assertEnvironmentIsReadable();
+
         $accounts = [
             [RoleName::SuperAdmin, 'SEED_SUPER_ADMIN_EMAIL', 'SEED_SUPER_ADMIN_PASSWORD', 'مدیر ارشد سیستم'],
             [RoleName::Admin, 'SEED_ADMIN_EMAIL', 'SEED_ADMIN_PASSWORD', 'مدیر سایت'],
@@ -64,6 +67,28 @@ class AdminUserSeeder extends Seeder
 
         $this->command?->warn(
             'Privileged roles must enrol TOTP two-factor authentication on first sign-in.',
+        );
+    }
+
+    /**
+     * Refuse to run when configuration is cached.
+     *
+     * Once `php artisan optimize` has cached the config, Laravel stops parsing
+     * .env, so every env() read here returns its default. On a re-run against a
+     * provisioned host that does not fail — it quietly creates a *second* set
+     * of admin accounts at @example.com addresses with generated passwords,
+     * alongside the real ones. Loud beats silent.
+     */
+    private function assertEnvironmentIsReadable(): void
+    {
+        if (! app()->configurationIsCached()) {
+            return;
+        }
+
+        throw new RuntimeException(
+            'Configuration is cached, so .env is not being read and the SEED_* '
+            .'credentials would be ignored. Run `php artisan config:clear` '
+            .'first, then re-cache with `php artisan optimize` afterwards.',
         );
     }
 }

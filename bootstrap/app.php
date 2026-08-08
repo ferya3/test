@@ -40,19 +40,12 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         /*
-         * Nginx talks to PHP-FPM over FastCGI, which passes the real client
-         * address in REMOTE_ADDR, so nothing is trusted by default. Put a CDN
-         * or a load balancer in front and that stops being true: every request
-         * would look like it came from the proxy, collapsing all the IP-keyed
-         * rate limits into one shared bucket that a single bot could exhaust
-         * for everybody. Set TRUSTED_PROXIES then — to the proxy addresses, or
-         * '*' when the proxy is the only possible ingress.
+         * Trusted proxies are configured in AppServiceProvider::boot() from
+         * config('security.trusted_proxies'), not here. This closure runs
+         * before the framework has loaded configuration, so an env() call in
+         * it returns null the moment `php artisan optimize` has cached the
+         * config — which is exactly what production does.
          */
-        $proxies = env('TRUSTED_PROXIES');
-
-        if (is_string($proxies) && $proxies !== '') {
-            $middleware->trustProxies(at: $proxies === '*' ? '*' : explode(',', $proxies));
-        }
 
         // The framework's `auth` middleware redirects guests to a route named
         // "login". The panel's is "admin.login", and there is no public login
