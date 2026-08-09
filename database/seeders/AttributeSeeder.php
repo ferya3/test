@@ -39,6 +39,7 @@ class AttributeSeeder extends Seeder
             ['moisture-resistant-mdf', 'ام‌دی‌اف ضد رطوبت', 'Moisture-Resistant MDF', 'مناسب محیط‌های مرطوب مانند زیر سینک ظرفشویی.', 'Suited to damp environments such as under-sink cabinetry.'],
             ['particleboard', 'نئوپان', 'Particleboard', 'گزینه اقتصادی برای بدنه کابینت و کمد.', 'An economical option for cabinet and wardrobe carcasses.'],
             ['plywood', 'تخته چندلایه', 'Plywood', 'مقاومت مکانیکی بالا و پایداری ابعادی.', 'High mechanical strength and dimensional stability.'],
+            ['compact-core', 'هسته کامپکت', 'Compact Core', 'لایه‌های کاغذ کرافت آغشته به رزین فنولیک که زیر فشار و حرارت بالا به یک ورق یکپارچه تبدیل می‌شوند؛ بدون هسته چوبی.', 'Kraft layers impregnated with phenolic resin and pressed under heat into one solid sheet, with no wood core at all.'],
         ];
 
         foreach ($materials as $position => [$slug, $nameFa, $nameEn, $descFa, $descEn]) {
@@ -87,6 +88,9 @@ class AttributeSeeder extends Seeder
             ['office-furniture', 'مبلمان اداری', 'Office Furniture'],
             ['commercial-fit-out', 'فضای تجاری', 'Commercial Fit-Out'],
             ['door-panel', 'درب و رودری', 'Door Panel'],
+            ['wet-area', 'فضای مرطوب', 'Wet Area'],
+            ['sanitary-partition', 'پارتیشن سرویس بهداشتی', 'Sanitary Partition'],
+            ['laboratory-worktop', 'میز آزمایشگاه', 'Laboratory Worktop'],
         ];
 
         foreach ($applications as $position => [$slug, $nameFa, $nameEn]) {

@@ -8,7 +8,7 @@
     <x-layout.container class="py-section-sm">
         <div class="grid gap-10 md:grid-cols-2 lg:grid-cols-4">
             <div class="flex flex-col gap-4">
-                <p class="text-body font-bold tracking-tight">{{ config('app.name') }}</p>
+                <p class="text-body font-bold tracking-tight">{{ $brandName }}</p>
                 <p class="max-w-xs text-body-sm text-text-muted">{{ __('footer.tagline') }}</p>
             </div>
 
@@ -22,7 +22,10 @@
                             <li>
                                 <a
                                     href="{{ $locales->url($link['path']) }}"
-                                    class="rounded-xs text-body-sm text-text-secondary underline-offset-4 transition-colors hover:text-text hover:underline"
+                                    {{-- inline-block + vertical padding: as bare
+                                         inline text these links were a 22px tap
+                                         target, which is under half a fingertip. --}}
+                                    class="inline-block rounded-sm py-1.5 text-body-sm text-text-secondary underline-offset-4 transition-colors hover:text-text hover:underline"
                                 >{{ __($link['label']) }}</a>
                             </li>
                         @endforeach
@@ -33,7 +36,7 @@
 
         <div class="mt-12 flex flex-col gap-4 border-t border-border pt-6 sm:flex-row sm:items-center sm:justify-between">
             <p class="text-caption text-text-muted">
-                {{ __('footer.copyright', ['year' => now()->year, 'name' => config('app.name')]) }}
+                {{ __('footer.copyright', ['year' => now()->year, 'name' => $brandName]) }}
             </p>
             <x-layout.language-switcher />
         </div>

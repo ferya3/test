@@ -25,16 +25,31 @@
                                         <label for="{{ $setting->key }}-{{ $code }}" class="text-caption text-text-muted">
                                             {{ $locales->nativeName($code) }}
                                         </label>
-                                        <input
-                                            id="{{ $setting->key }}-{{ $code }}"
-                                            type="text"
-                                            name="settings[{{ $setting->key }}][{{ $code }}]"
-                                            value="{{ $value[$code] ?? '' }}"
-                                            dir="{{ $locales->direction($code) }}"
-                                            class="h-11 w-full rounded-md border border-border-strong bg-surface-raised px-3.5 text-body focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
-                                        >
+
+                                        @if ($setting->isLongText())
+                                            <textarea
+                                                id="{{ $setting->key }}-{{ $code }}"
+                                                name="settings[{{ $setting->key }}][{{ $code }}]"
+                                                rows="6"
+                                                dir="{{ $locales->direction($code) }}"
+                                                class="w-full resize-y rounded-md border border-border-strong bg-surface-raised px-3.5 py-3 text-body focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                                            >{{ $value[$code] ?? '' }}</textarea>
+                                        @else
+                                            <input
+                                                id="{{ $setting->key }}-{{ $code }}"
+                                                type="text"
+                                                name="settings[{{ $setting->key }}][{{ $code }}]"
+                                                value="{{ $value[$code] ?? '' }}"
+                                                dir="{{ $locales->direction($code) }}"
+                                                class="h-11 w-full rounded-md border border-border-strong bg-surface-raised px-3.5 text-body focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                                            >
+                                        @endif
                                     </div>
                                 @endforeach
+
+                                @if ($setting->isLongText())
+                                    <p class="text-caption text-text-muted">{{ __('admin.hint.paragraph_break') }}</p>
+                                @endif
                             </fieldset>
                         @else
                             <div class="flex flex-col gap-2">

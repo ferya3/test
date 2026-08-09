@@ -48,4 +48,18 @@ class Setting extends Model
     {
         return $query->where('group', $group);
     }
+
+    /**
+     * Whether the admin should offer a textarea rather than a single-line input.
+     *
+     * Decided here rather than in the Blade template: which settings hold prose
+     * is a property of the setting, and the view has no business knowing the
+     * naming convention. A `_body` value is the several paragraphs of an
+     * introduction, which is unusable in a one-line field.
+     */
+    public function isLongText(): bool
+    {
+        return str_ends_with($this->key, '_body')
+            || str_ends_with($this->key, '_description');
+    }
 }

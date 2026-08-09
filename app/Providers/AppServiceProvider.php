@@ -8,11 +8,13 @@ use App\Services\Cache\CatalogCache;
 use App\Services\Localization\LocaleManager;
 use App\Services\SettingsRepository;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Contracts\View\View as ViewContract;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
 
@@ -52,6 +54,31 @@ class AppServiceProvider extends ServiceProvider
         $this->configureModels();
         $this->configureRateLimiting();
         $this->configureTrustedProxies();
+        $this->shareBrand();
+    }
+
+    /**
+     * The company name shown in the header, the footer and the copyright line.
+     *
+     * It comes from settings, so the factory can change it in the admin —
+     * `config('app.name')` is the framework's name for the application, and
+     * leaving the wordmark bound to it is why a fresh install says "Laravel"
+     * across the top of the site. Shared through a composer rather than fetched
+     * inside each partial so the settings blob is read once.
+     */
+    private function shareBrand(): void
+    {
+        View::composer(['partials.header', 'partials.footer'], function (ViewContract $view): void {
+            $settings = $this->app->make(SettingsRepository::class);
+            $name = $settings->translated('company_name') ?? config('app.name');
+
+            $view->with([
+                'brandName' => $name,
+                // First grapheme, not first byte: a Persian name would
+                // otherwise render half a character.
+                'brandMonogram' => mb_substr(trim($name), 0, 1),
+            ]);
+        });
     }
 
     /**

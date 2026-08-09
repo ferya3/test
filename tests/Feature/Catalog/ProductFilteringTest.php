@@ -142,13 +142,25 @@ describe('querying', function (): void {
     });
 
     it('includes descendants when a parent category is selected', function (): void {
-        // Every cabinet panel lives in a child category, so selecting the parent
-        // must not return an empty list.
-        $parent = Category::query()->where('slug', 'cabinet-panels')->firstOrFail();
+        // The seeded catalogue is two flat groups, so the sub-group is built
+        // here rather than assumed: an editor can add one from the admin at any
+        // time, and selecting the parent must not then return an empty list.
+        $parent = Category::query()->where('slug', 'hpl-cabinet-panel')->firstOrFail();
 
-        expect($parent->products()->count())->toBe(0)
-            ->and($this->query->paginate(filters(['category' => 'cabinet-panels']))->total())
-            ->toBeGreaterThan(0);
+        $child = Category::factory()->create([
+            'parent_id' => $parent->getKey(),
+            'slug' => 'gloss-doors',
+            'is_active' => true,
+        ]);
+
+        $moved = Product::query()->where('category_id', $parent->getKey())->firstOrFail();
+        $moved->forceFill(['category_id' => $child->getKey()])->save();
+
+        $directly = $parent->products()->count();
+
+        expect($this->query->paginate(filters(['category' => 'gloss-doors']))->total())->toBe(1)
+            ->and($this->query->paginate(filters(['category' => 'hpl-cabinet-panel']))->total())
+            ->toBe($directly + 1);
     });
 
     it('filters by thickness using the value in the URL, not an id', function (): void {

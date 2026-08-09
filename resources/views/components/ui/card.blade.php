@@ -30,13 +30,15 @@
 @endphp
 
 <div {{ $attributes->class([
-    'relative flex flex-col rounded-lg border',
+    'relative flex flex-col rounded-xl border',
     $tones[$tone] ?? $tones['default'],
     $paddings[$padding] ?? $paddings['md'],
-    // Borders and a restrained lift, not a drop shadow bloom.
-    'transition-[border-color,transform] duration-200 ease-industrial '
-        .'hover:-translate-y-0.5 hover:border-border-strong '
-        .'focus-within:border-border-strong' => $isInteractive,
+    // A soft ambient shadow that deepens on hover, rather than a border that
+    // merely darkens. The lift stays small — this is a panel catalogue, not a
+    // card that wants to jump at you.
+    'shadow-sm transition-[box-shadow,border-color,transform] duration-300 ease-out-soft '
+        .'hover:-translate-y-1 hover:border-border-strong hover:shadow-md '
+        .'focus-within:border-border-strong focus-within:shadow-md' => $isInteractive,
 ]) }}>
     {{ $slot }}
 
@@ -44,7 +46,7 @@
         {{-- Stretched overlay: the whole card is one hit area and one tab stop. --}}
         <a
             href="{{ $href }}"
-            class="absolute inset-0 rounded-lg"
+            class="absolute inset-0 rounded-xl"
             @if ($labelledby) aria-labelledby="{{ $labelledby }}" @endif
         >
             @unless ($labelledby)

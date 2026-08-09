@@ -5,10 +5,13 @@ declare(strict_types=1);
 return [
     'home' => [
         'hero_overline' => 'Since 1996',
-        'hero_heading' => 'Export-grade cabinet and decorative panels',
-        'hero_lead' => 'Melamine, high gloss and super matte panels across a full colour and decor range, with precise sizing and colour stability between production batches.',
-        'categories_heading' => 'Product groups',
-        'categories_lead' => 'From cabinet carcasses and doors to wall and acoustic panelling.',
+        'hero_heading' => 'Export-grade HPL panels',
+        'hero_lead' => 'HPL cabinet panels and solid compact sheets across a full colour and decor range, with precise sizing and colour stability between production batches.',
+        'intro_cta' => 'More about the factory',
+        'fact_founded' => 'Founded',
+        'fact_groups' => 'Product groups',
+        'categories_heading' => 'Two product groups',
+        'categories_lead' => 'One pressing process, two different jobs: cabinet panels over an MDF core, and solid compact sheets for wet areas.',
         'featured_heading' => 'Selected products',
         'projects_heading' => 'Projects',
         'projects_lead' => 'Our panels in residential, office and commercial work.',

@@ -52,17 +52,20 @@
     --}}
     <div
         {{ $attributes->class([
-            'flex items-center justify-center bg-surface-subtle text-text-placeholder',
+            'panel-placeholder flex items-center justify-center',
             $class,
         ]) }}
         @style(['aspect-ratio: '.str_replace('/', ' / ', (string) $ratio) => $ratio])
         role="img"
         aria-label="{{ $alternative !== '' ? $alternative : __('ui.image_unavailable') }}"
     >
-        <svg class="size-10 opacity-40" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <rect x="3" y="4" width="18" height="16" rx="1.5" stroke="currentColor" stroke-width="1.5" />
-            <path d="m3 16 4.5-4.5 3.5 3.5L15 11l6 5.5" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
-            <circle cx="9" cy="9" r="1.25" fill="currentColor" />
+        {{-- A stack of pressed sheets rather than a broken-image glyph: a
+             catalogue that has not had its photography uploaded yet should look
+             unfinished, not broken. --}}
+        <svg class="size-12 text-accent opacity-30" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+            <path d="M6 17 24 9l18 8-18 8-18-8Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+            <path d="m6 25 18 8 18-8" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+            <path d="m6 33 18 8 18-8" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
         </svg>
     </div>
 @else

@@ -15,17 +15,28 @@
         </x-slot:actions>
     </x-content.hero>
 
+    {{-- About the company ------------------------------------------------ --}}
+    @unless ($intro->isEmpty())
+        <x-content.intro :intro="$intro" />
+    @endunless
+
     {{-- Product groups ------------------------------------------------- --}}
     @if ($categories->isNotEmpty())
-        <x-layout.section>
+        <x-layout.section tone="subtle">
             <x-layout.section-header
                 :overline="__('nav.products')"
                 :heading="__('pages.home.categories_heading')"
                 :lead="__('pages.home.categories_lead')"
-                class="mb-10"
+                class="mb-8 md:mb-10"
             />
 
-            <ul class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {{--
+                Two groups, so two columns from `md` up and one below it — not
+                the three-up grid this was, which left a lone card stranded on
+                its own row. The image is taller on mobile, where it is the
+                whole card, and wider on desktop, where it sits beside text.
+            --}}
+            <ul class="grid gap-5 md:grid-cols-2 md:gap-6">
                 @foreach ($categories as $category)
                     <li class="flex">
                         <x-ui.card
@@ -37,17 +48,21 @@
                             <x-media.picture
                                 :media="$category->cover"
                                 :alt="$category->name"
-                                ratio="3/2"
-                                sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 92vw"
+                                ratio="4/3"
+                                sizes="(min-width: 768px) 46vw, 92vw"
                                 class="w-full"
                             />
 
-                            <div class="flex flex-1 flex-col gap-2 p-6">
-                                <h3 id="category-{{ $category->id }}" class="text-h4">{{ $category->name }}</h3>
+                            <div class="flex flex-1 flex-col gap-2.5 p-6 md:p-8">
+                                <h3 id="category-{{ $category->id }}" class="text-h3">{{ $category->name }}</h3>
 
                                 @if ($category->short_description)
-                                    <p class="text-body-sm text-text-muted">{{ $category->short_description }}</p>
+                                    <p class="text-body text-text-muted">{{ $category->short_description }}</p>
                                 @endif
+
+                                <span aria-hidden="true" class="mt-auto pt-4 text-body-sm font-semibold text-accent-text">
+                                    {{ __('cta.view_products') }}
+                                </span>
                             </div>
                         </x-ui.card>
                     </li>
@@ -58,7 +73,9 @@
 
     {{-- Selected products ----------------------------------------------- --}}
     @if ($featuredProducts->isNotEmpty())
-        <x-layout.section tone="subtle">
+        {{-- Default tone: the groups band above is already subtle, and two
+             tinted sections in a row read as one long grey block. --}}
+        <x-layout.section>
             <div class="mb-10 flex flex-wrap items-end justify-between gap-4">
                 <x-layout.section-header
                     :overline="__('nav.products')"

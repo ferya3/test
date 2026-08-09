@@ -5,19 +5,57 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Models\Category;
+use App\Models\Product;
 use Illuminate\Database\Seeder;
 
 class CategorySeeder extends Seeder
 {
     public function run(): void
     {
+        $seeded = [];
+
         foreach ($this->tree() as $position => $definition) {
             $parent = $this->upsert($definition, $position, null);
+            $seeded[] = $parent->slug;
 
             foreach ($definition['children'] ?? [] as $childPosition => $child) {
-                $this->upsert($child, $childPosition, $parent);
+                $seeded[] = $this->upsert($child, $childPosition, $parent)->slug;
             }
         }
+
+        $this->retire($seeded);
+    }
+
+    /**
+     * Deactivate categories the tree no longer defines, and hide the products
+     * left inside them.
+     *
+     * Deactivating rather than deleting: a category may already be referenced
+     * by an order, a printed catalogue or an inbound link, and a foreign key
+     * that vanishes takes its products with it. Hidden is recoverable; deleted
+     * is not.
+     *
+     * @param  list<string>  $keep
+     */
+    private function retire(array $keep): void
+    {
+        $stale = Category::query()->whereNotIn('slug', $keep)->get();
+
+        if ($stale->isEmpty()) {
+            return;
+        }
+
+        $ids = $stale->pluck('id')->all();
+
+        Category::query()->whereIn('id', $ids)->update(['is_active' => false, 'is_featured' => false]);
+
+        // Without this a product keeps pointing at a hidden category and shows
+        // up on the products index with no category to filter it by.
+        $hidden = Product::query()->whereIn('category_id', $ids)->update(['is_active' => false]);
+
+        $this->command?->info(
+            "Retired {$stale->count()} category(ies) no longer in the tree, hiding {$hidden} product(s).",
+        );
     }
 
     /**
@@ -45,79 +83,22 @@ class CategorySeeder extends Seeder
     {
         return [
             [
-                'slug' => 'cabinet-panels',
-                'name' => ['fa' => 'پنل کابینت', 'en' => 'Cabinet Panels'],
+                'slug' => 'hpl-cabinet-panel',
+                'name' => ['fa' => 'صفحه کابینت اچ‌پی‌ال', 'en' => 'HPL Cabinet Panel'],
                 'short' => [
-                    'fa' => 'پنل بدنه و درب کابینت آشپزخانه در ضخامت‌ها و سطوح مختلف.',
-                    'en' => 'Carcass and door panels for kitchen cabinetry in a range of thicknesses and finishes.',
-                ],
-                'featured' => true,
-                'children' => [
-                    [
-                        'slug' => 'high-gloss-cabinet-panels',
-                        'name' => ['fa' => 'پنل های‌گلاس', 'en' => 'High Gloss Panels'],
-                        'short' => [
-                            'fa' => 'سطح آینه‌ای با عمق رنگ بالا برای آشپزخانه‌های مدرن.',
-                            'en' => 'Mirror-finish surfaces with deep colour for contemporary kitchens.',
-                        ],
-                    ],
-                    [
-                        'slug' => 'super-matte-cabinet-panels',
-                        'name' => ['fa' => 'پنل سوپرمات', 'en' => 'Super Matte Panels'],
-                        'short' => [
-                            'fa' => 'سطح مخملی ضد اثر انگشت.',
-                            'en' => 'Velvet, anti-fingerprint surface.',
-                        ],
-                    ],
-                    [
-                        'slug' => 'membrane-cabinet-panels',
-                        'name' => ['fa' => 'پنل ممبران', 'en' => 'Membrane Panels'],
-                        'short' => [
-                            'fa' => 'روکش وکیوم با امکان فرم‌دهی لبه.',
-                            'en' => 'Vacuum-pressed foil with formable edge profiles.',
-                        ],
-                    ],
-                ],
-            ],
-            [
-                'slug' => 'decorative-panels',
-                'name' => ['fa' => 'پنل تزئینی', 'en' => 'Decorative Panels'],
-                'short' => [
-                    'fa' => 'پنل‌های دیوارپوش و تزئینی برای فضاهای مسکونی و تجاری.',
-                    'en' => 'Wall and decorative panels for residential and commercial interiors.',
-                ],
-                'featured' => true,
-                'children' => [
-                    [
-                        'slug' => 'wall-panels',
-                        'name' => ['fa' => 'دیوارپوش', 'en' => 'Wall Panels'],
-                    ],
-                    [
-                        'slug' => 'acoustic-panels',
-                        'name' => ['fa' => 'پنل آکوستیک', 'en' => 'Acoustic Panels'],
-                    ],
-                    [
-                        'slug' => 'slatted-panels',
-                        'name' => ['fa' => 'پنل شیاردار', 'en' => 'Slatted Panels'],
-                    ],
-                ],
-            ],
-            [
-                'slug' => 'melamine-boards',
-                'name' => ['fa' => 'ورق ملامینه', 'en' => 'Melamine Boards'],
-                'short' => [
-                    'fa' => 'ورق روکش‌دار ملامینه در تنوع کامل رنگ و طرح.',
-                    'en' => 'Melamine-faced boards across the full colour and decor range.',
+                    'fa' => 'ورق HPL پرس‌شده روی هسته MDF، برای بدنه و درب کابینت آشپزخانه و کمد.',
+                    'en' => 'HPL pressed onto an MDF core, for kitchen cabinet carcasses, doors and wardrobes.',
                 ],
                 'featured' => true,
             ],
             [
-                'slug' => 'edge-banding',
-                'name' => ['fa' => 'نوار لبه', 'en' => 'Edge Banding'],
+                'slug' => 'hpl-compact',
+                'name' => ['fa' => 'کامپکت اچ‌پی‌ال', 'en' => 'HPL Compact'],
                 'short' => [
-                    'fa' => 'نوار PVC و ABS هم‌رنگ با پنل.',
-                    'en' => 'PVC and ABS banding colour-matched to the panel range.',
+                    'fa' => 'ورق فشرده یکپارچه بدون هسته چوبی؛ خودایستا و مقاوم در برابر رطوبت مستقیم.',
+                    'en' => 'Solid, self-supporting compact laminate with no wood core — built for direct moisture.',
                 ],
+                'featured' => true,
             ],
         ];
     }

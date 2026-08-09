@@ -26,8 +26,7 @@ class ProductSeeder extends Seeder
 {
     public function run(): void
     {
-        // Includes root categories: "melamine-boards" has no children and holds
-        // products directly.
+        // The two groups are flat roots that hold products directly.
         $categories = Category::query()->get()->keyBy('slug');
         $decors = Decor::query()->get()->keyBy('slug');
         $colors = Color::query()->get()->keyBy('slug');
@@ -224,30 +223,29 @@ class ProductSeeder extends Seeder
 
         $combinations = [
             // category slug, decor slug, surface slug, material slug, color slug
-            ['high-gloss-cabinet-panels', 'plain-white-decor', 'high-gloss', 'mdf', 'pure-white'],
-            ['high-gloss-cabinet-panels', 'plain-graphite-decor', 'high-gloss', 'mdf', 'graphite'],
-            ['high-gloss-cabinet-panels', 'carrara-marble-decor', 'high-gloss', 'mdf', 'carrara'],
-            ['high-gloss-cabinet-panels', 'calacatta-decor', 'high-gloss', 'mdf', 'carrara'],
-            ['super-matte-cabinet-panels', 'plain-white-decor', 'super-matte', 'mdf', 'glacier-white'],
-            ['super-matte-cabinet-panels', 'plain-graphite-decor', 'super-matte', 'mdf', 'matte-black'],
-            ['super-matte-cabinet-panels', 'linen-decor', 'super-matte', 'mdf', 'cashmere'],
-            ['super-matte-cabinet-panels', 'concrete-decor', 'super-matte', 'mdf', 'urban-concrete'],
-            ['membrane-cabinet-panels', 'natural-oak-decor', 'embossed', 'moisture-resistant-mdf', 'natural-oak'],
-            ['membrane-cabinet-panels', 'rustic-oak-decor', 'embossed', 'moisture-resistant-mdf', 'natural-oak'],
-            ['membrane-cabinet-panels', 'american-walnut-decor', 'matte', 'moisture-resistant-mdf', 'smoked-walnut'],
-            ['membrane-cabinet-panels', 'wenge-decor', 'matte', 'mdf', 'smoked-walnut'],
-            ['melamine-boards', 'natural-oak-decor', 'matte', 'particleboard', 'natural-oak'],
-            ['melamine-boards', 'zebrano-decor', 'embossed', 'particleboard', 'smoked-walnut'],
-            ['melamine-boards', 'plain-white-decor', 'matte', 'particleboard', 'pure-white'],
-            ['melamine-boards', 'terrazzo-decor', 'semi-matte', 'particleboard', 'nordic-grey'],
-            ['wall-panels', 'concrete-decor', 'matte', 'hdf', 'urban-concrete'],
-            ['wall-panels', 'american-walnut-decor', 'semi-matte', 'hdf', 'smoked-walnut'],
-            ['wall-panels', 'linen-decor', 'matte', 'hdf', 'cashmere'],
-            ['acoustic-panels', 'natural-oak-decor', 'matte', 'mdf', 'natural-oak'],
-            ['acoustic-panels', 'wenge-decor', 'matte', 'mdf', 'smoked-walnut'],
-            ['slatted-panels', 'rustic-oak-decor', 'embossed', 'mdf', 'natural-oak'],
-            ['slatted-panels', 'plain-graphite-decor', 'super-matte', 'mdf', 'graphite'],
-            ['slatted-panels', 'linen-decor', 'super-matte', 'mdf', 'deep-green'],
+            ['hpl-cabinet-panel', 'plain-white-decor', 'high-gloss', 'mdf', 'pure-white'],
+            ['hpl-cabinet-panel', 'plain-graphite-decor', 'high-gloss', 'mdf', 'graphite'],
+            ['hpl-cabinet-panel', 'carrara-marble-decor', 'high-gloss', 'mdf', 'carrara'],
+            ['hpl-cabinet-panel', 'calacatta-decor', 'high-gloss', 'mdf', 'carrara'],
+            ['hpl-cabinet-panel', 'plain-white-decor', 'super-matte', 'mdf', 'glacier-white'],
+            ['hpl-cabinet-panel', 'plain-graphite-decor', 'super-matte', 'mdf', 'matte-black'],
+            ['hpl-cabinet-panel', 'linen-decor', 'super-matte', 'mdf', 'cashmere'],
+            ['hpl-cabinet-panel', 'concrete-decor', 'super-matte', 'mdf', 'urban-concrete'],
+            ['hpl-cabinet-panel', 'natural-oak-decor', 'embossed', 'moisture-resistant-mdf', 'natural-oak'],
+            ['hpl-cabinet-panel', 'rustic-oak-decor', 'embossed', 'moisture-resistant-mdf', 'natural-oak'],
+            ['hpl-cabinet-panel', 'american-walnut-decor', 'matte', 'moisture-resistant-mdf', 'smoked-walnut'],
+            ['hpl-cabinet-panel', 'wenge-decor', 'matte', 'mdf', 'smoked-walnut'],
+
+            ['hpl-compact', 'plain-white-decor', 'matte', 'compact-core', 'pure-white'],
+            ['hpl-compact', 'plain-graphite-decor', 'matte', 'compact-core', 'graphite'],
+            ['hpl-compact', 'plain-graphite-decor', 'super-matte', 'compact-core', 'matte-black'],
+            ['hpl-compact', 'natural-oak-decor', 'matte', 'compact-core', 'natural-oak'],
+            ['hpl-compact', 'american-walnut-decor', 'semi-matte', 'compact-core', 'smoked-walnut'],
+            ['hpl-compact', 'concrete-decor', 'matte', 'compact-core', 'urban-concrete'],
+            ['hpl-compact', 'terrazzo-decor', 'semi-matte', 'compact-core', 'nordic-grey'],
+            ['hpl-compact', 'carrara-marble-decor', 'semi-matte', 'compact-core', 'carrara'],
+            ['hpl-compact', 'linen-decor', 'matte', 'compact-core', 'cashmere'],
+            ['hpl-compact', 'linen-decor', 'super-matte', 'compact-core', 'deep-green'],
         ];
 
         $labels = $this->decorLabels();
@@ -257,10 +255,15 @@ class ProductSeeder extends Seeder
             [$decorFa, $decorEn] = $labels[$decor];
             [$surfaceFa, $surfaceEn] = $surfaceLabels[$surface];
 
-            // The same decor/surface pair is genuinely sold into several
-            // categories, so the category token is what makes the SKU — and
-            // therefore the slug — unique.
+            $isCompact = $category === 'hpl-compact';
+
+            // The same decor/surface pair is sold into both groups, so the
+            // category token is what makes the SKU — and therefore the slug —
+            // unique.
             $decorSegment = (string) preg_replace('/-decor$/', '', $decor);
+
+            $productFa = $isCompact ? 'ورق کامپکت' : 'صفحه کابینت';
+            $productEn = $isCompact ? 'Compact Sheet' : 'Cabinet Panel';
 
             $rows[] = [
                 'slug' => "{$decorSegment}-{$surface}-{$this->categoryToken($category)}",
@@ -269,22 +272,38 @@ class ProductSeeder extends Seeder
                 'surface' => $surface,
                 'material' => $material,
                 'color' => $color,
-                'featured' => $index < 6,
+                // Three from each group, so the homepage strip shows the range
+                // rather than twelve variations of a cabinet door.
+                'featured' => $index < 3 || ($index >= 12 && $index < 15),
                 'name' => [
-                    'fa' => "پنل {$surfaceFa} {$decorFa}",
-                    'en' => "{$decorEn} {$surfaceEn} Panel",
+                    'fa' => "{$productFa} {$surfaceFa} {$decorFa}",
+                    'en' => "{$decorEn} {$surfaceEn} {$productEn}",
                 ],
-                'short' => [
-                    'fa' => "پنل {$surfaceFa} با طرح {$decorFa}، مناسب کابینت و دکوراسیون داخلی.",
-                    'en' => "{$surfaceEn} panel in {$decorEn} decor for cabinetry and interior joinery.",
-                ],
-                'description' => [
-                    'fa' => "این پنل با روکش {$decorFa} و سطح {$surfaceFa} تولید می‌شود. پرس گرم و چسب مقاوم به رطوبت، پایداری ابعادی و دوام سطح را تضمین می‌کند. ابعاد دقیق و لبه‌های صاف، برش و مونتاژ را در کارگاه ساده می‌کند و تمام مراحل تولید تحت کنترل آزمایشگاه کیفیت کارخانه انجام می‌شود.",
-                    'en' => "Produced with a {$decorEn} facing and a {$surfaceEn} surface. Hot pressing with moisture-resistant adhesive delivers dimensional stability and surface durability. Precise sizing and clean edges simplify cutting and assembly, and every stage is verified by the factory's quality laboratory.",
-                ],
+                'short' => $isCompact
+                    ? [
+                        'fa' => "ورق کامپکت یکپارچه {$surfaceFa} با طرح {$decorFa}؛ خودایستا و مقاوم در برابر آب.",
+                        'en' => "Solid {$surfaceEn} compact sheet in {$decorEn} decor — self-supporting and waterproof.",
+                    ]
+                    : [
+                        'fa' => "صفحه کابینت {$surfaceFa} با روکش HPL طرح {$decorFa} روی هسته MDF.",
+                        'en' => "{$surfaceEn} cabinet panel faced in {$decorEn} HPL over an MDF core.",
+                    ],
+                'description' => $isCompact
+                    ? [
+                        'fa' => "ورق کامپکت اچ‌پی‌ال با روکش {$decorFa} و سطح {$surfaceFa}. لایه‌های کاغذ کرافت آغشته به رزین فنولیک زیر فشار و حرارت بالا به یک ورق یکپارچه تبدیل می‌شوند؛ چون هسته چوبی وجود ندارد، ورق در تماس مستقیم با آب باد نمی‌کند و نیازی به قاب یا زیرسازی ندارد. لبه‌ها پس از برش قابل پولیش‌اند و همان هسته تیره را نشان می‌دهند.",
+                        'en' => "HPL compact sheet with a {$decorEn} facing and a {$surfaceEn} surface. Kraft layers impregnated with phenolic resin are pressed under heat into a single solid board; with no wood core there is nothing to swell in direct contact with water, and the sheet needs no frame or substrate behind it. Cut edges polish up to show the same dark core.",
+                    ]
+                    : [
+                        'fa' => "صفحه کابینت با روکش اچ‌پی‌ال {$decorFa} و سطح {$surfaceFa} روی هسته MDF. پرس گرم و چسب مقاوم به رطوبت، پایداری ابعادی و دوام سطح را تضمین می‌کند. ابعاد دقیق و لبه‌های صاف، برش و نوارکاری را در کارگاه ساده می‌کند و تمام مراحل تولید تحت کنترل آزمایشگاه کیفیت کارخانه انجام می‌شود.",
+                        'en' => "Cabinet panel with a {$decorEn} HPL facing and a {$surfaceEn} surface over an MDF core. Hot pressing with moisture-resistant adhesive delivers dimensional stability and surface durability. Precise sizing and clean edges simplify cutting and edge-banding, and every stage is verified by the factory's quality laboratory.",
+                    ],
                 'thicknesses' => $this->thicknessesFor($category),
                 'applications' => $this->applicationsFor($category),
-                'sizes' => [[2800, 1220], [2440, 1220]],
+                // Compact is pressed on a larger press bed and sold in the
+                // sheet sizes that suit partitions and worktops.
+                'sizes' => $isCompact
+                    ? [[3050, 1300], [2440, 1220]]
+                    : [[2800, 1220], [2440, 1220]],
             ];
         }
 
@@ -318,13 +337,8 @@ class ProductSeeder extends Seeder
     private function categoryToken(string $categorySlug): string
     {
         return match ($categorySlug) {
-            'high-gloss-cabinet-panels',
-            'super-matte-cabinet-panels',
-            'membrane-cabinet-panels' => 'cabinet',
-            'melamine-boards' => 'melamine',
-            'wall-panels' => 'wall',
-            'acoustic-panels' => 'acoustic',
-            'slatted-panels' => 'slatted',
+            'hpl-cabinet-panel' => 'cabinet',
+            'hpl-compact' => 'compact',
             default => $categorySlug,
         };
     }
@@ -349,8 +363,9 @@ class ProductSeeder extends Seeder
     private function thicknessesFor(string $categorySlug): array
     {
         return match ($categorySlug) {
-            'wall-panels', 'acoustic-panels' => ['8', '10', '12'],
-            'slatted-panels' => ['12', '16', '18'],
+            // Compact is the finished board, so its thicknesses are the sheet
+            // itself; a cabinet panel's are the core it is pressed onto.
+            'hpl-compact' => ['6', '8', '10', '12'],
             default => ['16', '18', '22'],
         };
     }
@@ -361,8 +376,7 @@ class ProductSeeder extends Seeder
     private function applicationsFor(string $categorySlug): array
     {
         return match ($categorySlug) {
-            'wall-panels', 'acoustic-panels', 'slatted-panels' => ['wall-panel', 'commercial-fit-out', 'office-furniture'],
-            'melamine-boards' => ['kitchen-cabinet', 'wardrobe', 'office-furniture'],
+            'hpl-compact' => ['wet-area', 'sanitary-partition', 'laboratory-worktop', 'commercial-fit-out', 'wall-panel'],
             default => ['kitchen-cabinet', 'wardrobe', 'door-panel'],
         };
     }

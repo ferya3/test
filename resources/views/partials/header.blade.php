@@ -14,13 +14,13 @@
              extra request; the factory logo replaces this in production. --}}
         <a
             href="{{ $locales->url('/') }}"
-            class="flex shrink-0 items-center gap-2.5 rounded-sm"
+            class="flex shrink-0 items-center gap-2.5 rounded-md"
             aria-label="{{ __('ui.home') }}"
         >
-            <span aria-hidden="true" class="grid size-9 place-items-center rounded-sm bg-surface-inverse">
-                <span class="text-body-sm font-bold text-text-inverse">آ</span>
+            <span aria-hidden="true" class="grid size-9 place-items-center rounded-lg bg-surface-inverse">
+                <span class="text-body-sm font-bold text-text-inverse">{{ $brandMonogram }}</span>
             </span>
-            <span class="text-body font-bold tracking-tight">{{ config('app.name') }}</span>
+            <span class="text-body font-bold tracking-tight">{{ $brandName }}</span>
         </a>
 
         {{-- Desktop navigation --}}

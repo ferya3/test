@@ -16,14 +16,25 @@
 ])
 
 @php
+    /*
+     * Mobile heights are deliberately shorter than the desktop ones. A hero
+     * measured in svh fills the phone screen before a single word of the page
+     * has been read; on a phone the job is to introduce and get out of the way.
+     */
     $heights = [
-        'sm' => 'min-h-[38svh] md:min-h-[42svh]',
-        'default' => 'min-h-[52svh] md:min-h-[58svh]',
-        'lg' => 'min-h-[68svh] md:min-h-[76svh]',
+        'sm' => 'min-h-[34svh] md:min-h-[42svh]',
+        'default' => 'min-h-[44svh] md:min-h-[58svh]',
+        'lg' => 'min-h-[54svh] md:min-h-[72svh]',
     ];
 @endphp
 
-<section {{ $attributes->class(['relative isolate flex items-end overflow-hidden bg-surface-inverse', $heights[$size] ?? $heights['default']]) }}>
+<section {{ $attributes->class([
+    'relative isolate flex items-end overflow-hidden bg-surface-inverse',
+    // Without a photograph the hero is a black rectangle; the grain gives it a
+    // surface so it reads as a deliberate dark band until an image is uploaded.
+    'hero-grain' => $media === null,
+    $heights[$size] ?? $heights['default'],
+]) }}>
     @if ($media)
         <x-media.picture
             :media="$media"

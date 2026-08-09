@@ -12,8 +12,8 @@
 @php
     // Logical properties throughout (ps/pe, not pl/pr) so one class set renders
     // correctly in both RTL and LTR without a mirrored stylesheet.
-    $base = 'group relative inline-flex items-center justify-center gap-2.5 rounded-md '
-        .'font-semibold whitespace-nowrap transition-[background-color,color,border-color,transform] '
+    $base = 'group relative inline-flex items-center justify-center gap-2.5 rounded-lg '
+        .'font-semibold whitespace-nowrap transition-[background-color,color,border-color,transform,box-shadow] '
         .'duration-200 ease-industrial select-none '
         .'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring '
         .'active:translate-y-px '
@@ -21,7 +21,7 @@
 
     $variants = [
         // The single high-emphasis action on a view.
-        'primary' => 'bg-accent-surface text-text-on-accent hover:bg-accent-surface-hover',
+        'primary' => 'bg-accent-surface text-text-on-accent shadow-sm hover:bg-accent-surface-hover hover:shadow-md',
 
         // Equal weight, lower colour: used where two actions sit together.
         'secondary' => 'bg-surface-inverse text-text-inverse hover:opacity-90',

@@ -21,14 +21,19 @@
     />
 
     <div class="flex flex-1 flex-col gap-2.5 p-5">
-        <div class="flex items-center justify-between gap-2">
+        {{-- Wraps rather than overflows: at two cards to a 360px screen a long
+             surface name and the product code do not both fit on one line, and
+             an English badge is wider than its Persian equivalent. --}}
+        <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
             @if ($product->surface)
-                <x-ui.badge tone="accent" size="sm">{{ $product->surface->name }}</x-ui.badge>
+                <x-ui.badge tone="accent" size="sm" class="min-w-0 max-w-full">{{ $product->surface->name }}</x-ui.badge>
             @else
                 <span></span>
             @endif
 
-            <x-ui.measure :value="$product->code" dir="ltr" class="text-caption text-text-muted" />
+            {{-- nowrap: at two cards to a phone screen the column is narrow
+                 enough to break "PNL-1002" across two lines. --}}
+            <x-ui.measure :value="$product->code" dir="ltr" class="whitespace-nowrap text-caption text-text-muted" />
         </div>
 
         <h3 id="{{ $headingId }}" class="text-h4 text-balance">{{ $product->name }}</h3>
