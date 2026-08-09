@@ -250,15 +250,16 @@ log "Setting filesystem ownership"
 # be permissive is not a permission model, so the modes are set explicitly.
 chown -R www-data:www-data "$APP_DIR"
 
-find "$APP_DIR" -type d -exec chmod 755 {} +
-find "$APP_DIR" -type f -exec chmod 644 {} +
+# `X` rather than a blanket 644: capital X applies the execute bit to
+# directories and to files that already carry one, and leaves every other file
+# alone. A flat `chmod 644` would strip +x from artisan and deploy/*.sh — and
+# git records the executable bit, so the next deploy would abort on a working
+# tree made dirty by the previous one.
+chmod -R u=rwX,go=rX "$APP_DIR"
 
-# Writable by the owner *and* the group, so an operator added to www-data can
-# clear a cache without sudo.
-find "$APP_DIR/storage" "$APP_DIR/bootstrap/cache" -type d -exec chmod 775 {} +
-find "$APP_DIR/storage" "$APP_DIR/bootstrap/cache" -type f -exec chmod 664 {} +
-
-chmod +x "$APP_DIR/artisan"
+# Group-writable too, so an operator in the www-data group can clear a cache
+# without sudo.
+chmod -R u=rwX,g=rwX,o=rX "$APP_DIR/storage" "$APP_DIR/bootstrap/cache"
 
 # Never world-readable: this file holds the database password and APP_KEY, and
 # 644 would expose both to every account on the box.

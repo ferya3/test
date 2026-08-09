@@ -172,12 +172,12 @@ log "Setting filesystem ownership"
 # required vendor/autoload.php" — a green deploy followed by a site-wide 500.
 chown -R www-data:www-data "$APP_DIR"
 
-find "$APP_DIR" -type d -exec chmod 755 {} +
-find "$APP_DIR" -type f -exec chmod 644 {} +
-find "$APP_DIR/storage" "$APP_DIR/bootstrap/cache" -type d -exec chmod 775 {} +
-find "$APP_DIR/storage" "$APP_DIR/bootstrap/cache" -type f -exec chmod 664 {} +
+# `X` rather than a blanket 644 — see install-ubuntu.sh. A flat chmod strips
+# +x from the deploy scripts themselves, and because git records that bit, the
+# deploy after this one would abort with "working tree is dirty".
+chmod -R u=rwX,go=rX "$APP_DIR"
+chmod -R u=rwX,g=rwX,o=rX "$APP_DIR/storage" "$APP_DIR/bootstrap/cache"
 
-chmod +x "$APP_DIR/artisan"
 chmod 640 "$APP_DIR/.env"
 
 # Checked, not assumed — this is the step whose silent failure takes the site
