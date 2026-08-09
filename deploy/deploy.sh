@@ -64,6 +64,22 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# install-ubuntu.sh hands the checkout to www-data so PHP-FPM can write to
+# storage/, but this script runs as root — and git refuses to touch a repository
+# owned by another user unless the directory is marked trusted. Without this,
+# every deploy dies at the first git command with "detected dubious ownership",
+# which reads like a git problem rather than the ownership one it is.
+#
+# Registered before PREVIOUS is read, not at the fetch: `rev-parse` is a git
+# command too, so otherwise the current release resolves to "unknown" — and the
+# rollback hint this script prints on failure is `REF=$PREVIOUS`, which would be
+# unusable at exactly the moment it is needed.
+if [[ -d "$APP_DIR/.git" ]] \
+    && ! git config --global --get-all safe.directory 2>/dev/null | grep -qxF "$APP_DIR"; then
+    log "Marking $APP_DIR as a trusted git directory for $(id -un)"
+    git config --global --add safe.directory "$APP_DIR"
+fi
+
 PREVIOUS="$(git -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
 
 log "Deploying to $APP_DIR (currently at $PREVIOUS)"
