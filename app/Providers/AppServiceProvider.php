@@ -68,7 +68,13 @@ class AppServiceProvider extends ServiceProvider
      */
     private function shareBrand(): void
     {
-        View::composer(['partials.header', 'partials.footer'], function (ViewContract $view): void {
+        View::composer([
+            'partials.header',
+            'partials.footer',
+            'components.layouts.app',
+            'components.layouts.admin',
+            'components.layouts.admin-auth',
+        ], function (ViewContract $view): void {
             $settings = $this->app->make(SettingsRepository::class);
             $name = $settings->translated('company_name') ?? config('app.name');
 

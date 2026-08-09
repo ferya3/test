@@ -30,20 +30,20 @@ class SettingSeeder extends Seeder
     {
         return [
             'company_name' => [
-                'value' => ['fa' => 'صنایع پنل آرکا', 'en' => 'Arka Panel Industries'],
+                'value' => ['fa' => 'آرتاویل گلد', 'en' => 'Artavil Gold'],
                 'group' => 'company',
             ],
             'company_tagline' => [
                 'value' => [
-                    'fa' => 'تولیدکننده پنل کابینت آشپزخانه و پنل تزئینی',
-                    'en' => 'Manufacturer of kitchen cabinet and decorative panels',
+                    'fa' => 'تولیدکنندهٔ صفحه کابینت اچ‌پی‌ال و ورق کامپکت',
+                    'en' => 'Manufacturer of HPL cabinet panels and compact sheets',
                 ],
                 'group' => 'company',
             ],
             'company_description' => [
                 'value' => [
-                    'fa' => 'کارخانه تولید پنل کابینت و پنل تزئینی با خط تولید تمام‌اتوماتیک و آزمایشگاه کنترل کیفیت.',
-                    'en' => 'Cabinet and decorative panel factory with a fully automated production line and an in-house quality control laboratory.',
+                    'fa' => 'کارخانهٔ تولید ورق اچ‌پی‌ال با خط تولید تمام‌اتوماتیک و آزمایشگاه کنترل کیفیت.',
+                    'en' => 'HPL sheet factory with a fully automated production line and an in-house quality control laboratory.',
                 ],
                 'group' => 'company',
             ],
@@ -104,15 +104,15 @@ class SettingSeeder extends Seeder
 
             'seo_default_title' => [
                 'value' => [
-                    'fa' => 'پنل کابینت و پنل تزئینی | صنایع پنل آرکا',
-                    'en' => 'Cabinet & Decorative Panels | Arka Panel Industries',
+                    'fa' => 'ورق اچ‌پی‌ال و کامپکت | آرتاویل گلد',
+                    'en' => 'HPL & Compact Panels | Artavil Gold',
                 ],
                 'group' => 'seo',
             ],
             'seo_default_description' => [
                 'value' => [
-                    'fa' => 'تولید پنل کابینت آشپزخانه و پنل تزئینی با کیفیت صادراتی، تنوع رنگ و طرح، و گواهی‌نامه‌های بین‌المللی.',
-                    'en' => 'Export-grade kitchen cabinet panels and decorative panels, a wide colour and decor range, and international certification.',
+                    'fa' => 'تولید صفحه کابینت اچ‌پی‌ال و ورق کامپکت با کیفیت صادراتی، تنوع رنگ و طرح، و گواهی‌نامه‌های بین‌المللی.',
+                    'en' => 'Export-grade HPL cabinet panels and compact sheets, a wide colour and decor range, and international certification.',
                 ],
                 'group' => 'seo',
             ],

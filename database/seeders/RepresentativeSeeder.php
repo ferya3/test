@@ -42,7 +42,7 @@ class RepresentativeSeeder extends Seeder
             [
                 'slug' => 'tehran-central',
                 'name' => ['fa' => 'نمایندگی مرکزی تهران', 'en' => 'Tehran Central Branch'],
-                'company' => ['fa' => 'بازرگانی آرکا تهران', 'en' => 'Arka Trading Tehran'],
+                'company' => ['fa' => 'بازرگانی آرتاویل تهران', 'en' => 'Artavil Trading Tehran'],
                 'province' => 'تهران',
                 'city' => 'تهران',
                 'address' => [

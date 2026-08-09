@@ -7,7 +7,7 @@
     <meta name="robots" content="noindex, nofollow">
     <meta name="referrer" content="same-origin">
 
-    <title>{{ $title }} — {{ config('app.name') }}</title>
+    <title>{{ $title }} — {{ $brandName }}</title>
 
     <link rel="preload" href="{{ asset('fonts/vazirmatn-arabic.woff2') }}" as="font" type="font/woff2" crossorigin>
 

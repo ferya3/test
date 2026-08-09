@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Auth;
 
 use App\Models\User;
+use App\Services\SettingsRepository;
 use BaconQrCode\Renderer\Image\SvgImageBackEnd;
 use BaconQrCode\Renderer\ImageRenderer;
 use BaconQrCode\Renderer\RendererStyle\RendererStyle;
@@ -21,7 +22,10 @@ use PragmaRX\Google2FA\Google2FA;
  */
 class TwoFactorService
 {
-    public function __construct(private readonly Google2FA $google2fa) {}
+    public function __construct(
+        private readonly Google2FA $google2fa,
+        private readonly SettingsRepository $settings,
+    ) {}
 
     /**
      * Begin enrolment: generate a secret and store it *unconfirmed*.
@@ -108,11 +112,19 @@ class TwoFactorService
 
     public function provisioningUri(User $user, string $secret): string
     {
-        return $this->google2fa->getQRCodeUrl(
-            (string) config('app.name'),
-            $user->email,
-            $secret,
-        );
+        // The issuer is the label the authenticator app shows beside the code,
+        // so it has to be the company the person recognises — not the
+        // framework's application name, which on a default install is
+        // "Laravel" and tells a locked-out administrator nothing.
+        //
+        // Pinned to the default locale rather than the request's. The issuer is
+        // part of the account's identity in the authenticator, and one that
+        // changed with the language the enrolling admin happened to be browsing
+        // in would leave two entries for the same account.
+        $issuer = $this->settings->translated('company_name', config('localization.default', 'fa'))
+            ?? (string) config('app.name');
+
+        return $this->google2fa->getQRCodeUrl($issuer, $user->email, $secret);
     }
 
     /**

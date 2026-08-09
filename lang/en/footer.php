@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 return [
-    'tagline' => 'Manufacturer of export-grade kitchen cabinet panels and decorative panels.',
+    'tagline' => 'Manufacturer of export-grade HPL cabinet panels and compact sheets.',
     'copyright' => '© :year :name — All rights reserved.',
     'group' => [
         'products' => 'Products',

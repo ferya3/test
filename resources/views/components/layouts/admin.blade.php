@@ -10,7 +10,7 @@
     <meta name="robots" content="noindex, nofollow, noarchive">
     <meta name="referrer" content="same-origin">
 
-    <title>{{ $title ?? __('admin.panel') }} — {{ config('app.name') }}</title>
+    <title>{{ $title ?? __('admin.panel') }} — {{ $brandName }}</title>
 
     <script nonce="{{ Illuminate\Support\Facades\Vite::cspNonce() }}">
         try {

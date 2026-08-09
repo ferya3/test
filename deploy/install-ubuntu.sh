@@ -16,6 +16,7 @@
 #   DOMAIN     server_name for the Nginx vhost      (default: _)
 #   APP_DIR    where the application lives          (default: this checkout)
 #   APP_URL    public URL written into .env         (default: http://$DOMAIN)
+#   APP_NAME   application name in .env              (default: Artavil Gold)
 #   DB_NAME    MySQL database name                  (default: panels)
 #   DB_USER    MySQL username                       (default: panels)
 #   PHP_VER    PHP version to install               (default: 8.4)
@@ -24,6 +25,7 @@ set -Eeuo pipefail
 
 DOMAIN="${DOMAIN:-_}"
 PHP_VER="${PHP_VER:-8.4}"
+APP_NAME="${APP_NAME:-Artavil Gold}"
 DB_NAME="${DB_NAME:-panels}"
 DB_USER="${DB_USER:-panels}"
 
@@ -163,6 +165,10 @@ else
         grep -qF "${key}=\"${value}\"" .env || die "Could not set ${key} in .env"
     }
 
+    # The public brand comes from the company_name setting and is editable in
+    # the admin; APP_NAME is the framework's own name for the application and
+    # still surfaces in mail headers, so it is set rather than left as "Laravel".
+    set_env APP_NAME "$APP_NAME"
     set_env APP_ENV production
     set_env APP_DEBUG false
     set_env APP_URL "$APP_URL"
