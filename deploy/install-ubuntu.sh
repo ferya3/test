@@ -235,13 +235,51 @@ php artisan db:seed --force 2>&1 | tee "$SEED_LOG"
 php artisan storage:link || true
 
 log "Setting filesystem ownership"
-chown -R www-data:www-data "$APP_DIR/storage" "$APP_DIR/bootstrap/cache"
-find "$APP_DIR/storage" -type d -exec chmod 775 {} +
-find "$APP_DIR/storage" -type f -exec chmod 664 {} +
-chmod -R 775 "$APP_DIR/bootstrap/cache"
+
+# The whole tree, not just the writable directories.
+#
+# Everything here was created by root — the clone, composer's vendor/, Vite's
+# public/build — and PHP-FPM runs as www-data. Whether www-data can read any of
+# it therefore depends entirely on root's umask, which is not the same on every
+# image: at 022 the files land 644 and the site works, at 077 they land 600 and
+# every request dies with
+#
+#   Failed opening required '/var/www/panels/vendor/autoload.php'
+#
+# on a server where the file plainly exists. Relying on a umask that happens to
+# be permissive is not a permission model, so the modes are set explicitly.
+chown -R www-data:www-data "$APP_DIR"
+
+find "$APP_DIR" -type d -exec chmod 755 {} +
+find "$APP_DIR" -type f -exec chmod 644 {} +
+
+# Writable by the owner *and* the group, so an operator added to www-data can
+# clear a cache without sudo.
+find "$APP_DIR/storage" "$APP_DIR/bootstrap/cache" -type d -exec chmod 775 {} +
+find "$APP_DIR/storage" "$APP_DIR/bootstrap/cache" -type f -exec chmod 664 {} +
+
+chmod +x "$APP_DIR/artisan"
+
+# Never world-readable: this file holds the database password and APP_KEY, and
+# 644 would expose both to every account on the box.
+chmod 640 "$APP_DIR/.env"
+
+# Prove the permissions rather than assume them. What this replaces is an
+# install that reported success and then returned 500 on every request, with
+# the real reason only visible in the Nginx error log.
+sudo -u www-data test -r "$APP_DIR/vendor/autoload.php" \
+    || die "www-data cannot read vendor/autoload.php — every request would 500."
+sudo -u www-data test -r "$APP_DIR/public/build/manifest.json" \
+    || die "www-data cannot read the Vite manifest — every page would fail to render."
+sudo -u www-data test -r "$APP_DIR/.env" \
+    || die "www-data cannot read .env."
+sudo -u www-data test -w "$APP_DIR/storage/logs" \
+    || die "www-data cannot write to storage/logs — the app could not report its own errors."
 
 log "Caching configuration, routes and views"
-php artisan optimize
+# As www-data, not root. `optimize` writes into bootstrap/cache, and root-owned
+# cache files are ones the application itself cannot later rewrite.
+sudo -u www-data php artisan optimize
 
 # ---------------------------------------------------------------------------
 # Nginx

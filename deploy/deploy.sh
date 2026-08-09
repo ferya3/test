@@ -161,14 +161,38 @@ fi
 # 5. Caches
 # ---------------------------------------------------------------------------
 
+log "Setting filesystem ownership"
+
+# Ownership before the caches are written, and across the whole tree rather
+# than the writable directories alone.
+#
+# composer and npm have just recreated vendor/ and public/build as root, with
+# root's umask deciding the modes. On an image where that umask is 077 the new
+# files land unreadable to www-data and every request dies with "Failed opening
+# required vendor/autoload.php" — a green deploy followed by a site-wide 500.
+chown -R www-data:www-data "$APP_DIR"
+
+find "$APP_DIR" -type d -exec chmod 755 {} +
+find "$APP_DIR" -type f -exec chmod 644 {} +
+find "$APP_DIR/storage" "$APP_DIR/bootstrap/cache" -type d -exec chmod 775 {} +
+find "$APP_DIR/storage" "$APP_DIR/bootstrap/cache" -type f -exec chmod 664 {} +
+
+chmod +x "$APP_DIR/artisan"
+chmod 640 "$APP_DIR/.env"
+
+# Checked, not assumed — this is the step whose silent failure takes the site
+# down, and the trap above can only roll back what it is told about.
+sudo -u www-data test -r "$APP_DIR/vendor/autoload.php" \
+    || die "www-data cannot read vendor/autoload.php — refusing to finish the deploy."
+sudo -u www-data test -r "$APP_DIR/public/build/manifest.json" \
+    || die "www-data cannot read the Vite manifest — refusing to finish the deploy."
+
 log "Caching configuration, routes and views"
-$PHP artisan optimize
+# As www-data so the compiled artefacts belong to the user that reads them.
+sudo -u www-data $PHP artisan optimize
 
 # Application caches key off a version counter rather than being flushed, so
 # catalogue data survives a deploy. Only the compiled artefacts above change.
-
-log "Setting filesystem ownership"
-chown -R www-data:www-data "$APP_DIR/storage" "$APP_DIR/bootstrap/cache"
 
 # ---------------------------------------------------------------------------
 # 6-7. Restart the things holding old code
