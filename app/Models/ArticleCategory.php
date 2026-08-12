@@ -20,6 +20,7 @@ class ArticleCategory extends Model
 
     /** @use HasFactory<ArticleCategoryFactory> */
     use HasFactory;
+
     use HasSeoMetadata;
     use HasTranslations;
     use Orderable;

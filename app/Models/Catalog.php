@@ -28,6 +28,7 @@ class Catalog extends Model
 
     /** @use HasFactory<CatalogFactory> */
     use HasFactory;
+
     use HasSeoMetadata;
     use HasTranslations;
     use Orderable;

@@ -25,6 +25,7 @@ class Certificate extends Model
 
     /** @use HasFactory<CertificateFactory> */
     use HasFactory;
+
     use HasSeoMetadata;
     use HasTranslations;
     use Orderable;

@@ -19,6 +19,7 @@ class Representative extends Model
 
     /** @use HasFactory<RepresentativeFactory> */
     use HasFactory;
+
     use HasTranslations;
     use Orderable;
 
