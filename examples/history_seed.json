@@ -1,0 +1,33 @@
+[
+  {"indicator": "Core CPI m/m", "kind": "economic_release", "asset": "XAUUSD", "surprise_z": 1.5, "move_pct": -0.82},
+  {"indicator": "Core CPI m/m", "kind": "economic_release", "asset": "XAUUSD", "surprise_z": -1.0, "move_pct": 0.61},
+  {"indicator": "Core CPI m/m", "kind": "economic_release", "asset": "XAUUSD", "surprise_z": 0.5, "move_pct": -0.34},
+  {"indicator": "Core CPI m/m", "kind": "economic_release", "asset": "XAUUSD", "surprise_z": 2.0, "move_pct": -1.15},
+  {"indicator": "Core CPI m/m", "kind": "economic_release", "asset": "DXY", "surprise_z": 1.5, "move_pct": 0.48},
+  {"indicator": "Core CPI m/m", "kind": "economic_release", "asset": "DXY", "surprise_z": -1.0, "move_pct": -0.37},
+  {"indicator": "Core CPI m/m", "kind": "economic_release", "asset": "DXY", "surprise_z": 0.5, "move_pct": 0.19},
+  {"indicator": "Core CPI m/m", "kind": "economic_release", "asset": "DXY", "surprise_z": 2.0, "move_pct": 0.71},
+  {"indicator": "Core CPI m/m", "kind": "economic_release", "asset": "EURUSD", "surprise_z": 1.5, "move_pct": -0.44},
+  {"indicator": "Core CPI m/m", "kind": "economic_release", "asset": "EURUSD", "surprise_z": -1.0, "move_pct": 0.33},
+
+  {"indicator": "Non-Farm Employment Change", "kind": "economic_release", "asset": "XAUUSD", "surprise_z": 1.8, "move_pct": -0.95},
+  {"indicator": "Non-Farm Employment Change", "kind": "economic_release", "asset": "XAUUSD", "surprise_z": -1.5, "move_pct": 0.88},
+  {"indicator": "Non-Farm Employment Change", "kind": "economic_release", "asset": "XAUUSD", "surprise_z": 0.4, "move_pct": -0.29},
+  {"indicator": "Non-Farm Employment Change", "kind": "economic_release", "asset": "DXY", "surprise_z": 1.8, "move_pct": 0.62},
+  {"indicator": "Non-Farm Employment Change", "kind": "economic_release", "asset": "DXY", "surprise_z": -1.5, "move_pct": -0.55},
+  {"indicator": "Non-Farm Employment Change", "kind": "economic_release", "asset": "DXY", "surprise_z": 0.4, "move_pct": 0.21},
+
+  {"indicator": "Federal Funds Rate", "kind": "central_bank", "asset": "XAUUSD", "surprise_z": 1.0, "move_pct": -1.40},
+  {"indicator": "Federal Funds Rate", "kind": "central_bank", "asset": "XAUUSD", "surprise_z": 0.0, "move_pct": 0.35},
+  {"indicator": "Federal Funds Rate", "kind": "central_bank", "asset": "XAUUSD", "surprise_z": -1.0, "move_pct": 1.22},
+  {"indicator": "Federal Funds Rate", "kind": "central_bank", "asset": "DXY", "surprise_z": 1.0, "move_pct": 0.85},
+  {"indicator": "Federal Funds Rate", "kind": "central_bank", "asset": "DXY", "surprise_z": 0.0, "move_pct": -0.18},
+  {"indicator": "Federal Funds Rate", "kind": "central_bank", "asset": "DXY", "surprise_z": -1.0, "move_pct": -0.79},
+
+  {"kind": "geopolitical", "asset": "XAUUSD", "move_pct": 0.72},
+  {"kind": "geopolitical", "asset": "XAUUSD", "move_pct": 1.05},
+  {"kind": "geopolitical", "asset": "XAUUSD", "move_pct": 0.41},
+  {"kind": "geopolitical", "asset": "WTI", "move_pct": 1.85},
+  {"kind": "geopolitical", "asset": "WTI", "move_pct": 2.40},
+  {"kind": "geopolitical", "asset": "WTI", "move_pct": 0.95}
+]
