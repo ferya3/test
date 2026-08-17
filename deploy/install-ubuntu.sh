@@ -121,13 +121,23 @@ else
     UBUNTU_CODENAME="$(lsb_release -cs 2>/dev/null || echo unknown)"
     log "PHP $PHP_VER is not packaged for $UBUNTU_CODENAME — adding ppa:ondrej/php"
 
-    add-apt-repository -y ppa:ondrej/php >/dev/null
+    # Deliberately not silenced. add-apt-repository does not reliably signal
+    # failure through its exit status — it can fail to reach Launchpad, say so
+    # on stdout, and still exit 0 — so hiding its output hides the only
+    # evidence of what went wrong, and the run then fails later somewhere that
+    # does not mention the PPA at all.
+    add-apt-repository -y ppa:ondrej/php || true
 
-    if ! apt-get update -qq; then
+    apt-get update || warn "apt-get update reported errors — see above"
+
+    # The exit statuses above are advisory; this is the question that actually
+    # matters, so ask it directly rather than inferring it.
+    if ! php_available "$PHP_VER"; then
+        warn "The PPA did not provide php${PHP_VER}-fpm on $UBUNTU_CODENAME"
+
         # Leaving a broken source behind would make every later apt-get in this
         # script — and every one the operator runs afterwards — fail the same
         # way, which is a worse state than the one we started in.
-        warn "The PPA has no packages for $UBUNTU_CODENAME — removing it again"
         add-apt-repository -y --remove ppa:ondrej/php >/dev/null 2>&1 || true
         apt-get update -qq || true
 
@@ -141,10 +151,28 @@ else
             fi
         done
 
-        php_available "$PHP_VER" || die \
-"No PHP 8.3+ available. This release ($UBUNTU_CODENAME) does not package one and
-ppa:ondrej/php has not built for it yet. Either install PHP 8.3+ by hand and
-re-run with PHP_VER set to it, or provision on 24.04 LTS."
+        if ! php_available "$PHP_VER"; then
+            # Print what apt can actually see. Every previous version of this
+            # failure ended in a one-line message that named the missing package
+            # but gave no way to tell whether the repository was absent, empty,
+            # or simply not fetched.
+            warn "PHP-related sources apt currently has:"
+            grep -rhs --include='*.list' --include='*.sources' \
+                -e ondrej -e php /etc/apt/sources.list /etc/apt/sources.list.d/ || true
+            warn "What apt knows about php${PHP_VER}-fpm:"
+            apt-cache policy "php${PHP_VER}-fpm" || true
+
+            die \
+"No PHP 8.3+ available on $UBUNTU_CODENAME.
+
+This release does not package one itself, and ppa:ondrej/php did not supply it
+either — the output above shows what apt has. The usual causes are a network
+that cannot reach ppa.launchpadcontent.net, or a release the PPA has not built
+for.
+
+Add a working PHP 8.3+ source by hand, then re-run with PHP_VER set to the
+version you installed."
+        fi
     fi
 fi
 
@@ -175,8 +203,11 @@ PHP_PKGS=()
 # formatting of Persian content, redis because cache, session and queue are all
 # configured onto it below.
 for ext in fpm cli common mysql mbstring xml curl zip intl gd bcmath opcache redis; do
-    pkg="$(apt_pkg "php${PHP_VER}-${ext}" "php-${ext}")" \
-        || die "No package provides the $ext extension for PHP $PHP_VER."
+    if ! pkg="$(apt_pkg "php${PHP_VER}-${ext}" "php-${ext}")"; then
+        warn "What apt knows about php${PHP_VER}-${ext}:"
+        apt-cache policy "php${PHP_VER}-${ext}" "php-${ext}" || true
+        die "Neither php${PHP_VER}-${ext} nor php-${ext} exists in any configured source."
+    fi
     PHP_PKGS+=("$pkg")
 done
 
