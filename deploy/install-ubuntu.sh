@@ -133,7 +133,31 @@ else
     # The exit statuses above are advisory; this is the question that actually
     # matters, so ask it directly rather than inferring it.
     if ! php_available "$PHP_VER"; then
+        # A repository apt reports as "Hit" is not necessarily one it has
+        # package indices for. If an earlier update was interrupted after
+        # InRelease was written but before the Packages files were fetched,
+        # every later update sees an unchanged InRelease, prints Hit, and skips
+        # the download — so the repository is present, reachable, current, and
+        # empty, and apt says "Unable to locate package" about something that is
+        # definitely published.
+        #
+        # Dropping just this repository's list files forces the refetch.
+        warn "php${PHP_VER}-fpm is missing though the PPA is configured — refetching its indices"
+        rm -f /var/lib/apt/lists/*ondrej*
+        apt-get update || warn "apt-get update reported errors — see above"
+    fi
+
+    if ! php_available "$PHP_VER"; then
         warn "The PPA did not provide php${PHP_VER}-fpm on $UBUNTU_CODENAME"
+
+        # Printed before anything is removed. The first version of this
+        # diagnostic ran after the PPA had been taken out again and duly
+        # reported no PHP sources at all, which was true and useless.
+        warn "PHP-related sources apt currently has:"
+        grep -rhs --include='*.list' --include='*.sources' \
+            -e ondrej -e sury -e php /etc/apt/sources.list /etc/apt/sources.list.d/ || true
+        warn "PPA index files apt has fetched:"
+        ls -1 /var/lib/apt/lists/ 2>/dev/null | grep -i ondrej || warn "  (none)"
 
         # Leaving a broken source behind would make every later apt-get in this
         # script — and every one the operator runs afterwards — fail the same
@@ -156,9 +180,6 @@ else
             # failure ended in a one-line message that named the missing package
             # but gave no way to tell whether the repository was absent, empty,
             # or simply not fetched.
-            warn "PHP-related sources apt currently has:"
-            grep -rhs --include='*.list' --include='*.sources' \
-                -e ondrej -e php /etc/apt/sources.list /etc/apt/sources.list.d/ || true
             warn "What apt knows about php${PHP_VER}-fpm:"
             apt-cache policy "php${PHP_VER}-fpm" || true
 
@@ -166,12 +187,20 @@ else
 "No PHP 8.3+ available on $UBUNTU_CODENAME.
 
 This release does not package one itself, and ppa:ondrej/php did not supply it
-either — the output above shows what apt has. The usual causes are a network
-that cannot reach ppa.launchpadcontent.net, or a release the PPA has not built
-for.
+even after its indices were refetched — the output above shows what apt had.
 
-Add a working PHP 8.3+ source by hand, then re-run with PHP_VER set to the
-version you installed."
+ondrej/php is being merged into packages.sury.org, which is the other place
+PHP 8.4 is published for Ubuntu. To use it instead:
+
+  curl -fsSL https://packages.sury.org/php/apt.gpg \\
+      -o /etc/apt/keyrings/sury-php.gpg
+  echo \"deb [signed-by=/etc/apt/keyrings/sury-php.gpg] \\
+      https://packages.sury.org/php/ $UBUNTU_CODENAME main\" \\
+      > /etc/apt/sources.list.d/sury-php.list
+  apt-get update
+
+Then re-run this script. Set PHP_VER if you installed a version other than
+$PHP_VER."
         fi
     fi
 fi
