@@ -87,9 +87,66 @@ apt-get update -qq
 apt-get install -y -qq \
     software-properties-common curl git unzip ca-certificates gnupg lsb-release
 
-log "Adding the ondrej/php repository (Ubuntu ships an older PHP than $PHP_VER)"
-add-apt-repository -y ppa:ondrej/php >/dev/null
-apt-get update -qq
+# The PPA was unconditional, on the assumption that Ubuntu ships an older PHP
+# than this application needs. That was true of 22.04 and 24.04, and stopped
+# being true afterwards: 25.04 and later carry PHP 8.4 themselves.
+#
+# Meanwhile ppa:ondrej/php only publishes for releases it has built, so on a
+# newer Ubuntu than the PPA knows about `apt-get update` fails with "does not
+# have a Release file" — and the run died there, on a host whose own
+# repositories had the required PHP all along.
+#
+# So: ask apt what it can already see, and only reach for the PPA if the answer
+# is nothing.
+
+# Prints the first of its arguments that apt has a real package record for.
+# `apt-cache show` alone is not enough: it exits 0 for a name that only exists
+# as a Provides: or a pure virtual package, which cannot be installed.
+apt_pkg() {
+    for name in "$@"; do
+        if apt-cache show "$name" 2>/dev/null | grep -q '^Package:'; then
+            printf '%s' "$name"
+            return 0
+        fi
+    done
+    return 1
+}
+
+php_available() { apt_pkg "php${1}-fpm" >/dev/null; }
+
+log "Locating PHP $PHP_VER"
+if php_available "$PHP_VER"; then
+    log "PHP $PHP_VER is in this release's own repositories — no PPA needed"
+else
+    UBUNTU_CODENAME="$(lsb_release -cs 2>/dev/null || echo unknown)"
+    log "PHP $PHP_VER is not packaged for $UBUNTU_CODENAME — adding ppa:ondrej/php"
+
+    add-apt-repository -y ppa:ondrej/php >/dev/null
+
+    if ! apt-get update -qq; then
+        # Leaving a broken source behind would make every later apt-get in this
+        # script — and every one the operator runs afterwards — fail the same
+        # way, which is a worse state than the one we started in.
+        warn "The PPA has no packages for $UBUNTU_CODENAME — removing it again"
+        add-apt-repository -y --remove ppa:ondrej/php >/dev/null 2>&1 || true
+        apt-get update -qq || true
+
+        # Fall back to whatever this release does carry. composer.json requires
+        # PHP ^8.3, so anything at or above that will run the application.
+        for candidate in 8.5 8.4 8.3; do
+            if php_available "$candidate"; then
+                warn "Using PHP $candidate from the distribution instead of $PHP_VER"
+                PHP_VER="$candidate"
+                break
+            fi
+        done
+
+        php_available "$PHP_VER" || die \
+"No PHP 8.3+ available. This release ($UBUNTU_CODENAME) does not package one and
+ppa:ondrej/php has not built for it yet. Either install PHP 8.3+ by hand and
+re-run with PHP_VER set to it, or provision on 24.04 LTS."
+    fi
+fi
 
 log "Installing PHP $PHP_VER and extensions"
 # gd is required for image conversions; redis for cache/queue; intl for locale
@@ -101,12 +158,47 @@ log "Installing PHP $PHP_VER and extensions"
 # that bug. Installing it here means the servers, the CI job that guards
 # against it (tests/Feature/Catalog/CachedPayloadTest.php) and the docs all
 # describe the same machine.
-apt-get install -y -qq \
-    "php${PHP_VER}-fpm" "php${PHP_VER}-cli" "php${PHP_VER}-common" \
-    "php${PHP_VER}-mysql" "php${PHP_VER}-redis" "php${PHP_VER}-mbstring" \
-    "php${PHP_VER}-xml" "php${PHP_VER}-curl" "php${PHP_VER}-zip" \
-    "php${PHP_VER}-intl" "php${PHP_VER}-gd" "php${PHP_VER}-bcmath" \
-    "php${PHP_VER}-opcache" "php${PHP_VER}-igbinary"
+#
+# The package names differ between the two sources this can now install from.
+# ppa:ondrej/php versions every extension (php8.4-redis, php8.4-igbinary);
+# Ubuntu's own archive versions the ones built as part of PHP and ships the PECL
+# extensions unversioned in universe (php-redis, php-igbinary), because they are
+# built against the single PHP the release carries. Asking for the versioned
+# name on a distribution PHP fails on the extensions, not on PHP itself.
+#
+# So resolve each name against what apt actually has (`apt_pkg`, defined above),
+# rather than assuming which source we ended up with.
+
+PHP_PKGS=()
+
+# Everything here is required: gd for image conversions, intl for locale-aware
+# formatting of Persian content, redis because cache, session and queue are all
+# configured onto it below.
+for ext in fpm cli common mysql mbstring xml curl zip intl gd bcmath opcache redis; do
+    pkg="$(apt_pkg "php${PHP_VER}-${ext}" "php-${ext}")" \
+        || die "No package provides the $ext extension for PHP $PHP_VER."
+    PHP_PKGS+=("$pkg")
+done
+
+# igbinary is the one extension the application runs without, so it warns rather
+# than dies — but it is not incidental either. It is the faster serialiser for
+# everything going into Redis, and it is also the configuration in which a
+# cached object comes back as __PHP_Incomplete_Class. Stage 8 shipped exactly
+# that bug, and tests/Feature/Catalog/CachedPayloadTest.php guards it in CI with
+# igbinary loaded. Without it here, the server stops being the machine that CI
+# and docs/PERFORMANCE.md describe.
+if pkg="$(apt_pkg "php${PHP_VER}-igbinary" php-igbinary)"; then
+    PHP_PKGS+=("$pkg")
+    IGBINARY=yes
+else
+    IGBINARY=no
+fi
+
+apt-get install -y -qq "${PHP_PKGS[@]}"
+
+if [[ "$IGBINARY" == "no" ]]; then
+    warn "igbinary is not packaged for PHP $PHP_VER — Redis will use PHP's serialiser"
+fi
 
 log "Installing Nginx, MySQL and Redis"
 apt-get install -y -qq nginx mysql-server redis-server
