@@ -88,6 +88,24 @@ log "Building frontend assets"
 log "Dropping node_modules from the bundle"
 rm -rf "$DEST/node_modules"
 
+# Composer falls back to --prefer-source when a dist download is refused, and a
+# source install leaves a full .git directory inside every package. That was
+# 250MB of the first bundle built here — the repository history of Laravel,
+# Carbon and Guzzle, shipped to a server that will never read it.
+#
+# Worth removing on its own merits, too: deploy.sh refuses to run against a
+# dirty working tree, and nested repositories are what make that check
+# confusing to debug.
+log "Stripping vendor VCS directories"
+find "$DEST/vendor" -type d -name '.git' -prune -exec rm -rf {} + 2>/dev/null || true
+find "$DEST/vendor" -type f -name '.gitignore' -delete 2>/dev/null || true
+
+# The autoloader is generated from installed-package metadata, not from these
+# directories, so removing them cannot invalidate it — but verify, because a
+# bundle with a broken autoloader fails on the server rather than here.
+php -r 'require "'"$DEST"'/vendor/autoload.php"; exit(class_exists("Illuminate\\Foundation\\Application") ? 0 : 1);' \
+    || die "The autoloader stopped resolving after the VCS strip."
+
 # ---------------------------------------------------------------------------
 # Sanity checks before anything is shipped
 # ---------------------------------------------------------------------------
