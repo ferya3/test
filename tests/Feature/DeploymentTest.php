@@ -99,3 +99,52 @@ it('keeps env() out of the runtime path entirely', function (): void {
 
     expect($offenders)->toBe([]);
 });
+
+/*
+|--------------------------------------------------------------------------
+| Offline bundle
+|--------------------------------------------------------------------------
+|
+| `deploy/package.sh` ships a tarball containing vendor/ and public/build, and
+| install-ubuntu.sh decides to skip composer, npm and Node by looking for those
+| two artefacts rather than by reading a flag. That only distinguishes a bundle
+| from a checkout while neither path is committed, which is what these guard.
+|
+*/
+
+it('keeps the offline bundle markers out of version control', function (): void {
+    // If either of these were ever committed, install-ubuntu.sh would treat a
+    // plain git checkout as a bundle and skip installing its dependencies.
+    exec('git -C '.escapeshellarg(base_path()).' ls-files -- vendor public/build', $tracked, $status);
+
+    expect($status)->toBe(0)
+        ->and($tracked)->toBe([]);
+});
+
+it('detects a bundle by both artefacts, and lets FORCE_DEPS override', function (): void {
+    $installer = (string) file_get_contents(base_path('deploy/install-ubuntu.sh'));
+
+    expect($installer)
+        ->toContain('vendor/autoload.php')
+        ->toContain('public/build/manifest.json')
+        ->toContain('FORCE_DEPS');
+
+    // Every step the bundle replaces has to be behind one of the two guards,
+    // or an offline host still reaches for the network and the trap kills it.
+    foreach (['composer install', 'npm ci', 'npm run build'] as $step) {
+        expect($installer)->toContain($step);
+    }
+
+    expect($installer)
+        ->toContain('BUNDLED_VENDOR')
+        ->toContain('BUNDLED_ASSETS');
+});
+
+it('never ships an .env in the bundle', function (): void {
+    // The installer leaves an existing .env untouched, so one inside the
+    // tarball would become the server's configuration — carrying the packaging
+    // machine's APP_KEY and database password onto a live host.
+    $packager = (string) file_get_contents(base_path('deploy/package.sh'));
+
+    expect($packager)->toContain('.env is in the bundle');
+});

@@ -12,14 +12,20 @@
 # Usage:
 #   sudo DOMAIN=panels.example.com bash deploy/install-ubuntu.sh
 #
+# Works from a git checkout or from an offline bundle built by
+# `deploy/package.sh`. In a bundle, vendor/ and public/build are already
+# present, so composer, npm and Node are skipped — see the detection block
+# below.
+#
 # Environment variables:
-#   DOMAIN     server_name for the Nginx vhost      (default: _)
-#   APP_DIR    where the application lives          (default: this checkout)
-#   APP_URL    public URL written into .env         (default: http://$DOMAIN)
-#   APP_NAME   application name in .env              (default: Artavil Gold)
-#   DB_NAME    MySQL database name                  (default: panels)
-#   DB_USER    MySQL username                       (default: panels)
-#   PHP_VER    PHP version to install               (default: 8.4)
+#   DOMAIN      server_name for the Nginx vhost     (default: _)
+#   APP_DIR     where the application lives         (default: this checkout)
+#   APP_URL     public URL written into .env        (default: http://$DOMAIN)
+#   APP_NAME    application name in .env            (default: Artavil Gold)
+#   DB_NAME     MySQL database name                 (default: panels)
+#   DB_USER     MySQL username                      (default: panels)
+#   PHP_VER     PHP version to install              (default: 8.4)
+#   FORCE_DEPS  fetch dependencies even if bundled  (default: unset)
 
 set -Eeuo pipefail
 
@@ -46,6 +52,31 @@ trap 'die "Failed at line $LINENO. Nothing further was changed; fix the error an
 
 [[ $EUID -eq 0 ]] || die "Run this with sudo."
 [[ -f "$APP_DIR/artisan" ]] || die "No artisan found in $APP_DIR — set APP_DIR to the application root."
+
+# ---------------------------------------------------------------------------
+# Offline bundle detection
+# ---------------------------------------------------------------------------
+#
+# `deploy/package.sh` produces a tarball that already contains a production
+# `vendor/` and a built `public/build/`. That exists for hosts which cannot
+# reach packagist, npm or codeload — so when those artefacts are present the
+# steps that would fetch them are skipped rather than attempted and failed.
+#
+# Detection is by artefact, not by a flag, so an ordinary git checkout (where
+# neither is committed) still installs everything exactly as before. Set
+# FORCE_DEPS=1 to fetch anyway and overwrite what the bundle shipped.
+
+if [[ "${FORCE_DEPS:-}" == "1" ]]; then
+    BUNDLED_VENDOR=no
+    BUNDLED_ASSETS=no
+else
+    [[ -f "$APP_DIR/vendor/autoload.php" ]] && BUNDLED_VENDOR=yes || BUNDLED_VENDOR=no
+    [[ -f "$APP_DIR/public/build/manifest.json" ]] && BUNDLED_ASSETS=yes || BUNDLED_ASSETS=no
+fi
+
+if [[ "$BUNDLED_VENDOR" == "yes" || "$BUNDLED_ASSETS" == "yes" ]]; then
+    log "Offline bundle detected (vendor: $BUNDLED_VENDOR, assets: $BUNDLED_ASSETS)"
+fi
 
 # ---------------------------------------------------------------------------
 # System packages
@@ -82,13 +113,26 @@ apt-get install -y -qq nginx mysql-server redis-server
 
 log "Installing Composer"
 if ! command -v composer >/dev/null; then
-    curl -fsSL https://getcomposer.org/installer -o /tmp/composer-setup.php
-    php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer --quiet
-    rm -f /tmp/composer-setup.php
+    # With a bundled vendor/ nothing in this run needs composer, so a host that
+    # cannot reach getcomposer.org should not be stopped here. It is still worth
+    # attempting, because `deploy/deploy.sh` does need it later.
+    if curl -fsSL https://getcomposer.org/installer -o /tmp/composer-setup.php; then
+        php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer --quiet
+        rm -f /tmp/composer-setup.php
+    elif [[ "$BUNDLED_VENDOR" == "yes" ]]; then
+        warn "Could not download Composer, but vendor/ is bundled — continuing without it"
+    else
+        die "Could not download Composer and vendor/ is not bundled."
+    fi
 fi
 
 log "Installing Node.js 22"
-if ! command -v node >/dev/null || [[ "$(node -v)" != v22* ]]; then
+# Node exists only to build the assets. An offline bundle ships them already
+# built, so on a host that cannot reach deb.nodesource.com there is nothing to
+# install and nothing to do.
+if [[ "$BUNDLED_ASSETS" == "yes" ]]; then
+    warn "Assets are bundled — skipping Node.js"
+elif ! command -v node >/dev/null || [[ "$(node -v)" != v22* ]]; then
     curl -fsSL https://deb.nodesource.com/setup_22.x | bash - >/dev/null
     apt-get install -y -qq nodejs
 fi
@@ -130,7 +174,9 @@ cd "$APP_DIR"
 log "Installing PHP dependencies"
 # GitHub's API and codeload hosts are subject to rate limiting; when a dist
 # download is refused, installing from source uses plain git instead.
-if ! COMPOSER_ALLOW_SUPERUSER=1 composer install \
+if [[ "$BUNDLED_VENDOR" == "yes" ]]; then
+    warn "vendor/ is bundled — skipping composer install"
+elif ! COMPOSER_ALLOW_SUPERUSER=1 composer install \
         --no-dev --optimize-autoloader --no-interaction --prefer-dist 2>/dev/null; then
     warn "Dist downloads failed (GitHub rate limit or blocked host) — retrying from source"
     COMPOSER_ALLOW_SUPERUSER=1 composer install \
@@ -138,8 +184,12 @@ if ! COMPOSER_ALLOW_SUPERUSER=1 composer install \
 fi
 
 log "Building frontend assets"
-npm ci --no-audit --no-fund
-npm run build
+if [[ "$BUNDLED_ASSETS" == "yes" ]]; then
+    warn "public/build is bundled — skipping npm ci && npm run build"
+else
+    npm ci --no-audit --no-fund
+    npm run build
+fi
 
 log "Configuring .env"
 if [[ -f .env ]]; then
