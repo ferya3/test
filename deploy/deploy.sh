@@ -112,8 +112,43 @@ if [[ -d .git ]]; then
     log "Fetching code"
     git -C "$APP_DIR" fetch --prune --tags origin
 
-    TARGET="${REF:-$(git -C "$APP_DIR" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || echo '')}"
-    [[ -n "$TARGET" ]] || die "No REF given and no upstream branch is configured."
+    # Which branch this checkout deploys from, remembered across runs.
+    #
+    # The `checkout --detach` below leaves HEAD detached, which is deliberate —
+    # a release is a commit, not a moving branch — but it also means that from
+    # the second run onwards there is no current branch and `@{upstream}`
+    # resolves to nothing. deploy.sh therefore worked exactly once per install
+    # and then failed identically forever, on the line that reports a
+    # misconfiguration rather than the detachment that actually caused it.
+    #
+    # So the upstream is recorded in the repository's own config the first time
+    # it is knowable, and read back once HEAD is detached.
+    UPSTREAM="$(git -C "$APP_DIR" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || echo '')"
+
+    if [[ -n "$UPSTREAM" ]]; then
+        git -C "$APP_DIR" config --local deploy.upstream "$UPSTREAM"
+    else
+        UPSTREAM="$(git -C "$APP_DIR" config --local --get deploy.upstream 2>/dev/null || echo '')"
+    fi
+
+    TARGET="${REF:-$UPSTREAM}"
+
+    if [[ -z "$TARGET" ]]; then
+        die \
+"Cannot tell what to deploy.
+
+HEAD is detached — which is normal after a release — and no deployment branch
+is on record. Name it once and this fixes itself:
+
+  sudo REF=origin/<branch> bash deploy/deploy.sh"
+    fi
+
+    # An explicit origin/<branch> is recorded too, so the recovery above has to
+    # be done once rather than on every deploy from then on. A tag or a bare
+    # commit is not: those are one-off targets, not where releases come from.
+    if [[ -z "$UPSTREAM" && "$TARGET" == origin/* ]]; then
+        git -C "$APP_DIR" config --local deploy.upstream "$TARGET"
+    fi
 
     # Refuse to discard uncommitted work on the server — it is usually somebody
     # debugging in production, and silently throwing it away is unkind.
