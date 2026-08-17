@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Public;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Certificate;
+use App\Models\Media;
 use App\Queries\ArticleQuery;
 use App\Queries\ProductQuery;
 use App\Queries\ProjectQuery;
@@ -37,6 +38,11 @@ class HomeController extends Controller
         return view('pages.home', [
             'featuredProducts' => $products->featured(6),
             'categories' => $categories,
+            // The homepage is a route rather than a Page record, so its hero
+            // has no row to hang off and is referenced from settings, next to
+            // the introduction text kept there for the same reason. Null is a
+            // supported state: the hero falls back to its own textured band.
+            'hero' => Media::find($settings->get('home_hero_media_id')),
             'intro' => HomeIntro::fromSettings($settings, [
                 [
                     'label' => __('pages.home.fact_founded'),

@@ -25,6 +25,7 @@ use App\Http\Controllers\Admin\Resources\SettingController;
 use App\Http\Controllers\Admin\Resources\SurfaceController;
 use App\Http\Controllers\Admin\Resources\ThicknessController;
 use App\Http\Controllers\Admin\Resources\UserController;
+use App\Http\Controllers\Admin\SiteImageController;
 use App\Http\Middleware\EnsureCanAccessAdmin;
 use App\Http\Middleware\RequireTwoFactor;
 use Illuminate\Support\Facades\Route;
@@ -111,6 +112,15 @@ Route::middleware(['auth', EnsureCanAccessAdmin::class, RequireTwoFactor::class]
         Route::put("/{$slug}/{id}", [$controller, 'update'])->name("{$slug}.update");
         Route::delete("/{$slug}/{id}", [$controller, 'destroy'])->name("{$slug}.destroy");
     }
+
+    /*
+     * Every fixed image on the site in one place — the heroes, which belong to
+     * a page rather than to a record. Authorisation is per slot inside the
+     * controller, because a page hero and the settings-backed homepage hero
+     * answer to different policies.
+     */
+    Route::get('/site-images', [SiteImageController::class, 'index'])->name('site-images.index');
+    Route::put('/site-images', [SiteImageController::class, 'update'])->name('site-images.update');
 
     // Media library
     Route::get('/media', [MediaController::class, 'index'])->name('media.index');

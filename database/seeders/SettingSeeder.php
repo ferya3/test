@@ -57,6 +57,17 @@ class SettingSeeder extends Seeder
              *
              * `home_intro_body` is rendered as paragraphs split on blank lines.
              */
+            /*
+             * The homepage hero photograph. Null until one is chosen, which the
+             * hero handles by falling back to its textured band — a seeded
+             * install should look deliberately unphotographed, not broken.
+             *
+             * It is a setting rather than a column because the homepage is a
+             * route, not a Page record, so there is no row for it to hang off.
+             * Managed on the "site images" screen alongside the page heroes.
+             */
+            'home_hero_media_id' => ['value' => null, 'group' => 'home'],
+
             'home_intro_overline' => [
                 'value' => ['fa' => 'دربارهٔ کارخانه', 'en' => 'About the factory'],
                 'group' => 'home',

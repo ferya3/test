@@ -23,6 +23,10 @@
             ['label' => __('admin.resources.catalogs'), 'route' => 'admin.catalogs.index', 'model' => App\Models\Catalog::class],
             ['label' => __('admin.resources.representatives'), 'route' => 'admin.representatives.index', 'model' => App\Models\Representative::class],
             ['label' => __('admin.resources.media'), 'route' => 'admin.media.index', 'model' => App\Models\Media::class],
+            // Sits beside the library rather than inside it: the library is
+            // every file uploaded, this is the handful of places on the site
+            // that show one.
+            ['label' => __('admin.resources.site_images'), 'route' => 'admin.site-images.index', 'model' => App\Models\Media::class],
         ],
         __('admin.group.leads') => [
             ['label' => __('admin.resources.leads'), 'route' => 'admin.leads.index', 'model' => App\Models\ContactRequest::class],

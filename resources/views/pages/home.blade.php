@@ -1,5 +1,6 @@
 <x-layouts.app :seo="$seo">
     <x-content.hero
+        :media="$hero"
         :overline="__('pages.home.hero_overline')"
         :heading="__('pages.home.hero_heading')"
         :lead="__('pages.home.hero_lead')"

@@ -62,4 +62,42 @@ class Setting extends Model
         return str_ends_with($this->key, '_body')
             || str_ends_with($this->key, '_description');
     }
+
+    /**
+     * Whether this setting holds a media id rather than a value to be typed.
+     *
+     * Same reasoning as isLongText(): which settings point at the media library
+     * is a property of the setting. Without this the admin rendered a plain text
+     * box for `seo_default_og_media_id` and expected an operator to know, and
+     * type, the numeric id of a row in another table.
+     */
+    public function isMedia(): bool
+    {
+        return str_ends_with($this->key, '_media_id');
+    }
+
+    /**
+     * Human label for the admin, falling back to the key.
+     *
+     * The panel used to print the raw key for every field — `home_intro_overline`
+     * above the box you type the homepage overline into. The fallback keeps a
+     * newly seeded setting visible and editable before anyone writes its label,
+     * rather than rendering a blank label nobody can identify.
+     */
+    public function label(): string
+    {
+        $key = "admin.settings.{$this->key}";
+
+        return __($key) === $key ? $this->key : __($key);
+    }
+
+    /**
+     * One line saying where the setting shows up, or null when it needs none.
+     */
+    public function hint(): ?string
+    {
+        $key = "admin.settings_hint.{$this->key}";
+
+        return __($key) === $key ? null : __($key);
+    }
 }

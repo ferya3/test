@@ -61,6 +61,7 @@ return [
         'catalogs' => 'کاتالوگ‌ها',
         'representatives' => 'نمایندگی‌ها',
         'media' => 'رسانه‌ها',
+        'site_images' => 'تصاویر سایت',
         'leads' => 'درخواست‌ها',
         'catalog_requests' => 'درخواست کاتالوگ',
         'users' => 'کاربران',
@@ -149,6 +150,75 @@ return [
         'password_optional' => 'برای تغییر نکردن گذرواژه، خالی بگذارید.',
         'private_setting' => 'این مقدار در فرانت‌اند نمایش داده نمی‌شود.',
         'paragraph_break' => 'برای شروع پاراگراف تازه، یک خط خالی بگذارید.',
+    ],
+
+    'site_images' => [
+        'intro' => 'عکس‌های ثابت سایت — آن‌هایی که به یک جای مشخص تعلق دارند، نه به یک محصول یا پروژه. عکس محصولات، پروژه‌ها و مقالات در فرم خودشان تنظیم می‌شود.',
+        'empty' => 'بدون عکس',
+
+        'home_hero' => 'هیرو صفحهٔ اصلی',
+        'home_hero_where' => 'بزرگ‌ترین عکس سایت، بالای صفحهٔ اصلی.',
+
+        'about_hero' => 'هیرو صفحهٔ دربارهٔ ما',
+        'about_hero_where' => 'بالای صفحهٔ «دربارهٔ ما».',
+
+        'factory_hero' => 'هیرو صفحهٔ کارخانه',
+        'factory_hero_where' => 'بالای صفحهٔ «کارخانه».',
+
+        'process_hero' => 'هیرو صفحهٔ فرآیند تولید',
+        'process_hero_where' => 'بالای صفحهٔ «فرآیند تولید».',
+
+        'quality_hero' => 'هیرو صفحهٔ کنترل کیفیت',
+        'quality_hero_where' => 'بالای صفحهٔ «کنترل کیفیت».',
+
+        'portrait_guidance' => 'نسبت عمودی ۱۰۸۰×۱۹۲۰. عکس افقی در این قاب بریده می‌شود.',
+        'landscape_guidance' => 'نسبت افقی، حداقل ۱۶۰۰ پیکسل عرض.',
+    ],
+
+    'settings' => [
+        'company_name' => 'نام شرکت',
+        'company_tagline' => 'شعار شرکت',
+        'company_description' => 'معرفی کوتاه شرکت',
+        'founded_year' => 'سال تأسیس',
+
+        'home_intro_overline' => 'صفحهٔ اصلی — عنوان بالای بخش معرفی',
+        'home_intro_heading' => 'صفحهٔ اصلی — تیتر بخش معرفی',
+        'home_intro_body' => 'صفحهٔ اصلی — متن بخش معرفی',
+        'home_hero_media_id' => 'صفحهٔ اصلی — عکس هیرو',
+
+        'contact_phone' => 'تلفن',
+        'contact_sales_phone' => 'تلفن فروش',
+        'contact_email' => 'ایمیل',
+        'contact_sales_email' => 'ایمیل فروش',
+        'contact_address' => 'نشانی',
+        'contact_working_hours' => 'ساعات کاری',
+        'contact_latitude' => 'عرض جغرافیایی',
+        'contact_longitude' => 'طول جغرافیایی',
+
+        'social_instagram' => 'اینستاگرام',
+        'social_linkedin' => 'لینکدین',
+        'social_youtube' => 'یوتیوب',
+        'social_telegram' => 'تلگرام',
+
+        'seo_default_title' => 'عنوان پیش‌فرض صفحات',
+        'seo_default_description' => 'توضیح پیش‌فرض صفحات',
+        'seo_default_og_media_id' => 'عکس پیش‌فرض اشتراک‌گذاری',
+
+        'analytics_gtm_id' => 'شناسهٔ Google Tag Manager',
+        'lead_notification_email' => 'ایمیل دریافت سرنخ‌ها',
+    ],
+
+    'settings_hint' => [
+        'company_tagline' => 'زیر نام شرکت در سربرگ و پابرگ دیده می‌شود.',
+        'founded_year' => 'در بخش معرفی صفحهٔ اصلی به‌عنوان یکی از آمارها نمایش داده می‌شود.',
+        'home_intro_body' => 'چند پاراگراف زیر هیرو صفحهٔ اصلی.',
+        'home_hero_media_id' => 'بزرگ‌ترین عکس سایت. نسبت ۱۰۸۰×۱۹۲۰ (عمودی).',
+        'contact_latitude' => 'برای نمایش نقشه در صفحهٔ تماس.',
+        'contact_longitude' => 'برای نمایش نقشه در صفحهٔ تماس.',
+        'seo_default_title' => 'وقتی صفحه‌ای عنوان سئوی اختصاصی نداشته باشد از این استفاده می‌شود.',
+        'seo_default_description' => 'وقتی صفحه‌ای توضیح سئوی اختصاصی نداشته باشد از این استفاده می‌شود.',
+        'seo_default_og_media_id' => 'هنگام اشتراک‌گذاری لینک سایت در شبکه‌های اجتماعی نمایش داده می‌شود.',
+        'lead_notification_email' => 'فرم‌های تماس و درخواست کاتالوگ به این نشانی اطلاع داده می‌شوند.',
     ],
 
     'settings_group' => [

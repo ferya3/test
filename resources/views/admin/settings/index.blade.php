@@ -15,10 +15,24 @@
                     @foreach ($settings as $setting)
                         @php $value = $setting->value; @endphp
 
-                        @if (is_array($value))
+                        @if ($setting->isMedia())
+                            {{--
+                                Points at the media library, so it gets the
+                                picker every other media field on the panel
+                                gets. This was a plain text input, which asked
+                                the operator to know and type the numeric id of
+                                a row in another table.
+                            --}}
+                            <x-admin.media-picker
+                                :name="'settings['.$setting->key.']'"
+                                :label="$setting->label()"
+                                :value="$value"
+                                :hint="$setting->hint()"
+                            />
+                        @elseif (is_array($value))
                             {{-- Translatable setting: one input per locale. --}}
                             <fieldset class="flex flex-col gap-2">
-                                <legend class="mb-1 text-body-sm font-medium">{{ $setting->key }}</legend>
+                                <legend class="mb-1 text-body-sm font-medium">{{ $setting->label() }}</legend>
 
                                 @foreach ($locales->codes() as $code)
                                     <div class="flex flex-col gap-1.5">
@@ -47,13 +61,17 @@
                                     </div>
                                 @endforeach
 
+                                @if ($hint = $setting->hint())
+                                    <p class="text-caption text-text-muted">{{ $hint }}</p>
+                                @endif
+
                                 @if ($setting->isLongText())
                                     <p class="text-caption text-text-muted">{{ __('admin.hint.paragraph_break') }}</p>
                                 @endif
                             </fieldset>
                         @else
                             <div class="flex flex-col gap-2">
-                                <label for="{{ $setting->key }}" class="text-body-sm font-medium">{{ $setting->key }}</label>
+                                <label for="{{ $setting->key }}" class="text-body-sm font-medium">{{ $setting->label() }}</label>
                                 <input
                                     id="{{ $setting->key }}"
                                     type="text"
@@ -62,6 +80,10 @@
                                     dir="ltr"
                                     class="h-11 w-full rounded-md border border-border-strong bg-surface-raised px-3.5 text-body focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
                                 >
+                                @if ($hint = $setting->hint())
+                                    <p class="text-caption text-text-muted">{{ $hint }}</p>
+                                @endif
+
                                 @unless ($setting->is_public)
                                     <p class="text-caption text-text-muted">{{ __('admin.hint.private_setting') }}</p>
                                 @endunless
