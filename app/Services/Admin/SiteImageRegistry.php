@@ -35,7 +35,7 @@ class SiteImageRegistry
                 key: 'home_hero',
                 label: __('admin.site_images.home_hero'),
                 location: __('admin.site_images.home_hero_where'),
-                guidance: __('admin.site_images.portrait_guidance'),
+                guidance: __('admin.site_images.wide_guidance'),
                 source: 'setting',
                 target: 'home_hero_media_id',
             ),

@@ -10,17 +10,19 @@ declare(strict_types=1);
  * frame is authored at, the cap that keeps that ratio usable on a desktop, and
  * the wave staying decorative and behind the copy.
  */
-it('frames the home hero at the 1080x1920 ratio it is authored for', function (): void {
+it('frames the home hero at the 1920x1080 ratio it is authored for', function (): void {
+    // A photograph shot at 1920x1080 fills this exactly, with nothing cropped.
     $this->get('/')
         ->assertOk()
-        ->assertSee('aspect-[1080/1920]', escape: false);
+        ->assertSee('aspect-[1920/1080]', escape: false);
 });
 
-it('caps the portrait hero at the viewport height', function (): void {
-    // Without this the same ratio is over 3000px tall on a 1920px-wide screen
-    // and the visitor scrolls a full page before reaching any content.
+it('keeps the wide hero usable at both extremes', function (): void {
+    // 16:9 is about 220px tall on a phone, which will not hold a heading, a
+    // lead and two buttons; and it runs past the screen on an ultrawide.
     $this->get('/')
         ->assertOk()
+        ->assertSee('min-h-[52svh]', escape: false)
         ->assertSee('max-h-[100svh]', escape: false);
 });
 
@@ -49,10 +51,10 @@ it('paints the hero copy above the wave', function (): void {
 });
 
 it('leaves other pages on their own hero sizes', function (): void {
-    // `portrait` is set on the home page, not in the component's default, so a
-    // change to the landing page cannot silently turn every hero on the site
-    // into a full-height portrait frame.
+    // `wide` is set on the home page, not in the component's default, so a
+    // change to the landing page cannot silently re-frame every hero on the
+    // site.
     $this->get('/products')
         ->assertOk()
-        ->assertDontSee('aspect-[1080/1920]', escape: false);
+        ->assertDontSee('aspect-[1920/1080]', escape: false);
 });

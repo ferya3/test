@@ -23,19 +23,21 @@
      * measured in svh fills the phone screen before a single word of the page
      * has been read; on a phone the job is to introduce and get out of the way.
      *
-     * `portrait` is the exception, and is sized by ratio rather than by height:
-     * a 1080x1920 frame, which is the shape a phone-format hero photograph is
-     * shot in. On a phone that is close to full screen and the intent holds. On
-     * a wide desktop the same ratio would be over three thousand pixels tall,
-     * so it is capped at the viewport — the frame stays portrait, the image
-     * still covers it, and the page remains navigable. Raise the cap and the
-     * hero becomes a page of its own that the visitor has to scroll past.
+     * `wide` is the exception, and is sized by ratio rather than by height: a
+     * 1920x1080 frame, so a photograph shot at that size fills it exactly and
+     * nothing is cropped away.
+     *
+     * The floor matters as much as the ratio. On a phone 16:9 is only about
+     * 220px tall, which is not enough for a heading, a lead and two buttons —
+     * so a minimum height keeps the hero usable and the image covers the
+     * taller box. The cap is for the opposite end: on an ultrawide display the
+     * same ratio runs past the height of the screen.
      */
     $heights = [
         'sm' => 'min-h-[34svh] md:min-h-[42svh]',
         'default' => 'min-h-[44svh] md:min-h-[58svh]',
         'lg' => 'min-h-[54svh] md:min-h-[72svh]',
-        'portrait' => 'aspect-[1080/1920] max-h-[100svh] min-h-[34svh]',
+        'wide' => 'aspect-[1920/1080] min-h-[52svh] md:min-h-0 max-h-[100svh]',
     ];
 @endphp
 
