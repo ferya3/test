@@ -114,12 +114,28 @@ apt_pkg() {
 
 php_available() { apt_pkg "php${1}-fpm" >/dev/null; }
 
+# Any PHP at or above the ^8.3 that composer.json requires will run the
+# application, so a version that is actually available beats the requested one
+# being absent. $PHP_VER is tried first, then the rest newest-first.
+pick_php() {
+    for v in "$PHP_VER" 8.4 8.3 8.5; do
+        if php_available "$v"; then
+            PHP_VER="$v"
+            return 0
+        fi
+    done
+    return 1
+}
+
+REQUESTED_PHP="$PHP_VER"
+UBUNTU_CODENAME="$(lsb_release -cs 2>/dev/null || echo unknown)"
+
 log "Locating PHP $PHP_VER"
-if php_available "$PHP_VER"; then
+
+if pick_php; then
     log "PHP $PHP_VER is in this release's own repositories — no PPA needed"
 else
-    UBUNTU_CODENAME="$(lsb_release -cs 2>/dev/null || echo unknown)"
-    log "PHP $PHP_VER is not packaged for $UBUNTU_CODENAME — adding ppa:ondrej/php"
+    log "No PHP 8.3+ in $UBUNTU_CODENAME's own repositories — adding ppa:ondrej/php"
 
     # Deliberately not silenced. add-apt-repository does not reliably signal
     # failure through its exit status — it can fail to reach Launchpad, say so
@@ -127,81 +143,63 @@ else
     # evidence of what went wrong, and the run then fails later somewhere that
     # does not mention the PPA at all.
     add-apt-repository -y ppa:ondrej/php || true
-
     apt-get update || warn "apt-get update reported errors — see above"
 
-    # The exit statuses above are advisory; this is the question that actually
-    # matters, so ask it directly rather than inferring it.
-    if ! php_available "$PHP_VER"; then
+    if ! pick_php; then
         # A repository apt reports as "Hit" is not necessarily one it has
         # package indices for. If an earlier update was interrupted after
         # InRelease was written but before the Packages files were fetched,
         # every later update sees an unchanged InRelease, prints Hit, and skips
-        # the download — so the repository is present, reachable, current, and
+        # the download — so the repository is present, reachable, current and
         # empty, and apt says "Unable to locate package" about something that is
-        # definitely published.
+        # published.
         #
         # Dropping just this repository's list files forces the refetch.
-        warn "php${PHP_VER}-fpm is missing though the PPA is configured — refetching its indices"
+        warn "No PHP 8.3+ yet though the PPA is configured — refetching its indices"
         rm -f /var/lib/apt/lists/*ondrej*
         apt-get update || warn "apt-get update reported errors — see above"
     fi
 
-    if ! php_available "$PHP_VER"; then
-        warn "The PPA did not provide php${PHP_VER}-fpm on $UBUNTU_CODENAME"
-
-        # Printed before anything is removed. The first version of this
+    if pick_php; then
+        log "Using PHP $PHP_VER from ppa:ondrej/php"
+    else
+        # Printed before anything is removed. An earlier version of this
         # diagnostic ran after the PPA had been taken out again and duly
         # reported no PHP sources at all, which was true and useless.
-        warn "PHP-related sources apt currently has:"
+        warn "ppa:ondrej/php has no PHP 8.3+ for $UBUNTU_CODENAME"
+        warn "PHP sources apt currently has:"
         grep -rhs --include='*.list' --include='*.sources' \
             -e ondrej -e sury -e php /etc/apt/sources.list /etc/apt/sources.list.d/ || true
-        warn "PPA index files apt has fetched:"
-        ls -1 /var/lib/apt/lists/ 2>/dev/null | grep -i ondrej || warn "  (none)"
+        warn "PHP versions apt can actually see:"
+        apt-cache search --names-only '^php[0-9.]*-fpm$' | sort || warn "  (none)"
 
-        # Leaving a broken source behind would make every later apt-get in this
-        # script — and every one the operator runs afterwards — fail the same
-        # way, which is a worse state than the one we started in.
+        # Leaving a source behind that supplied nothing would make every later
+        # apt-get in this script — and every one the operator runs afterwards —
+        # carry the same dead repository.
         add-apt-repository -y --remove ppa:ondrej/php >/dev/null 2>&1 || true
         apt-get update -qq || true
 
-        # Fall back to whatever this release does carry. composer.json requires
-        # PHP ^8.3, so anything at or above that will run the application.
-        for candidate in 8.5 8.4 8.3; do
-            if php_available "$candidate"; then
-                warn "Using PHP $candidate from the distribution instead of $PHP_VER"
-                PHP_VER="$candidate"
-                break
-            fi
-        done
-
-        if ! php_available "$PHP_VER"; then
-            # Print what apt can actually see. Every previous version of this
-            # failure ended in a one-line message that named the missing package
-            # but gave no way to tell whether the repository was absent, empty,
-            # or simply not fetched.
-            warn "What apt knows about php${PHP_VER}-fpm:"
-            apt-cache policy "php${PHP_VER}-fpm" || true
-
-            die \
+        die \
 "No PHP 8.3+ available on $UBUNTU_CODENAME.
 
-This release does not package one itself, and ppa:ondrej/php did not supply it
-even after its indices were refetched — the output above shows what apt had.
+This release packages none itself, and ppa:ondrej/php supplied none either, even
+after its indices were refetched. The versions apt can see are listed above —
+if one of them is 8.3 or newer, re-run with PHP_VER set to it.
 
-ondrej/php is being merged into packages.sury.org, which is the other place
-PHP 8.4 is published for Ubuntu. To use it instead:
+ondrej/php is being merged into packages.sury.org, which is the other place PHP
+is published for Ubuntu. To try it:
 
+  install -d /etc/apt/keyrings
   curl -fsSL https://packages.sury.org/php/apt.gpg \\
       -o /etc/apt/keyrings/sury-php.gpg
   echo \"deb [signed-by=/etc/apt/keyrings/sury-php.gpg] \\
       https://packages.sury.org/php/ $UBUNTU_CODENAME main\" \\
       > /etc/apt/sources.list.d/sury-php.list
   apt-get update
+  apt-cache search --names-only '^php[0-9.]*-fpm$'
 
-Then re-run this script. Set PHP_VER if you installed a version other than
-$PHP_VER."
-        fi
+Then re-run this script, with PHP_VER set if the version differs from
+$REQUESTED_PHP."
     fi
 fi
 
