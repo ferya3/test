@@ -36,10 +36,26 @@ DB_NAME="${DB_NAME:-panels}"
 DB_USER="${DB_USER:-panels}"
 
 APP_DIR="${APP_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-if [[ "$DOMAIN" == "_" ]]; then
-    APP_URL="${APP_URL:-http://localhost}"
+
+# The scheme is inferred from whether a certificate exists, not from whether a
+# domain was given.
+#
+# Defaulting a named domain to https:// was wrong in a way that only showed up
+# at the login form. This script does not provision TLS and says so, but it
+# wrote APP_URL=https://..., and SESSION_SECURE_COOKIE follows APP_URL's scheme
+# — so a site served over plain HTTP set a TLS-only session cookie. The browser
+# never sent it back, the session was empty on POST, and every form died with
+# 419 Page Expired. Nothing in the message points at TLS.
+#
+# An explicit APP_URL is always honoured; this only picks the default.
+if [[ -n "${APP_URL:-}" ]]; then
+    :
+elif [[ "$DOMAIN" == "_" ]]; then
+    APP_URL="http://localhost"
+elif [[ -s "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]]; then
+    APP_URL="https://$DOMAIN"
 else
-    APP_URL="${APP_URL:-https://$DOMAIN}"
+    APP_URL="http://$DOMAIN"
 fi
 
 export DEBIAN_FRONTEND=noninteractive
@@ -414,15 +430,16 @@ else
     set_env SESSION_ENCRYPT true
     set_env SESSION_SAME_SITE lax
 
-    # TLS-only cookies would lock everyone out of a plain-HTTP install, so the
-    # flag follows the scheme actually in APP_URL. Enabling TLS later must be
-    # paired with flipping this to true.
+    # TLS-only cookies lock everyone out of a plain-HTTP install — the browser
+    # withholds the session cookie, the session is empty on POST, and every form
+    # returns 419 Page Expired — so the flag follows APP_URL's scheme, which is
+    # now itself decided by whether a certificate exists.
     if [[ "$APP_URL" == https://* ]]; then
         set_env SESSION_SECURE_COOKIE true
     else
         set_env SESSION_SECURE_COOKIE false
         warn "APP_URL is plain HTTP, so SESSION_SECURE_COOKIE is false."
-        warn "Set it to true in .env once a TLS certificate is installed."
+        warn "Set it to true — and APP_URL to https:// — once TLS is installed."
     fi
 
     # Security headers. HSTS only ever goes out over TLS (the middleware checks
@@ -662,9 +679,12 @@ cat <<'NEXT'
     1. Point DNS at this server, then enable TLS:
          sudo apt-get install -y certbot python3-certbot-nginx
          sudo certbot --nginx -d your-domain
-       Then set SESSION_SECURE_COOKIE=true in .env and re-run
-       `php artisan optimize`. Until a certificate exists the site runs on
-       plain HTTP with non-TLS-only cookies.
+       Then set BOTH of these in .env and re-run `php artisan optimize`:
+         APP_URL=https://your-domain
+         SESSION_SECURE_COOKIE=true
+       They go together. A TLS-only cookie on a plain-HTTP site is withheld
+       by the browser, and every form then fails with 419 Page Expired.
+       Until a certificate exists the site runs on plain HTTP.
     2. Sign in at /admin with the credentials above and enrol TOTP. Privileged
        roles cannot reach the panel until they have.
     3. Work through the pre-launch checklist in docs/DEPLOYMENT.md section 5 —
