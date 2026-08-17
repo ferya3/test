@@ -74,8 +74,14 @@ trap cleanup EXIT
 # command too, so otherwise the current release resolves to "unknown" — and the
 # rollback hint this script prints on failure is `REF=$PREVIOUS`, which would be
 # unusable at exactly the moment it is needed.
+# The membership test is done on a captured value rather than through
+# `| grep -qxF`, which under `set -o pipefail` reports failure whenever grep
+# exits at its first match before git has finished writing — so an already
+# trusted directory would be re-added on most runs.
+SAFE_DIRS="$(git config --global --get-all safe.directory 2>/dev/null || true)"
+
 if [[ -d "$APP_DIR/.git" ]] \
-    && ! git config --global --get-all safe.directory 2>/dev/null | grep -qxF "$APP_DIR"; then
+    && [[ $'\n'"$SAFE_DIRS"$'\n' != *$'\n'"$APP_DIR"$'\n'* ]]; then
     log "Marking $APP_DIR as a trusted git directory for $(id -un)"
     git config --global --add safe.directory "$APP_DIR"
 fi
@@ -218,7 +224,11 @@ $PHP artisan up >/dev/null
 # ---------------------------------------------------------------------------
 
 log "Checking the site responds"
-APP_URL_VALUE="$(grep -E '^APP_URL=' .env | head -1 | cut -d= -f2- | tr -d '"' || true)"
+# One awk rather than grep | head | cut | tr: `head -1` exits after the first
+# line and, under `set -o pipefail`, takes the whole pipeline down with it — the
+# `|| true` then hid that as an empty APP_URL, and the health check silently
+# fell back to localhost instead of the site it was meant to verify.
+APP_URL_VALUE="$(awk -F'=' '/^APP_URL=/ { sub(/^APP_URL=/, ""); gsub(/"/, ""); print; exit }' .env || true)"
 HEALTH="${APP_URL_VALUE:-http://localhost}/up"
 
 if curl -fsS --max-time 15 -o /dev/null "$HEALTH"; then

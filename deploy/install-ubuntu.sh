@@ -99,12 +99,23 @@ apt-get install -y -qq \
 # So: ask apt what it can already see, and only reach for the PPA if the answer
 # is nothing.
 
-# Prints the first of its arguments that apt has a real package record for.
-# `apt-cache show` alone is not enough: it exits 0 for a name that only exists
-# as a Provides: or a pure virtual package, which cannot be installed.
+# Prints the first of its arguments that apt has an installable candidate for.
+#
+# Deliberately free of pipes. The previous version ended in `| grep -q`, and
+# under `set -o pipefail` that is a race rather than a test: grep -q exits at
+# the first match and closes the pipe, apt-cache dies of SIGPIPE, and the
+# pipeline reports 141 — a failure — for a package that is present. It resolved
+# PHP 8.4 successfully one moment and denied its existence the next, on a host
+# where `apt-cache policy` showed a candidate the whole time.
+#
+# `policy` rather than `show`, too: `show` also succeeds for a pure virtual
+# package, which has a record but cannot be installed.
 apt_pkg() {
+    local name out
     for name in "$@"; do
-        if apt-cache show "$name" 2>/dev/null | grep -q '^Package:'; then
+        out="$(apt-cache policy "$name" 2>/dev/null || true)"
+
+        if [[ "$out" == *"Candidate:"* && "$out" != *"Candidate: (none)"* ]]; then
             printf '%s' "$name"
             return 0
         fi
@@ -300,7 +311,13 @@ if [[ -f "$DB_PASS_FILE" ]]; then
     DB_PASS="$(cat "$DB_PASS_FILE")"
     warn "Reusing the database password from $DB_PASS_FILE"
 else
-    DB_PASS="$(openssl rand -base64 30 | tr -d '/+=' | head -c 32)"
+    # `cut -c1-32` rather than `head -c 32`: head exits the moment it has its
+    # 32 bytes, which under `set -o pipefail` makes the upstream tr die of
+    # SIGPIPE and fails the substitution — so provisioning could abort here, at
+    # random, while generating a password. cut reads its input to the end.
+    DB_PASS="$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | cut -c1-32)"
+
+    [[ ${#DB_PASS} -eq 32 ]] || die "Could not generate a 32-character database password."
     umask 077
     printf '%s' "$DB_PASS" > "$DB_PASS_FILE"
 fi
