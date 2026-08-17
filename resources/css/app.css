@@ -500,6 +500,28 @@
     }
 
     /*
+       Horizontal drift for the layers of x-content.wave.
+
+       The translation is one tile — 1440 user units — and each path is drawn
+       twice across a 2880 unit group, so the loop has no seam. Written in px
+       rather than a percentage because a percentage inside SVG resolves against
+       the element's bounding box, which differs per layer; the tile width does
+       not.
+
+       Purely decorative. The reduced-motion rule above already reduces every
+       animation in the system to a single 0.01ms pass, which leaves the wave
+       drawn and still.
+    */
+    .wave-drift {
+        animation: wave-drift var(--wave-duration, 28s) linear infinite;
+        will-change: transform;
+    }
+
+    .wave-drift-reverse {
+        animation-direction: reverse;
+    }
+
+    /*
        Stand-in for a product photograph that has not been uploaded yet.
 
        A flat grey rectangle is what made an unphotographed catalogue read as
@@ -596,4 +618,16 @@
    without this rule a dropdown or drawer flashes open on first paint. */
 [x-cloak] {
     display: none !important;
+}
+
+/* Drift for the hero wave layers. One tile of the path is 1440 user units and
+   each layer draws two, so this translation loops seamlessly. */
+@keyframes wave-drift {
+    from {
+        transform: translateX(0);
+    }
+
+    to {
+        transform: translateX(-1440px);
+    }
 }

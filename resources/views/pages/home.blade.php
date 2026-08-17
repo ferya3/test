@@ -3,7 +3,8 @@
         :overline="__('pages.home.hero_overline')"
         :heading="__('pages.home.hero_heading')"
         :lead="__('pages.home.hero_lead')"
-        size="lg"
+        size="portrait"
+        wave
     >
         <x-slot:actions>
             <x-ui.button :href="lroute('products.index')" size="lg">
