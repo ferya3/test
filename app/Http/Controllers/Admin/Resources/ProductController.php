@@ -47,7 +47,7 @@ class ProductController extends CrudController
 
             Field::select('material_id', __('admin.field.material'), $this->options(Material::class)),
             Field::select('surface_id', __('admin.field.surface'), $this->options(Surface::class))->listed(),
-            Field::select('decor_id', __('admin.field.decor'), $this->options(Decor::class)),
+            Field::select('decor_id', __('admin.field.decor'), $this->decorOptions()),
             Field::select('color_id', __('admin.field.color'), $this->options(Color::class)),
 
             Field::relation('thicknesses', __('admin.field.thicknesses'), $this->thicknessOptions(), 'thicknesses'),
@@ -104,6 +104,31 @@ class ProductController extends CrudController
             ->orderBy('position')
             ->get()
             ->mapWithKeys(fn (Model $m): array => [(string) $m->getKey() => (string) $m->name])
+            ->all();
+    }
+
+    /**
+     * Decors, each labelled with the family it belongs to.
+     *
+     * The catalogue's only filter is the decor *family*, but a product does not
+     * carry one — it carries a decor, and the family comes from that. Choosing
+     * "بلوط طبیعی" therefore decides which filter bucket the product lands in,
+     * and nothing on the form said so. Naming the family in the option makes
+     * the consequence visible at the moment of the choice.
+     *
+     * @return array<string, string>
+     */
+    private function decorOptions(): array
+    {
+        return Decor::query()
+            ->orderBy('decor_family')
+            ->orderBy('position')
+            ->get()
+            ->mapWithKeys(fn (Decor $decor): array => [
+                (string) $decor->getKey() => $decor->decor_family === null
+                    ? (string) $decor->name
+                    : $decor->name.' — '.$decor->decor_family->label(),
+            ])
             ->all();
     }
 
