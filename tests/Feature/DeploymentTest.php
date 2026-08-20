@@ -148,3 +148,87 @@ it('never ships an .env in the bundle', function (): void {
 
     expect($packager)->toContain('.env is in the bundle');
 });
+
+/*
+|--------------------------------------------------------------------------
+| PHP version
+|--------------------------------------------------------------------------
+|
+| Three files have an opinion about which PHP this runs on — composer.json,
+| composer.lock and the installer — and they drifted apart once already, in the
+| direction that is hardest to diagnose: composer.json said ^8.3, the installer
+| believed it and happily selected the 8.3 that Ubuntu 24.04 ships, and the run
+| got several minutes further before composer rejected a lock full of packages
+| needing 8.4.1. Twenty conflicts, no cause named.
+|
+*/
+
+it('requires the PHP version its own lock file actually needs', function (): void {
+    $composer = json_decode((string) file_get_contents(base_path('composer.json')), true);
+    $lock = json_decode((string) file_get_contents(base_path('composer.lock')), true);
+
+    $required = $composer['require']['php'];
+
+    expect($lock['platform']['php'] ?? null)->toBe($required);
+
+    // Every locked package has to be installable on the floor that constraint
+    // sets, or `composer install` fails on a host provisioned to exactly it.
+    $floor = (float) ltrim($required, '^~>=');
+
+    $tooNew = [];
+
+    foreach ($lock['packages'] as $package) {
+        $constraint = $package['require']['php'] ?? null;
+
+        if ($constraint === null) {
+            continue;
+        }
+
+        // Just the lower bound: ">=8.4.1" and "^8.4" both mean 8.4 here.
+        if (preg_match('/(\d+\.\d+)/', $constraint, $matches) && (float) $matches[1] > $floor) {
+            $tooNew[] = "{$package['name']} needs {$constraint}";
+        }
+    }
+
+    expect($tooNew)->toBe([]);
+});
+
+it('does not let the installer select a PHP below that floor', function (): void {
+    $installer = (string) file_get_contents(base_path('deploy/install-ubuntu.sh'));
+    $composer = json_decode((string) file_get_contents(base_path('composer.json')), true);
+
+    $floor = (float) ltrim($composer['require']['php'], '^~>=');
+
+    expect($installer)->toMatch('/pick_php\(\)\s*\{\s*for v in "\$PHP_VER" ([\d. ]+); do/');
+
+    preg_match('/for v in "\$PHP_VER" ([\d. ]+); do/', $installer, $matches);
+
+    foreach (preg_split('/\s+/', trim($matches[1])) as $candidate) {
+        expect((float) $candidate)->toBeGreaterThanOrEqual(
+            $floor,
+            "The installer would accept PHP {$candidate}, below the {$floor} composer.json requires.",
+        );
+    }
+});
+
+it('runs every PHP command on the version it selected', function (): void {
+    // A bare `php` is the update-alternatives symlink, which on Ubuntu 24.04
+    // points at the distribution's 8.3 even once the PPA's 8.4 is installed
+    // beside it — so migrations would run on one interpreter and the queue
+    // worker, whose unit names /usr/bin/php$PHP_VER, on another.
+    $installer = (string) file_get_contents(base_path('deploy/install-ubuntu.sh'));
+
+    $offenders = [];
+
+    foreach (explode("\n", $installer) as $number => $line) {
+        if (str_starts_with(ltrim($line), '#')) {
+            continue;
+        }
+
+        if (preg_match('/(?<![\/$\w"])php artisan/', $line)) {
+            $offenders[] = 'line '.($number + 1).': '.trim($line);
+        }
+    }
+
+    expect($offenders)->toBe([]);
+});

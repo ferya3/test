@@ -141,11 +141,21 @@ apt_pkg() {
 
 php_available() { apt_pkg "php${1}-fpm" >/dev/null; }
 
-# Any PHP at or above the ^8.3 that composer.json requires will run the
-# application, so a version that is actually available beats the requested one
-# being absent. $PHP_VER is tried first, then the rest newest-first.
+# The floor is 8.4, and it does not bend downwards.
+#
+# It was briefly 8.3, to match composer.json's `^8.3`. 8.3 is what noble ships,
+# so this picked it, never reached the PPA, and handed the run a PHP that
+# composer.lock cannot be installed on at all — the locked symfony 8.1 packages
+# require >=8.4.1. The install died minutes later inside composer, listing
+# twenty version conflicts and naming no cause.
+#
+# composer.json has been corrected to ^8.4 to agree with its own lock, and
+# DeploymentTest holds the two to the same number as this list.
+#
+# $PHP_VER is tried first, then newer: an available version beats an absent
+# requested one, but only above the floor.
 pick_php() {
-    for v in "$PHP_VER" 8.4 8.3 8.5; do
+    for v in "$PHP_VER" 8.4 8.5; do
         if php_available "$v"; then
             PHP_VER="$v"
             return 0
@@ -162,7 +172,7 @@ log "Locating PHP $PHP_VER"
 if pick_php; then
     log "PHP $PHP_VER is in this release's own repositories — no PPA needed"
 else
-    log "No PHP 8.3+ in $UBUNTU_CODENAME's own repositories — adding ppa:ondrej/php"
+    log "No PHP 8.4+ in $UBUNTU_CODENAME's own repositories — adding ppa:ondrej/php"
 
     # Deliberately not silenced. add-apt-repository does not reliably signal
     # failure through its exit status — it can fail to reach Launchpad, say so
@@ -182,7 +192,7 @@ else
         # published.
         #
         # Dropping just this repository's list files forces the refetch.
-        warn "No PHP 8.3+ yet though the PPA is configured — refetching its indices"
+        warn "No PHP 8.4+ yet though the PPA is configured — refetching its indices"
         rm -f /var/lib/apt/lists/*ondrej*
         apt-get update || warn "apt-get update reported errors — see above"
     fi
@@ -193,7 +203,7 @@ else
         # Printed before anything is removed. An earlier version of this
         # diagnostic ran after the PPA had been taken out again and duly
         # reported no PHP sources at all, which was true and useless.
-        warn "ppa:ondrej/php has no PHP 8.3+ for $UBUNTU_CODENAME"
+        warn "ppa:ondrej/php has no PHP 8.4+ for $UBUNTU_CODENAME"
         warn "PHP sources apt currently has:"
         grep -rhs --include='*.list' --include='*.sources' \
             -e ondrej -e sury -e php /etc/apt/sources.list /etc/apt/sources.list.d/ || true
@@ -207,11 +217,11 @@ else
         apt-get update -qq || true
 
         die \
-"No PHP 8.3+ available on $UBUNTU_CODENAME.
+"No PHP 8.4+ available on $UBUNTU_CODENAME.
 
 This release packages none itself, and ppa:ondrej/php supplied none either, even
 after its indices were refetched. The versions apt can see are listed above —
-if one of them is 8.3 or newer, re-run with PHP_VER set to it.
+if one of them is 8.4 or newer, re-run with PHP_VER set to it.
 
 ondrej/php is being merged into packages.sury.org, which is the other place PHP
 is published for Ubuntu. To try it:
@@ -229,6 +239,15 @@ Then re-run this script, with PHP_VER set if the version differs from
 $REQUESTED_PHP."
     fi
 fi
+
+# Every later PHP invocation goes through this, never a bare `php`.
+#
+# `php` is an update-alternatives symlink pointing at whichever version apt
+# configured last. On noble that is the distribution's 8.3 even after the PPA's
+# 8.4 is installed alongside it — so migrations, seeding and `optimize` would
+# run on one PHP while the systemd units below, which name /usr/bin/php$PHP_VER
+# explicitly, run the queue and scheduler on another.
+PHP_BIN="/usr/bin/php${PHP_VER}"
 
 log "Installing PHP $PHP_VER and extensions"
 # gd is required for image conversions; redis for cache/queue; intl for locale
@@ -359,10 +378,10 @@ log "Installing PHP dependencies"
 # download is refused, installing from source uses plain git instead.
 if [[ "$BUNDLED_VENDOR" == "yes" ]]; then
     warn "vendor/ is bundled — skipping composer install"
-elif ! COMPOSER_ALLOW_SUPERUSER=1 composer install \
+elif ! COMPOSER_ALLOW_SUPERUSER=1 "$PHP_BIN" "$(command -v composer)" install \
         --no-dev --optimize-autoloader --no-interaction --prefer-dist 2>/dev/null; then
     warn "Dist downloads failed (GitHub rate limit or blocked host) — retrying from source"
-    COMPOSER_ALLOW_SUPERUSER=1 composer install \
+    COMPOSER_ALLOW_SUPERUSER=1 "$PHP_BIN" "$(command -v composer)" install \
         --no-dev --optimize-autoloader --no-interaction --prefer-source
 fi
 
@@ -452,7 +471,7 @@ else
     # client address. Set this only if a CDN or load balancer is added later.
     set_env TRUSTED_PROXIES ""
 
-    php artisan key:generate --force
+    "$PHP_BIN" artisan key:generate --force
 fi
 
 # A re-run arrives with the previous run's caches still in place. Migrating or
@@ -461,18 +480,18 @@ fi
 # it would silently ignore the SEED_* credentials and invent a second set of
 # admin accounts. Cleared here; `optimize` puts it all back below.
 log "Clearing cached config from any previous run"
-php artisan optimize:clear
+"$PHP_BIN" artisan optimize:clear
 
 log "Running migrations"
 # First real MySQL run: the products FULLTEXT index only applies on MySQL.
-php artisan migrate --force
+"$PHP_BIN" artisan migrate --force
 
 log "Seeding reference data"
 # Seeder output includes the generated admin passwords — capture it.
 SEED_LOG="$(mktemp)"
-php artisan db:seed --force 2>&1 | tee "$SEED_LOG"
+"$PHP_BIN" artisan db:seed --force 2>&1 | tee "$SEED_LOG"
 
-php artisan storage:link || true
+"$PHP_BIN" artisan storage:link || true
 
 log "Setting filesystem ownership"
 
@@ -520,7 +539,7 @@ sudo -u www-data test -w "$APP_DIR/storage/logs" \
 log "Caching configuration, routes and views"
 # As www-data, not root. `optimize` writes into bootstrap/cache, and root-owned
 # cache files are ones the application itself cannot later rewrite.
-sudo -u www-data php artisan optimize
+sudo -u www-data "$PHP_BIN" artisan optimize
 
 # ---------------------------------------------------------------------------
 # Nginx
@@ -618,7 +637,7 @@ Group=www-data
 Restart=always
 RestartSec=3
 WorkingDirectory=${APP_DIR}
-ExecStart=/usr/bin/php${PHP_VER} artisan queue:work redis --sleep=1 --tries=3 --max-time=3600
+ExecStart=${PHP_BIN} artisan queue:work redis --sleep=1 --tries=3 --max-time=3600
 
 [Install]
 WantedBy=multi-user.target
@@ -633,7 +652,7 @@ Description=Panels scheduler tick
 Type=oneshot
 User=www-data
 WorkingDirectory=${APP_DIR}
-ExecStart=/usr/bin/php${PHP_VER} artisan schedule:run
+ExecStart=${PHP_BIN} artisan schedule:run
 UNIT
 
 cat > /etc/systemd/system/panels-scheduler.timer <<UNIT
@@ -674,14 +693,16 @@ if grep -q 'Created ' "$SEED_LOG"; then
 fi
 rm -f "$SEED_LOG"
 
-cat <<'NEXT'
+cat <<NEXT
   Next steps
     1. Point DNS at this server, then enable TLS:
          sudo apt-get install -y certbot python3-certbot-nginx
          sudo certbot --nginx -d your-domain
-       Then set BOTH of these in .env and re-run `php artisan optimize`:
+       Then set BOTH of these in .env:
          APP_URL=https://your-domain
          SESSION_SECURE_COOKIE=true
+       and re-run:
+         sudo -u www-data ${PHP_BIN} artisan optimize
        They go together. A TLS-only cookie on a plain-HTTP site is withheld
        by the browser, and every form then fails with 419 Page Expired.
        Until a certificate exists the site runs on plain HTTP.
