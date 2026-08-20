@@ -42,7 +42,7 @@ dataset('locale prefixes', [
 it('renders every static page', function (string $prefix): void {
     $paths = [
         '/',
-        '/products',
+        '/categories/hpl-cabinet-panel',
         '/categories',
         '/colors-and-decor',
         '/about',

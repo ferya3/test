@@ -27,6 +27,7 @@ final readonly class ProductFilters
      * @param  list<string>  $categories
      * @param  list<string>  $colors
      * @param  list<string>  $decors
+     * @param  list<string>  $decorFamilies
      * @param  list<string>  $surfaces
      * @param  list<string>  $materials
      * @param  list<string>  $applications
@@ -36,6 +37,10 @@ final readonly class ProductFilters
         public array $categories = [],
         public array $colors = [],
         public array $decors = [],
+        // The catalogue's one public filter. Kept beside the others rather
+        // than replacing them: the remaining dimensions are still queryable by
+        // URL and still used by the admin, they are simply not offered.
+        public array $decorFamilies = [],
         public array $surfaces = [],
         public array $materials = [],
         public array $applications = [],
@@ -53,6 +58,7 @@ final readonly class ProductFilters
             categories: self::list($request, 'category'),
             colors: self::list($request, 'color'),
             decors: self::list($request, 'decor'),
+            decorFamilies: self::list($request, 'family'),
             surfaces: self::list($request, 'surface'),
             materials: self::list($request, 'material'),
             applications: self::list($request, 'application'),
@@ -79,6 +85,7 @@ final readonly class ProductFilters
             'category' => implode(',', $this->categories),
             'color' => implode(',', $this->colors),
             'decor' => implode(',', $this->decors),
+            'family' => implode(',', $this->decorFamilies),
             'surface' => implode(',', $this->surfaces),
             'material' => implode(',', $this->materials),
             'application' => implode(',', $this->applications),
@@ -139,6 +146,7 @@ final readonly class ProductFilters
         return $this->categories !== []
             || $this->colors !== []
             || $this->decors !== []
+            || $this->decorFamilies !== []
             || $this->surfaces !== []
             || $this->materials !== []
             || $this->applications !== []
@@ -151,6 +159,7 @@ final readonly class ProductFilters
         return count($this->categories)
             + count($this->colors)
             + count($this->decors)
+            + count($this->decorFamilies)
             + count($this->surfaces)
             + count($this->materials)
             + count($this->applications)
@@ -178,6 +187,7 @@ final readonly class ProductFilters
             'categories' => $this->categories,
             'colors' => $this->colors,
             'decors' => $this->decors,
+            'decorFamilies' => $this->decorFamilies,
             'surfaces' => $this->surfaces,
             'materials' => $this->materials,
             'applications' => $this->applications,
@@ -197,6 +207,7 @@ final readonly class ProductFilters
             'category' => 'categories',
             'color' => 'colors',
             'decor' => 'decors',
+            'family' => 'decorFamilies',
             'surface' => 'surfaces',
             'material' => 'materials',
             'application' => 'applications',

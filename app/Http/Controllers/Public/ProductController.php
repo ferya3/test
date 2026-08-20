@@ -9,32 +9,12 @@ use App\Models\Product;
 use App\Queries\ProductQuery;
 use App\Services\Seo\SchemaGenerator;
 use App\Services\Seo\SeoManager;
-use App\Support\Data\ProductFilters;
 use Illuminate\Contracts\View\View;
-use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class ProductController extends Controller
 {
-    public function index(Request $request, ProductQuery $query, SeoManager $seo, SchemaGenerator $schema): View
-    {
-        $filters = ProductFilters::fromRequest($request);
-
-        return view('pages.products.index', [
-            'products' => $query->paginate($filters),
-            'filters' => $filters,
-            'facets' => $query->facets($filters),
-            'filterGroups' => $query->filterGroups(),
-            'seo' => $seo->forPage(
-                routeName: 'products.index',
-                title: __('pages.products.heading'),
-                description: __('pages.products.lead'),
-                structuredData: $schema->graph([$schema->organization(), $schema->website()]),
-            ),
-        ]);
-    }
-
     public function show(Product $product, ProductQuery $query, SeoManager $seo, SchemaGenerator $schema): View
     {
         // Route model binding resolves by slug without regard to publication,

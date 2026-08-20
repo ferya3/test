@@ -26,7 +26,11 @@ return [
     */
     'primary' => [
         ['label' => 'nav.home', 'path' => '/'],
-        ['label' => 'nav.products', 'path' => '/products'],
+        // The catalogue is these two panels and nothing else, so they are the
+        // menu rather than something reached through a products index that
+        // would only ever list two cards.
+        ['label' => 'nav.cabinet_panel', 'path' => '/categories/hpl-cabinet-panel'],
+        ['label' => 'nav.compact', 'path' => '/categories/hpl-compact'],
         ['label' => 'nav.projects', 'path' => '/projects'],
         ['label' => 'nav.articles', 'path' => '/articles'],
         ['label' => 'nav.representatives', 'path' => '/representatives'],
@@ -36,8 +40,8 @@ return [
 
     'footer' => [
         'products' => [
-            ['label' => 'nav.products', 'path' => '/products'],
-            ['label' => 'nav.categories', 'path' => '/categories'],
+            ['label' => 'nav.cabinet_panel', 'path' => '/categories/hpl-cabinet-panel'],
+            ['label' => 'nav.compact', 'path' => '/categories/hpl-compact'],
             ['label' => 'nav.colors_and_decor', 'path' => '/colors-and-decor'],
             ['label' => 'nav.catalog', 'path' => '/catalog'],
         ],

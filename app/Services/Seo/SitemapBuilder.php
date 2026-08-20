@@ -57,8 +57,7 @@ class SitemapBuilder
         $sitemap = Sitemap::create();
 
         $this->addRoute($sitemap, 'home', priority: 1.0, changeFrequency: Url::CHANGE_FREQUENCY_WEEKLY);
-        $this->addRoute($sitemap, 'products.index', priority: 0.9, changeFrequency: Url::CHANGE_FREQUENCY_DAILY);
-        $this->addRoute($sitemap, 'categories.index', priority: 0.7);
+        $this->addRoute($sitemap, 'categories.index', priority: 0.9, changeFrequency: Url::CHANGE_FREQUENCY_DAILY);
         $this->addRoute($sitemap, 'colors-and-decor', priority: 0.6);
         $this->addRoute($sitemap, 'projects.index', priority: 0.6);
         $this->addRoute($sitemap, 'certificates', priority: 0.5);

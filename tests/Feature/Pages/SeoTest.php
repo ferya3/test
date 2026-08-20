@@ -5,10 +5,11 @@ declare(strict_types=1);
 use App\Models\Article;
 use App\Models\Product;
 use App\Models\SeoMetadata;
+use Database\Seeders\CategorySeeder;
 use Database\Seeders\SettingSeeder;
 
 beforeEach(function (): void {
-    $this->seed(SettingSeeder::class);
+    $this->seed([SettingSeeder::class, CategorySeeder::class]);
 });
 
 it('carries the core SEO surface on every page', function (): void {
@@ -23,18 +24,18 @@ it('carries the core SEO surface on every page', function (): void {
 });
 
 it('emits hreflang alternates with x-default on every page', function (): void {
-    $response = $this->get('/products')->assertOk();
+    $response = $this->get('/categories/hpl-cabinet-panel')->assertOk();
 
-    $response->assertSee('<link rel="alternate" hreflang="fa-IR" href="http://localhost/products">', false);
-    $response->assertSee('<link rel="alternate" hreflang="en" href="http://localhost/en/products">', false);
-    $response->assertSee('<link rel="alternate" hreflang="x-default" href="http://localhost/products">', false);
+    $response->assertSee('<link rel="alternate" hreflang="fa-IR" href="http://localhost/categories/hpl-cabinet-panel">', false);
+    $response->assertSee('<link rel="alternate" hreflang="en" href="http://localhost/en/categories/hpl-cabinet-panel">', false);
+    $response->assertSee('<link rel="alternate" hreflang="x-default" href="http://localhost/categories/hpl-cabinet-panel">', false);
 });
 
 it('points the English alternate at the English URL and vice versa', function (): void {
-    $this->get('/en/products')
+    $this->get('/en/categories/hpl-cabinet-panel')
         ->assertOk()
-        ->assertSee('<link rel="alternate" hreflang="fa-IR" href="http://localhost/products">', false)
-        ->assertSee('<link rel="alternate" hreflang="en" href="http://localhost/en/products">', false);
+        ->assertSee('<link rel="alternate" hreflang="fa-IR" href="http://localhost/categories/hpl-cabinet-panel">', false)
+        ->assertSee('<link rel="alternate" hreflang="en" href="http://localhost/en/categories/hpl-cabinet-panel">', false);
 });
 
 describe('a product detail page', function (): void {

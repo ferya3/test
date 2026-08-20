@@ -9,6 +9,7 @@ use App\Models\Setting;
 use App\Notifications\LeadReceived;
 use App\Services\SettingsRepository;
 use App\Support\Enums\ContactRequestType;
+use Database\Seeders\CategorySeeder;
 use Database\Seeders\SettingSeeder;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\Facades\Notification;
@@ -16,7 +17,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function (): void {
-    $this->seed(SettingSeeder::class);
+    $this->seed([SettingSeeder::class, CategorySeeder::class]);
     Notification::fake();
 });
 
@@ -98,7 +99,7 @@ describe('rate limiting', function (): void {
 
     it('leaves ordinary browsing unthrottled', function (): void {
         for ($i = 0; $i < 12; $i++) {
-            $this->get('/products')->assertOk();
+            $this->get('/categories/hpl-cabinet-panel')->assertOk();
         }
     });
 });

@@ -7,6 +7,7 @@ return [
     'category' => 'Category',
     'color' => 'Colour',
     'decor' => 'Decor',
+    'decor_family' => 'Decor',
     'surface' => 'Surface',
     'material' => 'Substrate',
     'thickness' => 'Thickness',

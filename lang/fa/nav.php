@@ -5,6 +5,8 @@ declare(strict_types=1);
 return [
     'home' => 'صفحه اصلی',
     'products' => 'محصولات',
+    'cabinet_panel' => 'صفحه کابینت اچ‌پی‌ال',
+    'compact' => 'کامپکت اچ‌پی‌ال',
     'categories' => 'دسته‌بندی محصولات',
     'colors_and_decor' => 'رنگ‌ها و طرح‌ها',
     'catalog' => 'کاتالوگ',

@@ -21,7 +21,8 @@ it('lists the primary menu in the agreed order', function (): void {
 
     $expected = [
         __('nav.home'),
-        __('nav.products'),
+        __('nav.cabinet_panel'),
+        __('nav.compact'),
         __('nav.projects'),
         __('nav.articles'),
         __('nav.representatives'),
@@ -69,7 +70,15 @@ it('keeps the pages dropped from the header reachable from the footer', function
     $html = $this->get('/')->assertOk()->getContent();
     $footer = substr($html, strpos($html, '<footer'));
 
-    foreach (['/categories', '/colors-and-decor', '/catalog', '/production-process', '/quality-control', '/certificates'] as $path) {
+    foreach ([
+        '/categories/hpl-cabinet-panel',
+        '/categories/hpl-compact',
+        '/colors-and-decor',
+        '/catalog',
+        '/production-process',
+        '/quality-control',
+        '/certificates',
+    ] as $path) {
         expect($footer)->toContain('href="'.url($path).'"');
     }
 });

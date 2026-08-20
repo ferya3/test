@@ -65,11 +65,10 @@ return [
     ],
 
     'decor_family' => [
-        'wood' => 'Wood decor',
-        'stone' => 'Stone decor',
-        'fabric' => 'Fabric decor',
-        'solid' => 'Solid colour',
-        'fantasy' => 'Fantasy',
+        'wood' => 'Wood',
+        'stone' => 'Stone',
+        'solid' => 'Solid',
+        'finish' => 'Textured',
     ],
 
     'project_type' => [

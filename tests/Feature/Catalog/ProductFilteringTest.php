@@ -225,7 +225,7 @@ describe('facet counts', function (): void {
         $facets = $this->query->facets(filters());
 
         expect($facets)->toHaveKeys([
-            'category', 'color', 'decor', 'surface', 'material', 'application', 'thickness',
+            'category', 'color', 'family', 'surface', 'material', 'application', 'thickness',
         ]);
     });
 
@@ -281,22 +281,34 @@ describe('the filter panel', function (): void {
     });
 
     it('works without JavaScript by linking each option', function (): void {
-        $response = $this->get('/products');
-
         // Options are anchors carrying the toggled query string, not checkboxes
         // that need a script to submit.
-        $response->assertOk()->assertSee('/products?surface=high-gloss', escape: false);
+        $this->get('/categories/hpl-cabinet-panel')
+            ->assertOk()
+            ->assertSee('family=wood', escape: false);
     });
 
     it('reflects the active filter in the page', function (): void {
-        $this->get('/products?surface=high-gloss')
+        $this->get('/categories/hpl-cabinet-panel?family=wood')
             ->assertOk()
             ->assertSee('aria-current="true"', escape: false);
     });
 
     it('offers a way to clear filters once any are applied', function (): void {
-        $this->get('/products?surface=high-gloss')
+        $this->get('/categories/hpl-cabinet-panel?family=wood')
             ->assertOk()
             ->assertSee(__('ui.clear_filters'));
+    });
+
+    it('offers the decor family and nothing else', function (): void {
+        // The catalogue asks one question. The other dimensions still exist in
+        // the query layer and the admin; they are simply not put to the visitor.
+        $response = $this->get('/categories/hpl-cabinet-panel')->assertOk();
+
+        $response->assertSee('family=', escape: false);
+
+        foreach (['surface=', 'material=', 'application=', 'thickness=', 'color='] as $dropped) {
+            $response->assertDontSee($dropped, escape: false);
+        }
     });
 });

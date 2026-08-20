@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Category;
 use App\Models\Color;
 use App\Models\Product;
 use App\Queries\ProductQuery;
@@ -82,17 +83,25 @@ it('returns filter groups unchanged when read back through a serialising store',
     expect($cached)->toEqual($fresh);
 });
 
-it('renders the products page from a warm cache', function (): void {
+it('renders a catalogue page from a warm cache', function (): void {
     // The end-to-end version: the first request populates every catalogue
     // cache, the second reads all of them back. A payload that does not
     // survive the round trip fails here with a 500.
-    $this->get('/products')->assertOk();
-    $this->get('/products')->assertOk();
+    //
+    // The slug comes from the category the factory made rather than being
+    // written in, so this keeps working whatever the seeded catalogue is called.
+    $slug = Category::query()->value('slug');
+
+    $this->get("/categories/{$slug}")->assertOk();
+    $this->get("/categories/{$slug}")->assertOk();
 });
 
-it('renders the products page from a warm cache in both locales', function (): void {
+it('renders a catalogue page from a warm cache in both locales', function (): void {
     // Cache keys carry the locale, so each locale writes and reads its own.
-    foreach (['/products', '/en/products', '/products', '/en/products'] as $url) {
+    $slug = Category::query()->value('slug');
+
+    foreach (["/categories/{$slug}", "/en/categories/{$slug}"] as $url) {
+        $this->get($url)->assertOk();
         $this->get($url)->assertOk();
     }
 });

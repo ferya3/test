@@ -5,6 +5,8 @@ declare(strict_types=1);
 return [
     'home' => 'Home',
     'products' => 'Products',
+    'cabinet_panel' => 'HPL Cabinet Panel',
+    'compact' => 'HPL Compact',
     'categories' => 'Product Categories',
     'colors_and_decor' => 'Colours & Decor',
     'catalog' => 'Catalogue',

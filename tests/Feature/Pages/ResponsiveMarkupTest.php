@@ -58,8 +58,8 @@ it('never puts hidden and an unconditional display utility on one element', func
 })->with([
     '/',
     '/en',
-    '/products',
-    '/en/products',
+    '/categories/hpl-cabinet-panel',
+    '/en/categories/hpl-cabinet-panel',
     '/contact',
     '/categories',
 ]);
@@ -112,7 +112,7 @@ function conflictingSizeClasses(string $html): array
 
 it('never puts h-auto and a full-height utility on one element', function (string $path): void {
     expect(conflictingSizeClasses($this->get($path)->assertOk()->getContent()))->toBe([]);
-})->with(['/', '/en', '/products', '/categories', '/contact']);
+})->with(['/', '/en', '/categories/hpl-cabinet-panel', '/categories', '/contact']);
 
 it('detects the sizing conflict it is meant to catch', function (): void {
     expect(conflictingSizeClasses('<img class="block h-auto w-full size-full object-cover">'))

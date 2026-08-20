@@ -51,6 +51,7 @@ class CategoryController extends Controller
             categories: [$category->slug],
             colors: $filters->colors,
             decors: $filters->decors,
+            decorFamilies: $filters->decorFamilies,
             surfaces: $filters->surfaces,
             materials: $filters->materials,
             applications: $filters->applications,
@@ -60,10 +61,23 @@ class CategoryController extends Controller
             perPage: $filters->perPage,
         );
 
+        /*
+         * Facets are counted against the scoped filters, so a family with no
+         * products *in this category* shows zero rather than the site-wide
+         * total — the count has to describe the list it sits next to.
+         *
+         * Only the decor family is offered. The other dimensions still work if
+         * someone puts them in the URL and the admin still records them; the
+         * catalogue simply asks one question.
+         */
+        $groups = array_intersect_key($query->filterGroups(), ['family' => true]);
+
         return view('pages.categories.show', [
             'category' => $category,
             'products' => $query->paginate($scoped),
             'filters' => $filters,
+            'facets' => $query->facets($scoped),
+            'filterGroups' => $groups,
             'seo' => $seo->forModel(
                 model: $category,
                 routeName: 'categories.show',

@@ -58,7 +58,7 @@ it('leaves other pages on their own hero sizes', function (): void {
     // `wide` is set on the home page, not in the component's default, so a
     // change to the landing page cannot silently re-frame every hero on the
     // site.
-    $this->get('/products')
+    $this->get('/contact')
         ->assertOk()
         ->assertDontSee('aspect-[1920/1080]', escape: false);
 });

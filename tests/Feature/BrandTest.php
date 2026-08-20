@@ -88,7 +88,7 @@ it('keeps the monogram to one whole character', function (): void {
 });
 
 it('carries no trace of the previous brand in seeded content', function (): void {
-    foreach (['/', '/en', '/products', '/representatives'] as $path) {
+    foreach (['/', '/en', '/categories/hpl-cabinet-panel', '/representatives'] as $path) {
         expect($this->get($path)->assertOk()->getContent())
             ->not->toContain('آرکا')
             ->not->toContain('Arka');

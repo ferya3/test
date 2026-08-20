@@ -157,10 +157,10 @@ class AttributeSeeder extends Seeder
             ['carrara-marble-decor', 'D-2001', 'مرمر کارارا', 'Carrara Marble', DecorFamily::Stone],
             ['calacatta-decor', 'D-2002', 'کالاکاتا', 'Calacatta', DecorFamily::Stone],
             ['concrete-decor', 'D-2003', 'بتن اکسپوز', 'Exposed Concrete', DecorFamily::Stone],
-            ['linen-decor', 'D-3001', 'کتان', 'Linen', DecorFamily::Fabric],
+            ['linen-decor', 'D-3001', 'کتان', 'Linen', DecorFamily::Finish],
             ['plain-white-decor', 'D-4001', 'سفید ساده', 'Plain White', DecorFamily::Solid],
             ['plain-graphite-decor', 'D-4002', 'گرافیتی ساده', 'Plain Graphite', DecorFamily::Solid],
-            ['terrazzo-decor', 'D-5001', 'تراتزو', 'Terrazzo', DecorFamily::Fantasy],
+            ['terrazzo-decor', 'D-5001', 'تراتزو', 'Terrazzo', DecorFamily::Stone],
         ];
 
         foreach ($decors as $position => [$slug, $code, $nameFa, $nameEn, $family]) {

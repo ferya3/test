@@ -38,7 +38,19 @@ $pages = function (): void {
     Route::get('/', HomeController::class)->name('home');
 
     // Catalogue
-    Route::get('/products', [ProductController::class, 'index'])->name('products.index');
+    /*
+     * The products index is retired. The catalogue is two panels, and an index
+     * listing two cards was a page between the visitor and the thing they came
+     * for — they now pick one from the menu, and each panel's own page carries
+     * the single decor-family filter.
+     *
+     * The route keeps its name and redirects rather than being deleted, so
+     * links already shared, indexed or printed still land somewhere sensible.
+     */
+    // Resolved through lroute() rather than Route::redirect(), which takes a
+    // literal path and would send /en/products to the Persian /categories.
+    Route::get('/products', fn () => redirect()->to(lroute('categories.index'), 301))
+        ->name('products.index');
     Route::get('/products/{product:slug}', [ProductController::class, 'show'])->name('products.show');
 
     Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index');

@@ -14,6 +14,7 @@ use App\Models\Surface;
 use App\Models\Thickness;
 use App\Services\Cache\CatalogCache;
 use App\Support\Data\ProductFilters;
+use App\Support\Enums\DecorFamily;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -185,10 +186,20 @@ class ProductQuery
                 'options' => Color::query()->active()->ordered()->get()
                     ->map(fn (Color $c): array => ['value' => $c->slug, 'label' => $c->name, 'hex' => $c->hex])->all(),
             ],
-            'decor' => [
-                'label' => __('product.decor'),
-                'options' => Decor::query()->active()->ordered()->get()
-                    ->map(fn (Decor $d): array => ['value' => $d->slug, 'label' => $d->name])->all(),
+            /*
+             * The catalogue's one filter. By family rather than by individual
+             * decor: there are dozens of decors and four families, and "what
+             * does it look like?" is answered by the family.
+             */
+            'family' => [
+                'label' => __('product.decor_family'),
+                'options' => array_map(
+                    static fn (DecorFamily $family): array => [
+                        'value' => $family->value,
+                        'label' => $family->label(),
+                    ],
+                    DecorFamily::cases(),
+                ),
             ],
             'material' => [
                 'label' => __('product.material'),
@@ -224,10 +235,14 @@ class ProductQuery
                 ->groupBy('colors.slug')
                 ->select('colors.slug', DB::raw('count(distinct products.id) as aggregate'))),
 
-            'decor' => $this->facetCounts($filters, 'decor', fn (Builder $q) => $q
+            'family' => $this->facetCounts($filters, 'family', fn (Builder $q) => $q
                 ->join('decors', 'decors.id', '=', 'products.decor_id')
-                ->groupBy('decors.slug')
-                ->select('decors.slug', DB::raw('count(distinct products.id) as aggregate'))),
+                ->whereNotNull('decors.decor_family')
+                ->groupBy('decors.decor_family')
+                // Aliased to `slug` because facetCounts() plucks that column
+                // for every facet; the alias is the contract, not the name of
+                // the underlying column.
+                ->select(DB::raw('decors.decor_family as slug'), DB::raw('count(distinct products.id) as aggregate'))),
 
             'surface' => $this->facetCounts($filters, 'surface', fn (Builder $q) => $q
                 ->join('surfaces', 'surfaces.id', '=', 'products.surface_id')
@@ -277,6 +292,15 @@ class ProductQuery
 
         if ($except !== 'decor') {
             $this->applyAttribute($query, 'decor', $filters->decors);
+        }
+
+        if ($except !== 'family' && $filters->decorFamilies !== []) {
+            // One decor per product, so this is a join rather than an exists on
+            // a pivot — see Product::decor().
+            $query->whereHas(
+                'decor',
+                fn (Builder $decor) => $decor->whereIn('decor_family', $filters->decorFamilies),
+            );
         }
 
         if ($except !== 'surface') {

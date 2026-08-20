@@ -67,9 +67,8 @@ return [
     'decor_family' => [
         'wood' => 'طرح چوب',
         'stone' => 'طرح سنگ',
-        'fabric' => 'طرح پارچه',
         'solid' => 'تک‌رنگ',
-        'fantasy' => 'فانتزی',
+        'finish' => 'فینیش‌دار',
     ],
 
     'project_type' => [

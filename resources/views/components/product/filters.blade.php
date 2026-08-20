@@ -14,7 +14,7 @@
 ])
 
 @php
-    $target = $route ?? lroute('products.index');
+    $target = $route ?? lroute('categories.index');
 
     // A filter combination that yields nothing is a dead end for crawlers as
     // well as people, so options with a zero count are disabled rather than

@@ -7,6 +7,7 @@ return [
     'category' => 'دسته‌بندی',
     'color' => 'رنگ',
     'decor' => 'طرح',
+    'decor_family' => 'طرح',
     'surface' => 'نوع سطح',
     'material' => 'جنس',
     'thickness' => 'ضخامت',

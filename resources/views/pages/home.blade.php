@@ -8,7 +8,7 @@
         wave
     >
         <x-slot:actions>
-            <x-ui.button :href="lroute('products.index')" size="lg">
+            <x-ui.button :href="lroute('categories.index')" size="lg">
                 {{ __('cta.view_products') }}
             </x-ui.button>
             <x-ui.button :href="lroute('catalog.index')" size="lg" variant="outline" class="border-white/40 text-white hover:bg-white/10">
@@ -84,7 +84,7 @@
                     :heading="__('pages.home.featured_heading')"
                 />
 
-                <x-ui.button :href="lroute('products.index')" variant="outline">
+                <x-ui.button :href="lroute('categories.index')" variant="outline">
                     {{ __('cta.view_all') }}
                 </x-ui.button>
             </div>
