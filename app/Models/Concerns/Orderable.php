@@ -12,6 +12,8 @@ use Illuminate\Database\Eloquent\Builder;
  */
 trait Orderable
 {
+    use NormalisesPosition;
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where("{$query->getModel()->getTable()}.is_active", true);

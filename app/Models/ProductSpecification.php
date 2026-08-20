@@ -19,6 +19,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[ObservedBy(InvalidatesCatalogCache::class)]
 class ProductSpecification extends Model
 {
+    use Concerns\NormalisesPosition;
+
     /** @use HasFactory<ProductSpecificationFactory> */
     use HasFactory;
 

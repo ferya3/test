@@ -18,6 +18,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class PageSection extends Model
 {
+    use Concerns\NormalisesPosition;
+
     /** @use HasFactory<PageSectionFactory> */
     use HasFactory;
 

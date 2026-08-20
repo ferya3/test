@@ -35,6 +35,7 @@ use Illuminate\Support\Carbon;
 #[ObservedBy([ProductObserver::class, InvalidatesCatalogCache::class, InvalidatesSitemapCache::class])]
 class Product extends Model
 {
+    use Concerns\NormalisesPosition;
     use GeneratesSlug;
 
     /** @use HasFactory<ProductFactory> */
