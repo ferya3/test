@@ -20,6 +20,15 @@
     'sizes' => '100vw',
     // '16/9', '4/3', '1/1', … renders inside a ratio frame with object-cover.
     'ratio' => null,
+    // Fills a positioned parent instead of sitting in the flow — for an image
+    // used as a backdrop, where the parent's height comes from somewhere else.
+    //
+    // Without this the only way to get cover behaviour was to pass a `ratio`,
+    // because the rule that produces it hangs off the `.media-frame` class that
+    // a ratio adds. The hero passed neither and got `h-auto`, which Tailwind
+    // emits after `size-full` and therefore wins: the image took its intrinsic
+    // height and left the rest of the hero empty.
+    'fill' => false,
     'priority' => false,
     'class' => '',
     'imgClass' => '',
@@ -42,7 +51,9 @@
             : $media->conversionUrl('webp', end($widths)) ?? $media->url();
     }
 
-    $imgClasses = trim('block h-auto w-full '.$imgClass);
+    // No `h-auto` in the fill case: it is the utility that beat `size-full` and
+    // stopped the image covering its box.
+    $imgClasses = trim(($fill ? 'absolute inset-0 size-full object-cover ' : 'block h-auto w-full ').$imgClass);
 @endphp
 
 @if ($media === null)

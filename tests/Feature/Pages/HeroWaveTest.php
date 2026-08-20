@@ -1,6 +1,10 @@
 <?php
 
 declare(strict_types=1);
+use App\Models\Media;
+use App\Models\Setting;
+use App\Services\SettingsRepository;
+use Illuminate\Support\Facades\Blade;
 
 /**
  * The portrait hero and the wave that closes it.
@@ -57,4 +61,53 @@ it('leaves other pages on their own hero sizes', function (): void {
     $this->get('/products')
         ->assertOk()
         ->assertDontSee('aspect-[1920/1080]', escape: false);
+});
+
+it('makes the hero photograph cover the whole section', function (): void {
+    /*
+     * The hero uses the image as a backdrop, so it has no ratio of its own —
+     * and cover behaviour used to hang off the `.media-frame` class that only a
+     * ratio adds. Without it the image fell back to `h-auto`, which Tailwind
+     * emits after `size-full` and therefore wins, so it took its intrinsic
+     * height and left the rest of the section bare.
+     */
+    $media = Media::factory()->create(['width' => 1920, 'height' => 1080]);
+
+    Setting::query()->updateOrCreate(
+        ['key' => 'home_hero_media_id'],
+        ['value' => $media->id, 'group' => 'home', 'is_public' => true],
+    );
+
+    app(SettingsRepository::class)->flush();
+
+    $html = $this->get('/')->assertOk()->getContent();
+
+    preg_match('/<img[^>]*fetchpriority="high"[^>]*>/s', $html, $matches);
+
+    expect($matches)->not->toBeEmpty();
+
+    $img = $matches[0];
+
+    expect($img)->toContain('absolute')
+        ->and($img)->toContain('inset-0')
+        ->and($img)->toContain('size-full')
+        ->and($img)->toContain('object-cover')
+        // The utility that caused the bug. Its absence is the fix.
+        ->and($img)->not->toContain('h-auto');
+});
+
+it('still lets an ordinary image size itself in the flow', function (): void {
+    // `fill` must not become the default: a card image reserves its space with
+    // an intrinsic height, and absolutely positioning it would collapse the
+    // card. Rendered directly, because whether the homepage happens to have a
+    // photographed category is not what this is about.
+    $media = Media::factory()->create(['width' => 1600, 'height' => 1200]);
+
+    $html = Blade::render(
+        '<x-media.picture :media="$media" alt="" ratio="4/3" sizes="50vw" />',
+        ['media' => $media],
+    );
+
+    expect($html)->toContain('block h-auto w-full')
+        ->and($html)->not->toContain('absolute inset-0 size-full');
 });

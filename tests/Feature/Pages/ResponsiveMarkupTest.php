@@ -69,3 +69,91 @@ it('detects the conflict it is meant to catch', function (): void {
     expect(conflictingDisplayClasses('<div class="hidden sm:flex flex items-center"></div>'))
         ->toHaveCount(1);
 });
+
+/*
+|--------------------------------------------------------------------------
+| Sizing conflicts
+|--------------------------------------------------------------------------
+|
+| The same hazard as above, one property along. `size-full` and `h-auto` on one
+| element are both height declarations, so which applies is decided by their
+| order in the compiled stylesheet — and Tailwind emits `h-auto` last, so it
+| wins wherever both appear.
+|
+| That is how the hero image stopped covering its section: x-media.picture
+| always prepended `h-auto w-full`, the hero added `size-full object-cover` on
+| top, and the image quietly took its intrinsic height and left the rest of the
+| hero empty. Nothing looked wrong in the markup.
+|
+*/
+
+/**
+ * @return list<string>
+ */
+function conflictingSizeClasses(string $html): array
+{
+    $conflicts = [];
+
+    preg_match_all('/class="([^"]*)"/', $html, $matches);
+
+    foreach ($matches[1] as $classList) {
+        $classes = preg_split('/\s+/', trim($classList)) ?: [];
+
+        $setsFullHeight = array_intersect($classes, ['size-full', 'h-full']);
+        $setsAutoHeight = in_array('h-auto', $classes, true);
+
+        if ($setsFullHeight !== [] && $setsAutoHeight) {
+            $conflicts[] = $classList;
+        }
+    }
+
+    return $conflicts;
+}
+
+it('never puts h-auto and a full-height utility on one element', function (string $path): void {
+    expect(conflictingSizeClasses($this->get($path)->assertOk()->getContent()))->toBe([]);
+})->with(['/', '/en', '/products', '/categories', '/contact']);
+
+it('detects the sizing conflict it is meant to catch', function (): void {
+    expect(conflictingSizeClasses('<img class="block h-auto w-full size-full object-cover">'))
+        ->toHaveCount(1);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Mobile first
+|--------------------------------------------------------------------------
+*/
+
+it('styles for the small screen first and layers larger ones on top', function (): void {
+    /*
+     * Tailwind's `sm:`/`md:`/`lg:` are min-width: the unprefixed classes are the
+     * phone, and each prefix adds to it going up. `max-md:` and friends invert
+     * that — the base becomes the desktop and the phone becomes the exception —
+     * and mixing the two conventions in one codebase is what makes a responsive
+     * bug take an afternoon instead of a minute.
+     *
+     * Asserted against the templates rather than the rendered page, because a
+     * page only exercises the branches its own data reaches.
+     */
+    $offenders = [];
+
+    $files = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator(resource_path('views'), FilesystemIterator::SKIP_DOTS),
+    );
+
+    foreach ($files as $file) {
+        if (! str_ends_with((string) $file, '.blade.php')) {
+            continue;
+        }
+
+        $contents = (string) file_get_contents((string) $file);
+
+        if (preg_match_all('/\bmax-(sm|md|lg|xl|2xl):/', $contents, $matches)) {
+            $offenders[] = str_replace(resource_path('views').'/', '', (string) $file)
+                .': '.implode(', ', array_unique($matches[0]));
+        }
+    }
+
+    expect($offenders)->toBe([]);
+});

@@ -49,13 +49,16 @@
     $heights[$size] ?? $heights['default'],
 ]) }}>
     @if ($media)
+        {{-- `fill`, not a ratio: the hero's height is set by the section, and
+             the image's job is to cover whatever that turns out to be at this
+             viewport width. --}}
         <x-media.picture
             :media="$media"
             alt=""
             priority
+            fill
             sizes="100vw"
             class="absolute inset-0 -z-10 size-full"
-            img-class="size-full object-cover"
         />
         <div aria-hidden="true" class="scrim absolute inset-0 -z-10"></div>
     @endif
