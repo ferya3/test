@@ -235,14 +235,16 @@ class ProductQuery
                 ->groupBy('colors.slug')
                 ->select('colors.slug', DB::raw('count(distinct products.id) as aggregate'))),
 
+            // Counted straight off products.decor_family — no join, because the
+            // family is the product's own column now rather than something
+            // reached through its decor.
+            //
+            // Aliased to `slug` because facetCounts() plucks that column for
+            // every facet; the alias is the contract, not the column name.
             'family' => $this->facetCounts($filters, 'family', fn (Builder $q) => $q
-                ->join('decors', 'decors.id', '=', 'products.decor_id')
-                ->whereNotNull('decors.decor_family')
-                ->groupBy('decors.decor_family')
-                // Aliased to `slug` because facetCounts() plucks that column
-                // for every facet; the alias is the contract, not the name of
-                // the underlying column.
-                ->select(DB::raw('decors.decor_family as slug'), DB::raw('count(distinct products.id) as aggregate'))),
+                ->whereNotNull('products.decor_family')
+                ->groupBy('products.decor_family')
+                ->select(DB::raw('products.decor_family as slug'), DB::raw('count(distinct products.id) as aggregate'))),
 
             'surface' => $this->facetCounts($filters, 'surface', fn (Builder $q) => $q
                 ->join('surfaces', 'surfaces.id', '=', 'products.surface_id')
@@ -295,12 +297,7 @@ class ProductQuery
         }
 
         if ($except !== 'family' && $filters->decorFamilies !== []) {
-            // One decor per product, so this is a join rather than an exists on
-            // a pivot — see Product::decor().
-            $query->whereHas(
-                'decor',
-                fn (Builder $decor) => $decor->whereIn('decor_family', $filters->decorFamilies),
-            );
+            $query->whereIn('products.decor_family', $filters->decorFamilies);
         }
 
         if ($except !== 'surface') {

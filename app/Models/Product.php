@@ -11,6 +11,7 @@ use App\Models\Concerns\HasTranslations;
 use App\Observers\InvalidatesCatalogCache;
 use App\Observers\InvalidatesSitemapCache;
 use App\Observers\ProductObserver;
+use App\Support\Enums\DecorFamily;
 use Database\Factories\ProductFactory;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
@@ -55,6 +56,7 @@ class Product extends Model
         'material_id',
         'surface_id',
         'decor_id',
+        'decor_family',
         'color_id',
         'name',
         'short_description',
@@ -74,6 +76,7 @@ class Product extends Model
     {
         return [
             'name' => TranslatedJson::class,
+            'decor_family' => DecorFamily::class,
             'short_description' => TranslatedJson::class,
             'description' => TranslatedJson::class,
             'is_active' => 'boolean',

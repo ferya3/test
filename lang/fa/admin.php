@@ -104,6 +104,7 @@ return [
         'material' => 'جنس',
         'surface' => 'سطح',
         'decor' => 'طرح',
+        'decor_name' => 'نام طرح (اختیاری)',
         'color' => 'رنگ',
         'thicknesses' => 'ضخامت‌ها',
         'applications' => 'کاربردها',

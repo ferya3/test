@@ -10,6 +10,7 @@ use App\Models\Decor;
 use App\Models\Material;
 use App\Models\Product;
 use App\Models\Surface;
+use App\Support\Enums\DecorFamily;
 use Database\Factories\Concerns\MakesTranslations;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -36,6 +37,7 @@ class ProductFactory extends Factory
             'material_id' => Material::factory(),
             'surface_id' => Surface::factory(),
             'decor_id' => Decor::factory(),
+            'decor_family' => fake()->randomElement(DecorFamily::cases()),
             'color_id' => Color::factory(),
             'name' => $this->bilingual(
                 "{$this->faPanelNoun()} {$decorFa} {$index}",

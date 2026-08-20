@@ -63,6 +63,9 @@ class ProductSeeder extends Seeder
                     'material_id' => $material?->getKey(),
                     'surface_id' => $surface->getKey(),
                     'decor_id' => $decor->getKey(),
+                    // The filter reads the product's own column, so it has to
+                    // be set rather than inferred from the decor at render time.
+                    'decor_family' => $decor->decor_family,
                     'color_id' => $color?->getKey(),
                     'name' => [
                         'fa' => $definition['name']['fa'],

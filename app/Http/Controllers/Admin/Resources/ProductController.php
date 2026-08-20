@@ -14,6 +14,7 @@ use App\Models\Product;
 use App\Models\Surface;
 use App\Models\Thickness;
 use App\Support\Admin\Field;
+use App\Support\Enums\DecorFamily;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\Rule;
@@ -47,7 +48,17 @@ class ProductController extends CrudController
 
             Field::select('material_id', __('admin.field.material'), $this->options(Material::class)),
             Field::select('surface_id', __('admin.field.surface'), $this->options(Surface::class))->listed(),
-            Field::select('decor_id', __('admin.field.decor'), $this->decorOptions()),
+            /*
+             * The catalogue's filter, chosen directly on the product. It used
+             * to be reachable only through a decor record, so filing a panel
+             * under "طرح چوب" meant creating a named decor first — a step for a
+             * catalogue that sells decors, which this one does not.
+             */
+            Field::enum('decor_family', __('admin.field.decor'), DecorFamily::class)->listed(),
+
+            // The specific decor, where the factory names one. Optional, and
+            // shown on the product page rather than used for filtering.
+            Field::select('decor_id', __('admin.field.decor_name'), $this->decorOptions()),
             Field::select('color_id', __('admin.field.color'), $this->options(Color::class)),
 
             Field::relation('thicknesses', __('admin.field.thicknesses'), $this->thicknessOptions(), 'thicknesses'),
