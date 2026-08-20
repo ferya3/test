@@ -79,8 +79,8 @@ it('renders every detail page', function (string $prefix): void {
 })->with('locale prefixes');
 
 it('serves the two locales at different URLs with the right direction', function (): void {
-    $this->get('/')->assertOk()->assertSee('<html lang="fa" dir="rtl">', escape: false);
-    $this->get('/en')->assertOk()->assertSee('<html lang="en" dir="ltr">', escape: false);
+    $this->get('/')->assertOk()->assertSee('<html lang="fa" dir="rtl"', escape: false);
+    $this->get('/en')->assertOk()->assertSee('<html lang="en" dir="ltr"', escape: false);
 });
 
 it('does not treat a path that merely starts with the prefix as a locale', function (): void {

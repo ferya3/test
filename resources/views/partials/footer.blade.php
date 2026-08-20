@@ -38,7 +38,9 @@
             <p class="text-caption text-text-muted">
                 {{ __('footer.copyright', ['year' => now()->year, 'name' => $brandName]) }}
             </p>
-            <x-layout.language-switcher />
+            @if (config('features.language_switcher'))
+                <x-layout.language-switcher />
+            @endif
         </div>
     </x-layout.container>
 </footer>

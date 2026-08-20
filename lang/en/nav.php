@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 return [
+    'home' => 'Home',
     'products' => 'Products',
     'categories' => 'Product Categories',
     'colors_and_decor' => 'Colours & Decor',

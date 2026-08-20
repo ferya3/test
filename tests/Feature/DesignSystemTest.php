@@ -8,13 +8,13 @@ use Illuminate\Support\Facades\Vite;
 it('renders the Persian reference page right to left', function (): void {
     $this->get('/design-system')
         ->assertOk()
-        ->assertSee('<html lang="fa" dir="rtl">', escape: false);
+        ->assertSee('<html lang="fa" dir="rtl"', escape: false);
 });
 
 it('renders the English reference page left to right', function (): void {
     $this->get('/en/design-system')
         ->assertOk()
-        ->assertSee('<html lang="en" dir="ltr">', escape: false);
+        ->assertSee('<html lang="en" dir="ltr"', escape: false);
 });
 
 it('preloads only the active locale font', function (): void {

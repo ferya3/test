@@ -12,6 +12,20 @@
                 @php
                     $assigned = $current[$slot->key] ?? null;
                     $image = $assigned === null ? null : $media->get($assigned);
+
+                    /*
+                     * A derivative is only generated when it would be smaller
+                     * than the original, so a 1920px upload silently caps the
+                     * srcset at 1920 and looks soft on a large monitor. That is
+                     * correct behaviour — upscaling would ship a bigger, blurrier
+                     * file — but it is invisible: the image uploads fine, appears
+                     * fine, and only looks wrong on hardware the operator may not
+                     * have. So it is said here, at the moment the image is chosen.
+                     */
+                    $largestWidth = max(config('media.widths', [1920]));
+                    $tooNarrow = $image?->isImage()
+                        && $image->width !== null
+                        && $image->width < $largestWidth;
                 @endphp
 
                 <section class="rounded-lg border border-border bg-surface p-6">
@@ -47,6 +61,15 @@
                                 :value="$assigned"
                                 :hint="$slot->guidance"
                             />
+
+                            @if ($tooNarrow)
+                                <p class="mt-3 rounded-md border border-warning-tint-text/30 bg-warning-tint px-3.5 py-2.5 text-caption text-warning-tint-text">
+                                    {{ __('admin.site_images.too_narrow', [
+                                        'width' => $image->width,
+                                        'largest' => $largestWidth,
+                                    ]) }}
+                                </p>
+                            @endif
                         </div>
                     </div>
                 </section>

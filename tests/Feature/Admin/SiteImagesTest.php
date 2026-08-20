@@ -135,3 +135,31 @@ it('does not let an editor write the home hero even by posting it', function ():
 
     expect(Setting::query()->where('key', 'home_hero_media_id')->value('value'))->toBeNull();
 });
+
+it('warns when the chosen image is too narrow for the largest derivative', function (): void {
+    /*
+     * A derivative is only produced when it would be smaller than the source,
+     * so a 1920px upload caps the srcset at 1920 and renders soft on a large
+     * monitor. Correct — upscaling would ship a bigger, blurrier file — but
+     * invisible, unless the panel says so at the point the image is chosen.
+     */
+    actingAsPanelUser('admin');
+
+    $narrow = Media::factory()->create(['width' => 1920, 'height' => 1080]);
+    $this->put('/admin/site-images', ['images' => ['home_hero' => $narrow->id]]);
+
+    $this->get('/admin/site-images')
+        ->assertOk()
+        ->assertSee((string) max(config('media.widths')), escape: false);
+});
+
+it('says nothing when the image is large enough', function (): void {
+    actingAsPanelUser('admin');
+
+    $wide = Media::factory()->create(['width' => 2560, 'height' => 1440]);
+    $this->put('/admin/site-images', ['images' => ['home_hero' => $wide->id]]);
+
+    $this->get('/admin/site-images')
+        ->assertOk()
+        ->assertDontSee(__('admin.site_images.too_narrow', ['width' => 2560, 'largest' => 2560]));
+});

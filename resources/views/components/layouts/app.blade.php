@@ -1,9 +1,12 @@
 <!DOCTYPE html>
-<html lang="{{ $currentLocale }}" dir="{{ $textDirection }}">
+<html lang="{{ $currentLocale }}" dir="{{ $textDirection }}"@unless (config('features.theme_toggle')) data-theme="light"@endunless>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="light dark">
+    {{-- Only advertise both schemes when the visitor can actually choose;
+         otherwise the browser paints form controls and scrollbars dark on a
+         page that is pinned light. --}}
+    <meta name="color-scheme" content="{{ config('features.theme_toggle') ? 'light dark' : 'light' }}">
 
     <title>{{ $seo->title ?? $title ?? $brandName }}</title>
 
@@ -18,14 +21,16 @@
         light page. Kept inline and nonce-allowed rather than deferred, because
         any external round trip here would be visible as a flash.
     --}}
-    <script nonce="{{ Illuminate\Support\Facades\Vite::cspNonce() }}">
-        try {
-            var stored = localStorage.getItem('theme');
-            if (stored === 'dark' || stored === 'light') {
-                document.documentElement.setAttribute('data-theme', stored);
-            }
-        } catch (e) {}
-    </script>
+    @if (config('features.theme_toggle'))
+        <script nonce="{{ Illuminate\Support\Facades\Vite::cspNonce() }}">
+            try {
+                var stored = localStorage.getItem('theme');
+                if (stored === 'dark' || stored === 'light') {
+                    document.documentElement.setAttribute('data-theme', stored);
+                }
+            } catch (e) {}
+        </script>
+    @endif
 
     {{--
         Preload only the face this locale renders. Persian pages need the Arabic

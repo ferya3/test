@@ -83,7 +83,9 @@
         </nav>
 
         <div class="ms-auto flex items-center gap-1 lg:ms-0">
-            <x-layout.theme-toggle />
+            @if (config('features.theme_toggle'))
+                <x-layout.theme-toggle />
+            @endif
 
             {{--
                 Visibility is controlled by a wrapper, never by passing display
@@ -96,9 +98,11 @@
                 left the switcher visible on mobile and pushed the header 9px
                 past the viewport in LTR.
             --}}
-            <div class="hidden sm:block">
-                <x-layout.language-switcher />
-            </div>
+            @if (config('features.language_switcher'))
+                <div class="hidden sm:block">
+                    <x-layout.language-switcher />
+                </div>
+            @endif
 
             <div class="hidden lg:block">
                 <x-ui.button :href="$locales->url('/catalog')" size="sm">
@@ -148,7 +152,13 @@
             class="absolute inset-y-0 end-0 flex w-[min(20rem,88vw)] flex-col overflow-y-auto bg-surface p-5"
         >
             <div class="mb-4 flex items-center justify-between">
-                <x-layout.language-switcher />
+                @if (config('features.language_switcher'))
+                    <x-layout.language-switcher />
+                @else
+                    {{-- Holds the close button at the end of the row, which
+                         justify-between would otherwise pull to the start. --}}
+                    <span aria-hidden="true"></span>
+                @endif
 
                 <button
                     type="button"
