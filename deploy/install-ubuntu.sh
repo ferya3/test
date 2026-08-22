@@ -47,6 +47,30 @@ trap 'die "Failed at line $LINENO. Nothing further was changed; fix the error an
 [[ $EUID -eq 0 ]] || die "Run this with sudo."
 [[ -f "$APP_DIR/artisan" ]] || die "No artisan found in $APP_DIR — set APP_DIR to the application root."
 
+# APP_URL is checked here, before a single package is installed.
+#
+# It is usually filled from a shell substitution — `APP_URL="http://$(curl -s
+# ifconfig.me)"` — and that substitution fails in ways that are not empty: the
+# service rate-limits and returns an HTML error page, or a proxy answers 403.
+# The malformed value then travels all the way to composer's post-autoload
+# hook, ten minutes in, and surfaces as
+#
+#     In Request.php line 394:  Invalid URI: Host is malformed.
+#
+# which names neither APP_URL nor the reason. Better to refuse in the first
+# second, while nothing has been changed.
+[[ "$APP_URL" =~ ^https?://[A-Za-z0-9._~:/?#@!$\&\'\(\)*+,\;=%-]+$ ]] \
+    || die "APP_URL is not a URL: '${APP_URL}'
+    This usually means a command substitution produced an error page rather
+    than an address. Check what it resolves to, then re-run:
+        IP=\$(ip -4 -o addr show scope global | awk '{print \$4}' | cut -d/ -f1 | head -1)
+        echo \"\$IP\"
+        APP_URL=\"http://\$IP\" bash \$0"
+
+# A host that is only a scheme ("http://") passes the pattern above but is just
+# as unusable, and is exactly what an empty variable produces.
+[[ "${APP_URL#*://}" != "" ]] || die "APP_URL has no host: '${APP_URL}' — the variable it was built from was empty."
+
 # ---------------------------------------------------------------------------
 # System packages
 # ---------------------------------------------------------------------------
