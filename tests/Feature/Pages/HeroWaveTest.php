@@ -22,12 +22,27 @@ it('frames the home hero at the 1920x1080 ratio it is authored for', function ()
 });
 
 it('keeps the wide hero usable at both extremes', function (): void {
-    // 16:9 is about 220px tall on a phone, which will not hold a heading, a
-    // lead and two buttons; and it runs past the screen on an ultrawide.
+    // A floor, because 16:9 is about 220px tall on a phone and will not hold a
+    // heading, a lead and two buttons.
     $this->get('/')
         ->assertOk()
-        ->assertSee('min-h-[52svh]', escape: false)
-        ->assertSee('max-h-[100svh]', escape: false);
+        ->assertSee('min-h-[52svh]', escape: false);
+});
+
+it('caps the hero at the width of the photograph rather than its height', function (): void {
+    /*
+     * A height cap was what cropped the image. On a 1920x1080 display the
+     * viewport is around 900px, so max-h-[100svh] made the box 1920x900 —
+     * wider than 16:9 — and object-cover trimmed the top and bottom off a
+     * photograph that fitted the frame exactly.
+     *
+     * Capping the width instead keeps the ratio intact: the frame stops
+     * growing at the size the image was made for, and never exceeds 1080 tall.
+     */
+    $this->get('/')
+        ->assertOk()
+        ->assertSee('max-w-[1920px]', escape: false)
+        ->assertDontSee('max-h-[100svh]', escape: false);
 });
 
 it('closes the home hero with the wave', function (): void {

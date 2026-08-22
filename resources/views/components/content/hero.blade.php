@@ -27,17 +27,27 @@
      * 1920x1080 frame, so a photograph shot at that size fills it exactly and
      * nothing is cropped away.
      *
-     * The floor matters as much as the ratio. On a phone 16:9 is only about
-     * 220px tall, which is not enough for a heading, a lead and two buttons —
-     * so a minimum height keeps the hero usable and the image covers the
-     * taller box. The cap is for the opposite end: on an ultrawide display the
-     * same ratio runs past the height of the screen.
+     * Two bounds, and only one of them survives.
+     *
+     * The width is capped at 1920, so on a display wider than the photograph
+     * the frame stops growing instead of scaling the image up and cropping
+     * more of it. At exactly 1920 the image renders one-to-one.
+     *
+     * There is no height cap. There was — max-h-[100svh] — and it was the bug:
+     * a 1920x1080 screen has roughly 900px of viewport, so the cap made the box
+     * 1920x900, which is wider than 16:9, and object-cover answered by
+     * trimming the top and bottom off the photograph. Ratio alone decides the
+     * height now, and the width cap keeps that from ever exceeding 1080.
+     *
+     * The floor stays: on a phone 16:9 is only about 220px tall, which will not
+     * hold a heading, a lead and two buttons. There the image covers the taller
+     * box and is cropped at the sides, which is the right trade on a phone.
      */
     $heights = [
         'sm' => 'min-h-[34svh] md:min-h-[42svh]',
         'default' => 'min-h-[44svh] md:min-h-[58svh]',
         'lg' => 'min-h-[54svh] md:min-h-[72svh]',
-        'wide' => 'aspect-[1920/1080] min-h-[52svh] md:min-h-0 max-h-[100svh]',
+        'wide' => 'mx-auto w-full max-w-[1920px] aspect-[1920/1080] min-h-[52svh] md:min-h-0',
     ];
 @endphp
 
