@@ -1,0 +1,145 @@
+//@version=6
+// Gold Scalper Pro — backtestable version of gold_scalper_signals.pine.
+// Same entry rules; adds position sizing, break-even and an optional ATR
+// trailing stop so the Strategy Tester can price the rules honestly.
+strategy("Gold Scalper Pro — Strategy (XAUUSD M1/M5)", shorttitle="GoldScalper ST", overlay=true,
+     default_qty_type=strategy.percent_of_equity, default_qty_value=2,
+     initial_capital=10000, currency=currency.USD,
+     commission_type=strategy.commission.cash_per_contract, commission_value=0.04,
+     slippage=3, calc_on_every_tick=false, process_orders_on_close=true)
+
+// ─────────────────────────── inputs ───────────────────────────
+gTrend = "Trend"
+fastLen  = input.int(21,  "Fast EMA (pullback)", minval=2,  group=gTrend)
+slowLen  = input.int(50,  "Slow EMA",            minval=3,  group=gTrend)
+trendLen = input.int(200, "Trend EMA",           minval=10, group=gTrend)
+useHtf   = input.bool(true, "Use higher timeframe bias",    group=gTrend)
+htfTf    = input.timeframe("15", "Higher timeframe",        group=gTrend)
+htfLen   = input.int(50, "Higher timeframe EMA", minval=3,  group=gTrend)
+
+gEntry = "Entry"
+pullbackBars = input.int(6,  "Pullback must happen within N bars", minval=1, maxval=30, group=gEntry)
+rsiLen       = input.int(14, "RSI length", minval=2, group=gEntry)
+rsiBuyMin    = input.float(50.0, "RSI floor for buys",    minval=1, maxval=99, step=0.5, group=gEntry)
+rsiSellMax   = input.float(50.0, "RSI ceiling for sells", minval=1, maxval=99, step=0.5, group=gEntry)
+rsiExhaust   = input.float(78.0, "Block entries beyond RSI extreme", minval=55, maxval=99, step=0.5, group=gEntry)
+needMacd     = input.bool(true, "Require MACD histogram to agree", group=gEntry)
+cooldownBars = input.int(8, "Cooldown between entries (bars)", minval=0, maxval=100, group=gEntry)
+
+gFilter = "Filters"
+adxLen    = input.int(14, "ADX length", minval=2, group=gFilter)
+adxMin    = input.float(20.0, "Minimum ADX (skip chop)", minval=0, maxval=60, step=0.5, group=gFilter)
+atrLen    = input.int(14, "ATR length", minval=2, group=gFilter)
+minAtrPct = input.float(0.02, "Minimum ATR as % of price", minval=0.0, maxval=1.0, step=0.01, group=gFilter)
+useSession   = input.bool(true, "Trade only inside session", group=gFilter)
+sessionStr   = input.session("0700-2000", "Session (London + New York)", group=gFilter)
+sessionTz    = input.string("UTC", "Session timezone", options=["UTC", "Europe/London", "America/New_York", "Asia/Tehran", "Asia/Dubai"], group=gFilter)
+skipOpenBars = input.int(2, "Skip first N bars of the session", minval=0, maxval=30, group=gFilter)
+closeAtEnd   = input.bool(true, "Close open trades when the session ends", group=gFilter)
+
+gRisk = "Risk"
+slAtrMult   = input.float(1.5, "Stop loss (× ATR)",       minval=0.2, step=0.1, group=gRisk)
+rMultiple   = input.float(2.0, "Take profit (R multiple)", minval=0.5, step=0.1, group=gRisk)
+useBreakEven = input.bool(true,  "Move the stop to break even at 1R", group=gRisk)
+useTrail     = input.bool(false, "ATR trailing stop instead of a fixed TP", group=gRisk)
+trailMult    = input.float(2.0, "Trailing distance (× ATR)", minval=0.3, step=0.1, group=gRisk)
+
+gStyle = "Appearance"
+sellBelow = input.bool(true, "Draw sell markers below the candle too", group=gStyle)
+showEmas  = input.bool(true, "Show the EMAs", group=gStyle)
+buyColor  = input.color(color.new(#00a86b, 0), "Buy colour",  group=gStyle)
+sellColor = input.color(color.new(#e5333f, 0), "Sell colour", group=gStyle)
+
+// ─────────────────────────── indicators ───────────────────────────
+emaFast  = ta.ema(close, fastLen)
+emaSlow  = ta.ema(close, slowLen)
+emaTrend = ta.ema(close, trendLen)
+htfEma   = request.security(syminfo.tickerid, htfTf, ta.ema(close, htfLen)[1], lookahead=barmerge.lookahead_off)
+
+rsi = ta.rsi(close, rsiLen)
+[_macdLine, _signalLine, hist] = ta.macd(close, 12, 26, 9)
+[_diPlus, _diMinus, adx] = ta.dmi(adxLen, adxLen)
+atr = ta.atr(atrLen)
+atrPct = atr / close * 100.0
+
+inSession = not useSession or not na(time(timeframe.period, sessionStr, sessionTz))
+sessionStarted = inSession and not inSession[1]
+sessionEnded = not inSession and inSession[1]
+barsIntoSession = ta.barssince(sessionStarted)
+sessionReady = inSession and (na(barsIntoSession) or barsIntoSession >= skipOpenBars)
+
+htfBull = not useHtf or close > htfEma
+htfBear = not useHtf or close < htfEma
+bullBias = close > emaTrend and emaFast > emaSlow and htfBull
+bearBias = close < emaTrend and emaFast < emaSlow and htfBear
+
+pulledBackLong  = ta.barssince(low  <= emaFast) <= pullbackBars
+pulledBackShort = ta.barssince(high >= emaFast) <= pullbackBars
+
+macdBull = not needMacd or (hist > 0 and hist > hist[1])
+macdBear = not needMacd or (hist < 0 and hist < hist[1])
+
+tradeable = sessionReady and atrPct >= minAtrPct and adx >= adxMin
+
+longSetup  = bullBias and pulledBackLong  and close > emaFast and close > open and rsi >= rsiBuyMin  and rsi < rsiExhaust and macdBull and tradeable
+shortSetup = bearBias and pulledBackShort and close < emaFast and close < open and rsi <= rsiSellMax and rsi > (100.0 - rsiExhaust) and macdBear and tradeable
+
+var int lastEntryBar = na
+cooledDown = na(lastEntryBar) or (bar_index - lastEntryBar) >= cooldownBars
+
+goLong  = longSetup  and cooledDown and strategy.position_size <= 0
+goShort = shortSetup and cooledDown and strategy.position_size >= 0
+
+// ─────────────────────────── orders ───────────────────────────
+var float stopPx   = na
+var float targetPx = na
+var float riskPx   = na
+var bool  movedBe  = false
+
+if goLong
+    riskPx   := atr * slAtrMult
+    stopPx   := close - riskPx
+    targetPx := close + riskPx * rMultiple
+    movedBe  := false
+    lastEntryBar := bar_index
+    strategy.entry("Long", strategy.long)
+
+if goShort
+    riskPx   := atr * slAtrMult
+    stopPx   := close + riskPx
+    targetPx := close - riskPx * rMultiple
+    movedBe  := false
+    lastEntryBar := bar_index
+    strategy.entry("Short", strategy.short)
+
+// Break even at 1R, then optionally trail behind the ATR.
+if strategy.position_size > 0
+    if useBreakEven and not movedBe and high >= strategy.position_avg_price + riskPx
+        stopPx  := strategy.position_avg_price
+        movedBe := true
+    if useTrail
+        stopPx := math.max(stopPx, close - atr * trailMult)
+    strategy.exit("Long exit", "Long", stop=stopPx, limit=useTrail ? na : targetPx)
+
+if strategy.position_size < 0
+    if useBreakEven and not movedBe and low <= strategy.position_avg_price - riskPx
+        stopPx  := strategy.position_avg_price
+        movedBe := true
+    if useTrail
+        stopPx := math.min(stopPx, close + atr * trailMult)
+    strategy.exit("Short exit", "Short", stop=stopPx, limit=useTrail ? na : targetPx)
+
+if closeAtEnd and sessionEnded
+    strategy.close_all(comment="session end")
+
+// ─────────────────────────── drawing ───────────────────────────
+plot(showEmas ? emaFast  : na, "EMA fast",  color=color.new(color.orange, 20))
+plot(showEmas ? emaSlow  : na, "EMA slow",  color=color.new(color.blue, 20))
+plot(showEmas ? emaTrend : na, "EMA trend", color=color.new(color.gray, 10), linewidth=2)
+
+plotshape(goLong, "BUY", shape.triangleup, location.belowbar, buyColor, text="BUY", textcolor=buyColor, size=size.small)
+plotshape(goShort and sellBelow, "SELL (below)", shape.triangledown, location.belowbar, sellColor, text="SELL", textcolor=sellColor, size=size.small)
+plotshape(goShort and not sellBelow, "SELL (above)", shape.triangledown, location.abovebar, sellColor, text="SELL", textcolor=sellColor, size=size.small)
+
+plot(strategy.position_size != 0 ? stopPx   : na, "Stop",   color=color.new(sellColor, 20), style=plot.style_linebr)
+plot(strategy.position_size != 0 and not useTrail ? targetPx : na, "Target", color=color.new(buyColor, 20), style=plot.style_linebr)
