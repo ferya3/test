@@ -1,0 +1,209 @@
+//@version=6
+// Rally-Base-Rally (RBR) and Drop-Base-Drop (DBD) continuation zones.
+// Built for the 4H chart: it marks the base of every explosive continuation
+// leg and keeps the resulting demand/supply zone on the chart until price
+// trades through it.
+indicator("RBR / DBD Supply & Demand (4H)", "RBR/DBD", overlay = true, max_bars_back = 500, max_boxes_count = 500, max_labels_count = 500)
+
+// ── Timeframe ────────────────────────────────────────────────────────────────
+gTF    = "Timeframe"
+lockTF = input.bool(true, "Detect on one timeframe only", group = gTF, tooltip = "Leave this on so the zones you see are the 4H zones. Turn it off to scan whatever chart you are on.")
+tfWant = input.timeframe("240", "Timeframe", group = gTF)
+
+// ── Candle anatomy ───────────────────────────────────────────────────────────
+gC          = "Candle definition"
+atrLen      = input.int(14, "ATR length", minval = 1, group = gC)
+legBodyMin  = input.float(0.55, "Leg: min body / range", minval = 0.10, maxval = 1.00, step = 0.05, group = gC)
+legAtrMin   = input.float(1.00, "Leg: min range (× ATR)", minval = 0.10, step = 0.10, group = gC)
+baseBodyMax = input.float(0.45, "Base: max body / range", minval = 0.05, maxval = 0.95, step = 0.05, group = gC)
+baseAtrMax  = input.float(1.00, "Base: max range (× ATR)", minval = 0.10, step = 0.10, group = gC)
+
+// ── Pattern ──────────────────────────────────────────────────────────────────
+gP        = "Pattern"
+minBase   = input.int(1, "Min base candles", minval = 1, maxval = 10, group = gP)
+maxBase   = input.int(5, "Max base candles", minval = 1, maxval = 10, group = gP)
+needBreak = input.bool(true, "Leg-out must close beyond the base", group = gP)
+legVsBase = input.float(1.0, "Leg-out range ≥ × base range", minval = 0, step = 0.1, group = gP)
+showRBR   = input.bool(true, "Rally-Base-Rally (demand)", group = gP)
+showDBD   = input.bool(true, "Drop-Base-Drop (supply)", group = gP)
+
+// ── Zones ────────────────────────────────────────────────────────────────────
+gZ          = "Zones"
+zoneEdge    = input.string("Bodies", "Proximal line from", options = ["Bodies", "Wicks"], group = gZ, tooltip = "Bodies = tighter entry, Wicks = the full base range.")
+touchOn     = input.string("Wick", "Count a touch on", options = ["Wick", "Close"], group = gZ)
+breakOn     = input.string("Close", "Count a break on", options = ["Wick", "Close"], group = gZ)
+extendRight = input.int(3, "Extend zone past the last bar", minval = 0, maxval = 100, group = gZ)
+keepBroken  = input.bool(false, "Keep broken zones on the chart", group = gZ)
+freshOnly   = input.bool(false, "Delete a zone once it is tested", group = gZ)
+maxZones    = input.int(20, "Max live zones per side", minval = 1, maxval = 100, group = gZ)
+
+// ── Style ────────────────────────────────────────────────────────────────────
+gS         = "Style"
+demandCol  = input.color(#26a69a, "Demand", group = gS)
+supplyCol  = input.color(#ef5350, "Supply", group = gS)
+brokenCol  = input.color(#787b86, "Broken", group = gS)
+fillAlpha  = input.int(85, "Zone fill transparency", minval = 0, maxval = 100, group = gS)
+showLabels = input.bool(true, "Label each zone", group = gS)
+
+// ── Candle classification ────────────────────────────────────────────────────
+// A candle is either a leg or a base, never both: the base body cap is clamped
+// below the leg body floor so the two definitions cannot overlap and a single
+// base length can match any given setup.
+baseBodyCap = math.min(baseBodyMax, legBodyMin - 0.01)
+
+atr       = ta.atr(atrLen)
+rng       = high - low
+bodyRatio = rng > 0 ? math.abs(close - open) / rng : 0.0
+
+isLeg  = not na(atr) and bodyRatio >= legBodyMin  and rng >= legAtrMin  * atr
+isBase = not na(atr) and bodyRatio <= baseBodyCap and rng <= baseAtrMax * atr
+isBull = close > open
+isBear = close < open
+
+tfOK      = not lockTF or timeframe.period == tfWant
+canDetect = tfOK and barstate.isconfirmed and maxBase >= minBase
+
+// ── Live zone registry ───────────────────────────────────────────────────────
+var box[]   zBox   = array.new<box>()
+var label[] zLab   = array.new<label>()
+var int[]   zSide  = array.new<int>()      //  1 = demand, -1 = supply
+var int[]   zState = array.new<int>()      //  0 = fresh,   1 = tested, 2 = broken
+var float[] zProx  = array.new<float>()
+var float[] zDist  = array.new<float>()
+
+dropZone(int i) =>
+    box.delete(array.get(zBox, i))
+    label.delete(array.get(zLab, i))
+    array.remove(zBox, i)
+    array.remove(zLab, i)
+    array.remove(zSide, i)
+    array.remove(zState, i)
+    array.remove(zProx, i)
+    array.remove(zDist, i)
+
+// Walk the registry newest-first so a removal never shifts an index we have
+// yet to visit.
+if array.size(zBox) > 0
+    for i = array.size(zBox) - 1 to 0
+        side  = array.get(zSide, i)
+        state = array.get(zState, i)
+        prox  = array.get(zProx, i)
+        dist  = array.get(zDist, i)
+        bx    = array.get(zBox, i)
+
+        // Price crossing the proximal line is a test; trading clean through
+        // the distal line kills the zone.
+        wick    = side == 1 ? low : high
+        touchPx = touchOn == "Close" ? close : wick
+        breakPx = breakOn == "Close" ? close : wick
+        entered = side == 1 ? touchPx <= prox : touchPx >= prox
+        broke   = side == 1 ? breakPx < dist : breakPx > dist
+
+        if state < 2 and broke
+            array.set(zState, i, 2)
+            box.set_bgcolor(bx, color.new(brokenCol, math.min(99, fillAlpha + 5)))
+            box.set_border_color(bx, brokenCol)
+            box.set_right(bx, bar_index)
+            alert((side == 1 ? "Demand" : "Supply") + " zone broken at " + str.tostring(dist, format.mintick), alert.freq_once_per_bar)
+            if not keepBroken
+                dropZone(i)
+        else if state == 0 and entered
+            array.set(zState, i, 1)
+            box.set_border_style(bx, line.style_dashed)
+            alert((side == 1 ? "Demand" : "Supply") + " zone tested at " + str.tostring(prox, format.mintick), alert.freq_once_per_bar)
+            if freshOnly
+                dropZone(i)
+            else
+                box.set_right(bx, bar_index + extendRight)
+        else if state < 2
+            box.set_right(bx, bar_index + extendRight)
+
+// ── Pattern detection ────────────────────────────────────────────────────────
+// The current bar is the leg-out. Behind it sit n base candles, and behind
+// those a leg-in pointing the same way.
+int   patSide  = 0
+int   patLen   = 0
+int   patScore = 0
+float patProx  = na
+float patDist  = na
+float patTop   = na
+float patBot   = na
+
+if canDetect and isLeg
+    legRng = rng
+    for n = minBase to maxBase
+        if patSide == 0 and isLeg[n + 1]
+            bool  allBase = true
+            float bHi     = high[1]
+            float bLo     = low[1]
+            float bTop    = math.max(open[1], close[1])
+            float bBot    = math.min(open[1], close[1])
+            for i = 1 to n
+                allBase := allBase and isBase[i]
+                bHi     := math.max(bHi, high[i])
+                bLo     := math.min(bLo, low[i])
+                bTop    := math.max(bTop, math.max(open[i], close[i]))
+                bBot    := math.min(bBot, math.min(open[i], close[i]))
+
+            if allBase
+                baseRng = bHi - bLo
+                bigLeg  = legRng >= legVsBase * baseRng
+                rbr     = showRBR and isBull and isBull[n + 1] and bigLeg and (not needBreak or close > bHi)
+                dbd     = showDBD and isBear and isBear[n + 1] and bigLeg and (not needBreak or close < bLo)
+
+                if rbr or dbd
+                    patSide := rbr ? 1 : -1
+                    patLen  := n
+                    patProx := rbr ? (zoneEdge == "Bodies" ? bTop : bHi) : (zoneEdge == "Bodies" ? bBot : bLo)
+                    patDist := rbr ? bLo : bHi
+                    patTop  := rbr ? patProx : patDist
+                    patBot  := rbr ? patDist : patProx
+                    // Quality: how hard price left, how tight the base was,
+                    // and how few candles it spent there.
+                    unit     = math.max(atr, syminfo.mintick)
+                    depart   = math.min(1.0, legRng / (2 * unit))
+                    tight    = math.max(0.0, 1.0 - baseRng / (1.5 * unit))
+                    few      = maxBase > minBase ? (maxBase - n) * 1.0 / (maxBase - minBase) : 1.0
+                    patScore := int(math.round(40 * depart + 30 * tight + 30 * few))
+
+if patSide != 0
+    isDemand = patSide == 1
+    col      = isDemand ? demandCol : supplyCol
+    left     = math.max(0, bar_index - patLen - 1)
+
+    bx = box.new(left, patTop, bar_index + extendRight, patBot, border_color = col, border_width = 1, bgcolor = color.new(col, fillAlpha))
+    label lb = na
+    if showLabels
+        lb := label.new(left, isDemand ? patBot : patTop, (isDemand ? "RBR " : "DBD ") + str.tostring(patScore),
+             style = isDemand ? label.style_label_up : label.style_label_down,
+             color = color.new(col, 20), textcolor = color.white, size = size.tiny,
+             tooltip = "Base candles: " + str.tostring(patLen) + "\nProximal: " + str.tostring(patProx, format.mintick) + "\nDistal: " + str.tostring(patDist, format.mintick))
+
+    array.push(zBox, bx)
+    array.push(zLab, lb)
+    array.push(zSide, patSide)
+    array.push(zState, 0)
+    array.push(zProx, patProx)
+    array.push(zDist, patDist)
+
+    // Trim the oldest zone on this side once the registry is full.
+    liveOnSide = 0
+    for i = 0 to array.size(zSide) - 1
+        liveOnSide += (array.get(zSide, i) == patSide ? 1 : 0)
+    if liveOnSide > maxZones
+        for i = 0 to array.size(zSide) - 1
+            if array.get(zSide, i) == patSide
+                dropZone(i)
+                break
+
+    alert((isDemand ? "New RBR demand zone " : "New DBD supply zone ") + str.tostring(patProx, format.mintick) + " to " + str.tostring(patDist, format.mintick), alert.freq_once_per_bar)
+
+alertcondition(patSide ==  1, "New RBR demand zone", "Rally-Base-Rally demand zone formed on {{ticker}}")
+alertcondition(patSide == -1, "New DBD supply zone", "Drop-Base-Drop supply zone formed on {{ticker}}")
+
+// An empty chart while the timeframe is locked usually means the wrong
+// timeframe, so say so instead of leaving it a mystery.
+var label warn = na
+if lockTF and not tfOK and barstate.islast
+    label.delete(warn)
+    warn := label.new(bar_index, high, "RBR/DBD is locked to " + tfWant + " — switch the chart, or turn the lock off in settings", style = label.style_label_down, color = color.new(color.orange, 10), textcolor = color.white, size = size.small)
