@@ -1,8 +1,11 @@
 //@version=6
 // Rally-Base-Rally (RBR) and Drop-Base-Drop (DBD) continuation zones.
-// Built for the 4H chart: it marks the base of every explosive continuation
-// leg and keeps the resulting demand/supply zone on the chart until price
-// trades through it.
+//
+// A base is judged against the two legs that surround it, not against a fixed
+// ATR threshold: whatever is small next to the impulse that made it and the
+// impulse that left it is a base. That keeps the pattern recognisable on a
+// quiet 4H forex chart and on a violent one, and it means no candle can fall
+// into a gap between the two definitions and silently kill a valid setup.
 indicator("RBR / DBD Supply & Demand (4H)", "RBR/DBD", overlay = true, max_bars_back = 500, max_boxes_count = 500, max_labels_count = 500)
 
 // ── Timeframe ────────────────────────────────────────────────────────────────
@@ -10,28 +13,40 @@ gTF    = "Timeframe"
 lockTF = input.bool(true, "Detect on one timeframe only", group = gTF, tooltip = "Leave this on so the zones you see are the 4H zones. Turn it off to scan whatever chart you are on.")
 tfWant = input.timeframe("240", "Timeframe", group = gTF)
 
-// ── Candle anatomy ───────────────────────────────────────────────────────────
-gC          = "Candle definition"
-atrLen      = input.int(14, "ATR length", minval = 1, group = gC)
-legBodyMin  = input.float(0.55, "Leg: min body / range", minval = 0.10, maxval = 1.00, step = 0.05, group = gC)
-legAtrMin   = input.float(1.00, "Leg: min range (× ATR)", minval = 0.10, step = 0.10, group = gC)
-baseBodyMax = input.float(0.45, "Base: max body / range", minval = 0.05, maxval = 0.95, step = 0.05, group = gC)
-baseAtrMax  = input.float(1.00, "Base: max range (× ATR)", minval = 0.10, step = 0.10, group = gC)
+// ── Detection ────────────────────────────────────────────────────────────────
+gD     = "Detection"
+tune   = input.string("Normal", "Strictness", options = ["Loose", "Normal", "Strict", "Custom"], group = gD, tooltip = "Too few zones? Loose. Too much noise? Strict. Custom hands the four thresholds below to you.")
+atrLen = input.int(14, "ATR length", minval = 1, group = gD)
+
+gX        = "Custom thresholds (used only when Strictness = Custom)"
+cExcited  = input.float(0.55, "Leg: min body / range", minval = 0.20, maxval = 0.95, step = 0.05, group = gX)
+cLegAtr   = input.float(1.00, "Leg: min range (× ATR before it)", minval = 0.20, step = 0.10, group = gX)
+cBaseBody = input.float(0.50, "Base: max body (× leg body)", minval = 0.10, maxval = 1.00, step = 0.05, group = gX)
+cBaseRng  = input.float(1.00, "Base: max range (× leg range)", minval = 0.20, maxval = 2.00, step = 0.10, group = gX)
+cMinScore = input.int(30, "Min zone score", minval = 0, maxval = 100, group = gX)
+
+// One dial moves all four thresholds together; Custom hands them back.
+excitedBody = tune == "Loose" ? 0.45 : tune == "Normal" ? 0.55 : tune == "Strict" ? 0.62 : cExcited
+legAtrMin   = tune == "Loose" ? 0.70 : tune == "Normal" ? 1.00 : tune == "Strict" ? 1.40 : cLegAtr
+baseBodyK   = tune == "Loose" ? 0.65 : tune == "Normal" ? 0.50 : tune == "Strict" ? 0.35 : cBaseBody
+baseRangeK  = tune == "Loose" ? 1.30 : tune == "Normal" ? 1.00 : tune == "Strict" ? 0.70 : cBaseRng
+minScore    = tune == "Loose" ? 0    : tune == "Normal" ? 30   : tune == "Strict" ? 55   : cMinScore
 
 // ── Pattern ──────────────────────────────────────────────────────────────────
-gP        = "Pattern"
-minBase   = input.int(1, "Min base candles", minval = 1, maxval = 10, group = gP)
-maxBase   = input.int(5, "Max base candles", minval = 1, maxval = 10, group = gP)
-needBreak = input.bool(true, "Leg-out must close beyond the base", group = gP)
-legVsBase = input.float(1.0, "Leg-out range ≥ × base range", minval = 0, step = 0.1, group = gP)
-showRBR   = input.bool(true, "Rally-Base-Rally (demand)", group = gP)
-showDBD   = input.bool(true, "Drop-Base-Drop (supply)", group = gP)
+gP         = "Pattern"
+minBase    = input.int(1, "Min base candles", minval = 1, maxval = 10, group = gP)
+maxBase    = input.int(6, "Max base candles", minval = 1, maxval = 10, group = gP)
+needBreak  = input.bool(true, "Leg-out must close beyond the base", group = gP)
+contiguous = input.bool(true, "Legs must touch the base", group = gP, tooltip = "Rejects a setup where the leg-in ends, or the leg-out starts, well away from the base — those are two separate moves, not one pattern.")
+showRBR    = input.bool(true, "Rally-Base-Rally (demand)", group = gP)
+showDBD    = input.bool(true, "Drop-Base-Drop (supply)", group = gP)
 
 // ── Zones ────────────────────────────────────────────────────────────────────
 gZ          = "Zones"
 zoneEdge    = input.string("Bodies", "Proximal line from", options = ["Bodies", "Wicks"], group = gZ, tooltip = "Bodies = tighter entry, Wicks = the full base range.")
 touchOn     = input.string("Wick", "Count a touch on", options = ["Wick", "Close"], group = gZ)
 breakOn     = input.string("Close", "Count a break on", options = ["Wick", "Close"], group = gZ)
+overlapMax  = input.float(0.60, "Skip a zone overlapping a fresh one by", minval = 0.0, maxval = 1.0, step = 0.05, group = gZ, tooltip = "0.6 = drop the new zone when 60% of it sits inside an untouched zone on the same side. Set to 1 to keep every zone.")
 extendRight = input.int(3, "Extend zone past the last bar", minval = 0, maxval = 100, group = gZ)
 keepBroken  = input.bool(false, "Keep broken zones on the chart", group = gZ)
 freshOnly   = input.bool(false, "Delete a zone once it is tested", group = gZ)
@@ -44,19 +59,18 @@ supplyCol  = input.color(#ef5350, "Supply", group = gS)
 brokenCol  = input.color(#787b86, "Broken", group = gS)
 fillAlpha  = input.int(85, "Zone fill transparency", minval = 0, maxval = 100, group = gS)
 showLabels = input.bool(true, "Label each zone", group = gS)
+showTable  = input.bool(true, "Show the tuning panel", group = gS, tooltip = "Counts what the current settings actually find, so you can dial Strictness with numbers instead of guesswork.")
 
-// ── Candle classification ────────────────────────────────────────────────────
-// A candle is either a leg or a base, never both: the base body cap is clamped
-// below the leg body floor so the two definitions cannot overlap and a single
-// base length can match any given setup.
-baseBodyCap = math.min(baseBodyMax, legBodyMin - 0.01)
-
-atr       = ta.atr(atrLen)
+// ── Candle measurements ──────────────────────────────────────────────────────
+// ATR is read one bar back so an explosive candle is measured against the
+// volatility that preceded it, instead of against a reading its own true
+// range has already inflated.
+atrPrev   = ta.atr(atrLen)[1]
 rng       = high - low
-bodyRatio = rng > 0 ? math.abs(close - open) / rng : 0.0
+body      = math.abs(close - open)
+bodyRatio = rng > 0 ? body / rng : 0.0
 
-isLeg  = not na(atr) and bodyRatio >= legBodyMin  and rng >= legAtrMin  * atr
-isBase = not na(atr) and bodyRatio <= baseBodyCap and rng <= baseAtrMax * atr
+isLeg  = not na(atrPrev) and atrPrev > 0 and bodyRatio >= excitedBody and rng >= legAtrMin * atrPrev
 isBull = close > open
 isBear = close < open
 
@@ -120,7 +134,8 @@ if array.size(zBox) > 0
 
 // ── Pattern detection ────────────────────────────────────────────────────────
 // The current bar is the leg-out. Behind it sit n base candles, and behind
-// those a leg-in pointing the same way.
+// those a leg-in pointing the same way. The smallest n that fits wins, so one
+// setup is never reported at several widths.
 int   patSide  = 0
 int   patLen   = 0
 int   patScore = 0
@@ -130,46 +145,77 @@ float patTop   = na
 float patBot   = na
 
 if canDetect and isLeg
-    legRng = rng
     for n = minBase to maxBase
-        if patSide == 0 and isLeg[n + 1]
+        if patSide == 0 and isLeg[n + 1] and (isBull == isBull[n + 1])
+            // Both legs point the same way. Measure the base against the
+            // smaller of the two, so one oversized leg cannot excuse a base
+            // that is really just a third leg.
+            float legInBody  = math.abs(close[n + 1] - open[n + 1])
+            float refBody    = math.max(math.min(body, legInBody), syminfo.mintick)
+            float refRng     = math.max(math.min(rng, rng[n + 1]), syminfo.mintick)
+
             bool  allBase = true
             float bHi     = high[1]
             float bLo     = low[1]
             float bTop    = math.max(open[1], close[1])
             float bBot    = math.min(open[1], close[1])
             for i = 1 to n
-                allBase := allBase and isBase[i]
+                allBase := allBase and (math.abs(close[i] - open[i]) <= baseBodyK * refBody) and ((high[i] - low[i]) <= baseRangeK * refRng)
                 bHi     := math.max(bHi, high[i])
                 bLo     := math.min(bLo, low[i])
                 bTop    := math.max(bTop, math.max(open[i], close[i]))
                 bBot    := math.min(bBot, math.min(open[i], close[i]))
 
-            if allBase
-                baseRng = bHi - bLo
-                bigLeg  = legRng >= legVsBase * baseRng
-                rbr     = showRBR and isBull and isBull[n + 1] and bigLeg and (not needBreak or close > bHi)
-                dbd     = showDBD and isBear and isBear[n + 1] and bigLeg and (not needBreak or close < bLo)
+            baseRng = bHi - bLo
+            // The whole base has to stay inside one leg's range, or it is a
+            // range rather than a pause.
+            tightBase = baseRng <= baseRangeK * refRng
+            // No gap between the legs and the base they belong to.
+            tol     = math.max(baseRng * 0.25, syminfo.mintick)
+            joined  = not contiguous or (close[n + 1] >= bLo - tol and close[n + 1] <= bHi + tol and open >= bLo - tol and open <= bHi + tol)
+
+            if allBase and tightBase and joined
+                rbr = showRBR and isBull and (not needBreak or close > bHi)
+                dbd = showDBD and isBear and (not needBreak or close < bLo)
 
                 if rbr or dbd
-                    patSide := rbr ? 1 : -1
-                    patLen  := n
-                    patProx := rbr ? (zoneEdge == "Bodies" ? bTop : bHi) : (zoneEdge == "Bodies" ? bBot : bLo)
-                    patDist := rbr ? bLo : bHi
-                    patTop  := rbr ? patProx : patDist
-                    patBot  := rbr ? patDist : patProx
                     // Quality: how hard price left, how tight the base was,
                     // and how few candles it spent there.
-                    unit     = math.max(atr, syminfo.mintick)
-                    depart   = math.min(1.0, legRng / (2 * unit))
-                    tight    = math.max(0.0, 1.0 - baseRng / (1.5 * unit))
-                    few      = maxBase > minBase ? (maxBase - n) * 1.0 / (maxBase - minBase) : 1.0
-                    patScore := int(math.round(40 * depart + 30 * tight + 30 * few))
+                    depart = math.min(1.0, rng / (2 * refRng))
+                    tight  = math.max(0.0, 1.0 - baseRng / refRng)
+                    few    = maxBase > minBase ? (maxBase - n) * 1.0 / (maxBase - minBase) : 1.0
+                    score  = int(math.round(40 * depart + 40 * tight + 20 * few))
 
-if patSide != 0
+                    if score >= minScore
+                        patSide  := rbr ? 1 : -1
+                        patLen   := n
+                        patScore := score
+                        patProx  := rbr ? (zoneEdge == "Bodies" ? bTop : bHi) : (zoneEdge == "Bodies" ? bBot : bLo)
+                        patDist  := rbr ? bLo : bHi
+                        patTop   := rbr ? patProx : patDist
+                        patBot   := rbr ? patDist : patProx
+
+// A fresh zone sitting on top of an untouched older one is the same level
+// twice; the older, deeper one is the one price actually turned from.
+blocked = false
+if patSide != 0 and overlapMax < 1.0 and array.size(zSide) > 0
+    newRng = math.max(patTop - patBot, syminfo.mintick)
+    for i = 0 to array.size(zSide) - 1
+        if not blocked and array.get(zSide, i) == patSide and array.get(zState, i) == 0
+            oldProx = array.get(zProx, i)
+            oldDist = array.get(zDist, i)
+            oldTop  = math.max(oldProx, oldDist)
+            oldBot  = math.min(oldProx, oldDist)
+            shared  = math.min(patTop, oldTop) - math.max(patBot, oldBot)
+            blocked := shared > 0 and shared / newRng >= overlapMax
+
+var int foundTotal = 0
+
+if patSide != 0 and not blocked
     isDemand = patSide == 1
     col      = isDemand ? demandCol : supplyCol
     left     = math.max(0, bar_index - patLen - 1)
+    foundTotal += 1
 
     bx = box.new(left, patTop, bar_index + extendRight, patBot, border_color = col, border_width = 1, bgcolor = color.new(col, fillAlpha))
     label lb = na
@@ -198,8 +244,31 @@ if patSide != 0
 
     alert((isDemand ? "New RBR demand zone " : "New DBD supply zone ") + str.tostring(patProx, format.mintick) + " to " + str.tostring(patDist, format.mintick), alert.freq_once_per_bar)
 
-alertcondition(patSide ==  1, "New RBR demand zone", "Rally-Base-Rally demand zone formed on {{ticker}}")
-alertcondition(patSide == -1, "New DBD supply zone", "Drop-Base-Drop supply zone formed on {{ticker}}")
+drawn = patSide != 0 and not blocked
+alertcondition(drawn and patSide ==  1, "New RBR demand zone", "Rally-Base-Rally demand zone formed on {{ticker}}")
+alertcondition(drawn and patSide == -1, "New DBD supply zone", "Drop-Base-Drop supply zone formed on {{ticker}}")
+
+// ── Tuning panel ─────────────────────────────────────────────────────────────
+var table panel = na
+if barstate.islast
+    table.delete(panel)
+    if showTable
+        dCount = 0
+        sCount = 0
+        if array.size(zSide) > 0
+            for i = 0 to array.size(zSide) - 1
+                side = array.get(zSide, i)
+                dCount += (side ==  1 ? 1 : 0)
+                sCount += (side == -1 ? 1 : 0)
+        panel := table.new(position.top_right, 2, 4, border_width = 1, frame_color = color.new(color.gray, 50), frame_width = 1)
+        table.cell(panel, 0, 0, "RBR/DBD", text_color = color.gray, text_size = size.tiny)
+        table.cell(panel, 1, 0, tfOK ? timeframe.period : timeframe.period + " ≠ " + tfWant, text_color = tfOK ? color.gray : color.orange, text_size = size.tiny)
+        table.cell(panel, 0, 1, "Demand", text_color = demandCol, text_size = size.tiny)
+        table.cell(panel, 1, 1, str.tostring(dCount), text_color = demandCol, text_size = size.tiny)
+        table.cell(panel, 0, 2, "Supply", text_color = supplyCol, text_size = size.tiny)
+        table.cell(panel, 1, 2, str.tostring(sCount), text_color = supplyCol, text_size = size.tiny)
+        table.cell(panel, 0, 3, "Found", text_color = color.gray, text_size = size.tiny)
+        table.cell(panel, 1, 3, str.tostring(foundTotal) + " (" + tune + ")", text_color = color.gray, text_size = size.tiny)
 
 // An empty chart while the timeframe is locked usually means the wrong
 // timeframe, so say so instead of leaving it a mystery.
