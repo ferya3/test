@@ -46,12 +46,13 @@ rangeCut = input.float(0.50, "Half of the range that counts", minval = 0.20, max
 
 // ── Detection ────────────────────────────────────────────────────────────────
 gD     = "Detection"
-tune   = input.string("Balanced", "Strictness", options = ["Loose", "Balanced", "Normal", "Strict", "Custom"], group = gD, tooltip = "Each step tightens five thresholds at once and they multiply, so one step can cut the count several times over. Balanced sits between Loose and Normal for exactly that reason. To tune, switch to Custom and move ONE number at a time, watching Found in the panel.")
-atrLen = input.int(14, "ATR length", minval = 1, group = gD)
+tune   = input.string("Loose", "Strictness", options = ["Loose", "Balanced", "Normal", "Strict", "Custom"], group = gD, tooltip = "Each step tightens five thresholds at once and they multiply, so one step can cut the count several times over. To tune, switch to Custom and move ONE number at a time, watching Found in the panel.")
+atrLen = input.int(14, "Volatility length", minval = 1, group = gD)
+legBase= input.string("Median candle", "Measure leg size against", options = ["Median candle", "ATR"], group = gD, tooltip = "ATR is an average, and the impulse candles this script hunts are exactly what drags it upward — so in a lively market ATR quietly disqualifies the very legs it should be finding. The median candle is what typical means to a reader, and it does not move when a few candles are huge.")
 
 gX        = "Custom thresholds (used only when Strictness = Custom)"
 cExcited  = input.float(0.55, "Leg: min body / range", minval = 0.20, maxval = 0.95, step = 0.05, group = gX)
-cLegAtr   = input.float(1.00, "Leg: min range (× ATR before it)", minval = 0.20, step = 0.10, group = gX)
+cLegAtr   = input.float(1.00, "Leg: min range (× the volatility measure)", minval = 0.20, step = 0.10, group = gX)
 cBaseBody = input.float(0.50, "Base: max body (× leg body)", minval = 0.10, maxval = 1.00, step = 0.05, group = gX)
 cBaseRng  = input.float(1.00, "Base: max range (× leg range)", minval = 0.20, maxval = 2.00, step = 0.10, group = gX)
 cMinScore = input.int(30, "Min zone score", minval = 0, maxval = 100, group = gX)
@@ -60,11 +61,14 @@ cMinScore = input.int(30, "Min zone score", minval = 0, maxval = 100, group = gX
 // of what reaches it, one step down the list finds a sixth as many setups.
 // Hence Balanced — the gap between Loose and Normal was a cliff, and the
 // leg-size rule is most of it, since it has to be satisfied by both legs.
+// The leg rules decide HOW MANY setups exist; the base rules decide whether
+// they are any good. Loose therefore stays permissive about legs and spends
+// all of its tightening on the base — the count survives, the junk does not.
 excitedBody = tune == "Loose" ? 0.45 : tune == "Balanced" ? 0.50 : tune == "Normal" ? 0.55 : tune == "Strict" ? 0.62 : cExcited
 legAtrMin   = tune == "Loose" ? 0.70 : tune == "Balanced" ? 0.85 : tune == "Normal" ? 1.00 : tune == "Strict" ? 1.40 : cLegAtr
-baseBodyK   = tune == "Loose" ? 0.65 : tune == "Balanced" ? 0.57 : tune == "Normal" ? 0.50 : tune == "Strict" ? 0.35 : cBaseBody
-baseRangeK  = tune == "Loose" ? 1.30 : tune == "Balanced" ? 1.15 : tune == "Normal" ? 1.00 : tune == "Strict" ? 0.70 : cBaseRng
-minScore    = tune == "Loose" ? 0    : tune == "Balanced" ? 15   : tune == "Normal" ? 30   : tune == "Strict" ? 55   : cMinScore
+baseBodyK   = tune == "Loose" ? 0.52 : tune == "Balanced" ? 0.51 : tune == "Normal" ? 0.50 : tune == "Strict" ? 0.35 : cBaseBody
+baseRangeK  = tune == "Loose" ? 1.05 : tune == "Balanced" ? 1.02 : tune == "Normal" ? 1.00 : tune == "Strict" ? 0.70 : cBaseRng
+minScore    = tune == "Loose" ? 12   : tune == "Balanced" ? 20   : tune == "Normal" ? 30   : tune == "Strict" ? 55   : cMinScore
 
 // ── Pattern ──────────────────────────────────────────────────────────────────
 gP         = "Pattern"
@@ -126,11 +130,15 @@ showTrack  = input.bool(true, "Track how the verdicts resolved", group = gS)
 // or side 0 for nothing. The pattern name travels as a code because a tuple
 // of prices and flags crosses the timeframe boundary more cleanly than text.
 detectZone() =>
-    atrP  = ta.atr(atrLen)[1]
     r     = high - low
     b     = math.abs(close - open)
     ratio = r > 0 ? b / r : 0.0
-    leg   = not na(atrP) and atrP > 0 and ratio >= excitedBody and r >= legAtrMin * atrP
+    // Both read one bar back, so a candle is never measured against a figure
+    // its own range has already moved.
+    atrP  = ta.atr(atrLen)[1]
+    medP  = ta.median(r, atrLen)[1]
+    legRef= legBase == "ATR" ? atrP : medP
+    leg   = not na(legRef) and legRef > 0 and ratio >= excitedBody and r >= legAtrMin * legRef
     bull  = close > open
     bear  = close < open
     swL   = ta.lowest(low, sweepLook)
