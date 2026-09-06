@@ -99,8 +99,11 @@ boxFromLeg  = input.bool(false, "Start the box at the leg-in candle", group = gZ
 keepBroken  = input.bool(false, "Keep broken zones on the chart", group = gZ)
 maxZones    = input.int(20, "Max live zones per side", minval = 1, maxval = 100, group = gZ)
 
-// ── Style ────────────────────────────────────────────────────────────────────
-gS         = "Style"
+// ── Display ──────────────────────────────────────────────────────────────────
+// Named Display, not Style: these are inputs and live in the Inputs tab, and a
+// group called Style there sends every reader to TradingView's own Style tab
+// looking for them.
+gS         = "Display"
 demandCol  = input.color(#26a69a, "Demand", group = gS)
 supplyCol  = input.color(#ef5350, "Supply", group = gS)
 brokenCol  = input.color(#787b86, "Broken", group = gS)
