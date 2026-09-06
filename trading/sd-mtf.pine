@@ -1,0 +1,551 @@
+//@version=6
+// Supply & demand zones with a multi-timeframe verdict.
+//
+// All four bases — the continuation pair RBR and DBD, the reversal pair RBD
+// and DBR — found on the zone timeframe, filtered by the higher timeframe and
+// by where price sits in its own range, graded on the evidence institutions
+// leave behind, and confirmed on two faster timeframes before anything is
+// called a trade.
+//
+// Four ideas hold it together:
+//
+//   The leg that LEAVES a base decides what the base is. Price left upward,
+//   so the base is demand; downward, so it is supply. The leg that arrives
+//   only decides whether the setup continues the move or turns it.
+//
+//   A base is judged against the two legs around it, never against a fixed
+//   ATR threshold. Whatever is small next to the impulse that made it and the
+//   impulse that left it is a base, on a quiet chart and a violent one alike.
+//
+//   Zones are always requested FROM the zone timeframe, so the script runs on
+//   any chart. Put it on 15m and the 4H zones arrive when each 4H bar closes —
+//   the honest direction for request.security — while entries are read on the
+//   chart itself. Put it on 4H and it behaves as it always did.
+//
+//   A level says WHERE, never WHEN. The verdict opens five gates or it is not
+//   a trade, and the panel names the gate that stayed shut.
+indicator("S&D MTF Verdict", "S&D MTF", overlay = true, max_bars_back = 500, max_boxes_count = 500, max_labels_count = 500)
+
+// ── Timeframes ───────────────────────────────────────────────────────────────
+gTF    = "Timeframes"
+tfZone = input.timeframe("240", "Zone timeframe", group = gTF, tooltip = "Where the bases are found. Leave at 240 and run the script on 15m: zones stay 4H, entries become 15m.")
+tfConf1= input.timeframe("15", "Confirmation 1", group = gTF)
+tfConf2= input.timeframe("5", "Confirmation 2", group = gTF)
+
+// ── Higher-timeframe bias ────────────────────────────────────────────────────
+gB      = "Higher-timeframe bias"
+useBias = input.bool(true, "Only trade with the higher timeframe", group = gB, tooltip = "A demand zone in a falling daily market is where longs go to die. Off, the verdict ignores the bigger picture.")
+tfBias  = input.timeframe("D", "Bias timeframe", group = gB)
+biasEma = input.int(50, "Bias EMA", minval = 5, group = gB)
+
+// ── Range location ───────────────────────────────────────────────────────────
+gR       = "Range location"
+useRange = input.bool(true, "Buy the discount, sell the premium", group = gR, tooltip = "Measured where price is NOW, not where the zone was born, so a pullback into a continuation zone still counts as a discount.")
+rangeLen = input.int(100, "Range lookback", minval = 20, group = gR)
+rangeCut = input.float(0.50, "Half of the range that counts", minval = 0.20, maxval = 0.80, step = 0.05, group = gR, tooltip = "0.5 = longs only in the lower half. 0.35 is the stricter read.")
+
+// ── Detection ────────────────────────────────────────────────────────────────
+gD     = "Detection"
+tune   = input.string("Normal", "Strictness", options = ["Loose", "Normal", "Strict", "Custom"], group = gD)
+atrLen = input.int(14, "ATR length", minval = 1, group = gD)
+
+gX        = "Custom thresholds (used only when Strictness = Custom)"
+cExcited  = input.float(0.55, "Leg: min body / range", minval = 0.20, maxval = 0.95, step = 0.05, group = gX)
+cLegAtr   = input.float(1.00, "Leg: min range (× ATR before it)", minval = 0.20, step = 0.10, group = gX)
+cBaseBody = input.float(0.50, "Base: max body (× leg body)", minval = 0.10, maxval = 1.00, step = 0.05, group = gX)
+cBaseRng  = input.float(1.00, "Base: max range (× leg range)", minval = 0.20, maxval = 2.00, step = 0.10, group = gX)
+cMinScore = input.int(30, "Min zone score", minval = 0, maxval = 100, group = gX)
+
+excitedBody = tune == "Loose" ? 0.45 : tune == "Normal" ? 0.55 : tune == "Strict" ? 0.62 : cExcited
+legAtrMin   = tune == "Loose" ? 0.70 : tune == "Normal" ? 1.00 : tune == "Strict" ? 1.40 : cLegAtr
+baseBodyK   = tune == "Loose" ? 0.65 : tune == "Normal" ? 0.50 : tune == "Strict" ? 0.35 : cBaseBody
+baseRangeK  = tune == "Loose" ? 1.30 : tune == "Normal" ? 1.00 : tune == "Strict" ? 0.70 : cBaseRng
+minScore    = tune == "Loose" ? 0    : tune == "Normal" ? 30   : tune == "Strict" ? 55   : cMinScore
+
+// ── Pattern ──────────────────────────────────────────────────────────────────
+gP         = "Pattern"
+minBase    = input.int(1, "Min base candles", minval = 1, maxval = 10, group = gP)
+maxBase    = input.int(6, "Max base candles", minval = 1, maxval = 10, group = gP)
+needBreak  = input.bool(true, "Leg-out must close beyond the base", group = gP)
+contiguous = input.bool(true, "Legs must touch the base", group = gP)
+needFVG    = input.bool(false, "Leg-out must leave an imbalance", group = gP, tooltip = "The three-candle gap a real departure leaves behind. On, only zones price ran away from are drawn.")
+sweepLook  = input.int(20, "Liquidity lookback", minval = 5, group = gP)
+maxTouch   = input.int(2, "Max touches before a zone is spent", minval = 1, maxval = 10, group = gP)
+showRBR    = input.bool(true, "RBR — Rally-Base-Rally (demand, continuation)", group = gP)
+showDBD    = input.bool(true, "DBD — Drop-Base-Drop (supply, continuation)", group = gP)
+showDBR    = input.bool(true, "DBR — Drop-Base-Rally (demand, reversal)", group = gP)
+showRBD    = input.bool(true, "RBD — Rally-Base-Drop (supply, reversal)", group = gP)
+
+// ── Confirmation ─────────────────────────────────────────────────────────────
+gL      = "Confirmation"
+useMTF  = input.bool(true, "Require the faster timeframes to agree", group = gL)
+pivLen  = input.int(3, "Structure pivot length", minval = 1, maxval = 20, group = gL)
+emaFast = input.int(9, "Fast EMA", minval = 2, group = gL)
+emaSlow = input.int(21, "Slow EMA", minval = 3, group = gL)
+locLen  = input.int(20, "Location lookback", minval = 5, group = gL)
+confMin = input.int(30, "Min agreement score", minval = 0, maxval = 100, group = gL)
+rMult   = input.float(2.0, "Target (× risk)", minval = 0.5, step = 0.5, group = gL)
+
+// ── Zones ────────────────────────────────────────────────────────────────────
+gZ          = "Zones"
+zoneEdge    = input.string("Bodies", "Proximal line from", options = ["Bodies", "Wicks"], group = gZ)
+touchOn     = input.string("Wick", "Count a touch on", options = ["Wick", "Close"], group = gZ)
+breakOn     = input.string("Close", "Count a break on", options = ["Wick", "Close"], group = gZ)
+overlapMax  = input.float(0.60, "Skip a zone overlapping a fresh one by", minval = 0.0, maxval = 1.0, step = 0.05, group = gZ)
+maxAge      = input.int(300, "Retire a zone after N zone-bars", minval = 20, group = gZ, tooltip = "Counted in bars of the zone timeframe, so it means the same thing whatever chart you are on.")
+extendRight = input.int(3, "Extend zone past the last bar", minval = 0, maxval = 100, group = gZ)
+keepBroken  = input.bool(false, "Keep broken zones on the chart", group = gZ)
+maxZones    = input.int(20, "Max live zones per side", minval = 1, maxval = 100, group = gZ)
+
+// ── Style ────────────────────────────────────────────────────────────────────
+gS         = "Style"
+demandCol  = input.color(#26a69a, "Demand", group = gS)
+supplyCol  = input.color(#ef5350, "Supply", group = gS)
+brokenCol  = input.color(#787b86, "Broken", group = gS)
+fillAlpha  = input.int(85, "Zone fill transparency", minval = 0, maxval = 100, group = gS)
+showLabels = input.bool(true, "Label each zone", group = gS)
+showTable  = input.bool(true, "Show the verdict panel", group = gS)
+showMarks  = input.bool(true, "Mark confirmed entries", group = gS)
+showTrack  = input.bool(true, "Track how the verdicts resolved", group = gS)
+
+// ── Zone detection ───────────────────────────────────────────────────────────
+// Runs entirely inside the zone timeframe's context, so every history access
+// below is a zone-timeframe bar. Returns the zone the last closed bar formed,
+// or side 0 for nothing. The pattern name travels as a code because a tuple
+// of prices and flags crosses the timeframe boundary more cleanly than text.
+detectZone() =>
+    atrP  = ta.atr(atrLen)[1]
+    r     = high - low
+    b     = math.abs(close - open)
+    ratio = r > 0 ? b / r : 0.0
+    leg   = not na(atrP) and atrP > 0 and ratio >= excitedBody and r >= legAtrMin * atrP
+    bull  = close > open
+    bear  = close < open
+    swL   = ta.lowest(low, sweepLook)
+    swH   = ta.highest(high, sweepLook)
+
+    int   oSide = 0
+    int   oCode = 0
+    int   oQual = 0
+    bool  oFvg  = false
+    bool  oSwp  = false
+    float oProx = na
+    float oDist = na
+    int   oTime = 0
+
+    if leg
+        for n = minBase to maxBase
+            if oSide == 0 and leg[n + 1]
+                // The leg-out decides the side; the leg-in only names it.
+                bool legInBull = bull[n + 1]
+                bool toDemand  = bull
+                bool allowed   = toDemand ? (legInBull ? showRBR : showDBR) : (legInBull ? showRBD : showDBD)
+
+                // Measure the base against the smaller of the two legs, so one
+                // oversized leg cannot excuse a base that is really a third leg.
+                float legInBody = math.abs(close[n + 1] - open[n + 1])
+                float refBody   = math.max(math.min(b, legInBody), syminfo.mintick)
+                float refRng    = math.max(math.min(r, r[n + 1]), syminfo.mintick)
+
+                bool  allBase = true
+                float bHi     = high[1]
+                float bLo     = low[1]
+                float bTop    = math.max(open[1], close[1])
+                float bBot    = math.min(open[1], close[1])
+                for i = 1 to n
+                    allBase := allBase and (math.abs(close[i] - open[i]) <= baseBodyK * refBody) and ((high[i] - low[i]) <= baseRangeK * refRng)
+                    bHi     := math.max(bHi, high[i])
+                    bLo     := math.min(bLo, low[i])
+                    bTop    := math.max(bTop, math.max(open[i], close[i]))
+                    bBot    := math.min(bBot, math.min(open[i], close[i]))
+
+                baseRng   = bHi - bLo
+                tightBase = baseRng <= baseRangeK * refRng
+                tol       = math.max(baseRng * 0.25, syminfo.mintick)
+                joined    = not contiguous or (close[n + 1] >= bLo - tol and close[n + 1] <= bHi + tol and open >= bLo - tol and open <= bHi + tol)
+
+                if allBase and tightBase and joined
+                    departed = toDemand ? (not needBreak or close > bHi) : (not needBreak or close < bLo)
+
+                    // The imbalance a real departure leaves: the leg-out never
+                    // trades back into the candle two bars behind it.
+                    gap = toDemand ? low > high[2] : high < low[2]
+
+                    // Did the leg-in take out the swing before it and get it
+                    // back? That is the liquidity the base was built on.
+                    priorLow  = swL[n + 2]
+                    priorHigh = swH[n + 2]
+                    swept = toDemand ? (not na(priorLow) and math.min(bLo, low[n + 1]) < priorLow and close > priorLow) : (not na(priorHigh) and math.max(bHi, high[n + 1]) > priorHigh and close < priorHigh)
+
+                    if allowed and departed and (bull or bear) and (not needFVG or gap)
+                        depart = math.min(1.0, r / (2 * refRng))
+                        tight  = math.max(0.0, 1.0 - baseRng / refRng)
+                        few    = maxBase > minBase ? (maxBase - n) * 1.0 / (maxBase - minBase) : 1.0
+                        score  = int(math.round(30 * depart + 25 * tight + 15 * few + (gap ? 15 : 0) + (swept ? 15 : 0)))
+
+                        if score >= minScore
+                            oSide := toDemand ? 1 : -1
+                            oQual := score
+                            oFvg  := gap
+                            oSwp  := swept
+                            oCode := toDemand ? (legInBull ? 1 : 2) : (legInBull ? 4 : 3)
+                            oProx := toDemand ? (zoneEdge == "Bodies" ? bTop : bHi) : (zoneEdge == "Bodies" ? bBot : bLo)
+                            oDist := toDemand ? bLo : bHi
+                            oTime := time[n + 1]
+    [oSide, oProx, oDist, oQual, oCode, oFvg, oSwp, oTime]
+
+tagOf(int code) =>
+    code == 1 ? "RBR" : code == 2 ? "DBR" : code == 3 ? "DBD" : code == 4 ? "RBD" : ""
+
+[zSideR, zProxR, zDistR, zQualR, zCodeR, zFvgR, zSwpR, zTimeR] = request.security(syminfo.tickerid, tfZone, detectZone(), lookahead = barmerge.lookahead_off)
+
+// ── Higher-timeframe bias ────────────────────────────────────────────────────
+// Two slow votes: where price sits against an average that must itself be
+// sloping, and whether the last swing has actually been taken.
+htfBias() =>
+    e  = ta.ema(close, biasEma)
+    ph = ta.pivothigh(high, 3, 3)
+    pl = ta.pivotlow(low, 3, 3)
+    var float sh = na
+    var float sl = na
+    sh := na(ph) ? sh : ph
+    sl := na(pl) ? sl : pl
+    trendVote  = close > e and e > e[3] ? 1 : close < e and e < e[3] ? -1 : 0
+    structVote = not na(sh) and close > sh ? 1 : not na(sl) and close < sl ? -1 : 0
+    trendVote + structVote
+
+rawBias = request.security(syminfo.tickerid, tfBias, htfBias(), lookahead = barmerge.lookahead_off)
+htfDir  = useBias and not na(rawBias) ? (rawBias > 0 ? 1 : rawBias < 0 ? -1 : 0) : 0
+
+// ── Where price sits in its own range ────────────────────────────────────────
+// Read live, so a pullback into a continuation zone reads as a discount even
+// though the zone was born at the top of the move.
+rHi        = ta.highest(high, rangeLen)
+rLo        = ta.lowest(low, rangeLen)
+rangeLoc   = rHi > rLo ? (close - rLo) / (rHi - rLo) : 0.5
+inDiscount = rangeLoc <= rangeCut
+inPremium  = rangeLoc >= 1.0 - rangeCut
+
+// ── Faster-timeframe bias ────────────────────────────────────────────────────
+// Which way is a timeframe leaning right now, -100 to +100. Structure carries
+// the most weight because a broken swing is a fact; the EMAs and where price
+// sits in its recent range only describe a lean.
+biasCalc() =>
+    e1 = ta.ema(close, emaFast)
+    e2 = ta.ema(close, emaSlow)
+    ph = ta.pivothigh(high, pivLen, pivLen)
+    pl = ta.pivotlow(low, pivLen, pivLen)
+    var float swingHi = na
+    var float swingLo = na
+    swingHi := na(ph) ? swingHi : ph
+    swingLo := na(pl) ? swingLo : pl
+    brokeUp   = not na(swingHi) and close > swingHi
+    brokeDown = not na(swingLo) and close < swingLo
+    structure = brokeUp ? 40.0 : brokeDown ? -40.0 : 0.0
+    trend     = e1 > e2 ? 30.0 : e1 < e2 ? -30.0 : 0.0
+    hi        = ta.highest(high, locLen)
+    lo        = ta.lowest(low, locLen)
+    pos       = hi > lo ? (close - lo) / (hi - lo) : 0.5
+    locScore  = (pos - 0.5) * 60.0
+    int(math.round(math.max(-100.0, math.min(100.0, structure + trend + locScore))))
+
+// Computed natively as well: when a confirmation timeframe IS the chart, the
+// native read is bar-accurate and a request would only launder the same data.
+nativeBias = biasCalc()
+req1 = request.security(syminfo.tickerid, tfConf1, biasCalc(), lookahead = barmerge.lookahead_off)
+req2 = request.security(syminfo.tickerid, tfConf2, biasCalc(), lookahead = barmerge.lookahead_off)
+
+chartSec = timeframe.in_seconds(timeframe.period)
+c1Native = tfConf1 == timeframe.period
+c2Native = tfConf2 == timeframe.period
+s1 = useMTF ? (c1Native ? nativeBias : (na(req1) ? 0 : req1)) : 0
+s2 = useMTF ? (c2Native ? nativeBias : (na(req2) ? 0 : req2)) : 0
+
+// History is only trustworthy where nothing is read from below the chart.
+// Say so rather than letting the marks look like a backtest.
+barAccurate = timeframe.in_seconds(tfZone) >= chartSec and timeframe.in_seconds(tfConf1) >= chartSec and timeframe.in_seconds(tfConf2) >= chartSec
+
+// ── A zone ───────────────────────────────────────────────────────────────────
+// One object per level. Every new piece of evidence is a field here, not a
+// ninth parallel array whose removal is one day forgotten.
+type Zone
+    box    bx
+    label  lb
+    int    side        //  1 demand, -1 supply
+    int    state       //  0 fresh, 1 tested, 2 broken
+    int    touches
+    bool   inside      //  was price in the zone on the previous bar
+    float  prox
+    float  dist
+    int    qual
+    string tag
+    int    bornT
+    bool   fvg
+    bool   sweep
+
+var array<Zone> zones = array.new<Zone>()
+
+chartMs = chartSec * 1000
+zoneMs  = timeframe.in_seconds(tfZone) * 1000
+rightT  = time + extendRight * chartMs
+
+dropZone(int i) =>
+    z = array.get(zones, i)
+    box.delete(z.bx)
+    label.delete(z.lb)
+    array.remove(zones, i)
+
+// Walk the registry newest-first so a removal never shifts an index we have
+// yet to visit.
+if array.size(zones) > 0
+    for i = array.size(zones) - 1 to 0
+        z = array.get(zones, i)
+
+        wick    = z.side == 1 ? low : high
+        touchPx = touchOn == "Close" ? close : wick
+        breakPx = breakOn == "Close" ? close : wick
+        entered = z.side == 1 ? touchPx <= z.prox : touchPx >= z.prox
+        broke   = z.side == 1 ? breakPx < z.dist : breakPx > z.dist
+        nowIn   = entered and not broke
+
+        // A touch is an arrival, not a stay: only count the bar price walks in.
+        if nowIn and not z.inside
+            z.touches := z.touches + 1
+        z.inside := nowIn
+
+        if z.state < 2 and broke
+            z.state := 2
+            box.set_bgcolor(z.bx, color.new(brokenCol, math.min(99, fillAlpha + 5)))
+            box.set_border_color(z.bx, brokenCol)
+            box.set_right(z.bx, time)
+            alert((z.side == 1 ? "Demand" : "Supply") + " zone broken at " + str.tostring(z.dist, format.mintick), alert.freq_once_per_bar)
+            if not keepBroken
+                dropZone(i)
+        else if z.state < 2
+            if z.state == 0 and entered
+                z.state := 1
+                box.set_border_style(z.bx, line.style_dashed)
+                alert((z.side == 1 ? "Demand" : "Supply") + " zone tested at " + str.tostring(z.prox, format.mintick), alert.freq_once_per_bar)
+            if zoneMs > 0 and (time - z.bornT) / zoneMs > maxAge
+                dropZone(i)
+            else
+                box.set_right(z.bx, rightT)
+
+// ── Taking delivery of a zone ────────────────────────────────────────────────
+// The request repeats its last answer on every chart bar inside one zone bar,
+// so the base's own start time is the key that says "this one is new".
+var int lastZoneT = 0
+var int foundTotal = 0
+
+newZone = zSideR != 0 and zTimeR > lastZoneT and not na(zProxR) and not na(zDistR)
+patTop  = math.max(nz(zProxR), nz(zDistR))
+patBot  = math.min(nz(zProxR), nz(zDistR))
+
+// A fresh zone sitting on top of an untouched older one is the same level
+// twice; the older, deeper one is the one price actually turned from.
+blocked = false
+if newZone and overlapMax < 1.0 and array.size(zones) > 0
+    newRng = math.max(patTop - patBot, syminfo.mintick)
+    for i = 0 to array.size(zones) - 1
+        z = array.get(zones, i)
+        if not blocked and z.side == zSideR and z.state == 0
+            oldTop = math.max(z.prox, z.dist)
+            oldBot = math.min(z.prox, z.dist)
+            shared = math.min(patTop, oldTop) - math.max(patBot, oldBot)
+            blocked := shared > 0 and shared / newRng >= overlapMax
+
+if newZone
+    lastZoneT := zTimeR
+
+if newZone and not blocked
+    isDemand = zSideR == 1
+    col      = isDemand ? demandCol : supplyCol
+    tag      = tagOf(zCodeR)
+    grade    = zFvgR and zSwpR       // imbalance and liquidity: the A setup
+    foundTotal += 1
+
+    bx = box.new(zTimeR, patTop, rightT, patBot, xloc = xloc.bar_time, border_color = col, border_width = grade ? 2 : 1, bgcolor = color.new(col, fillAlpha))
+    label lb = na
+    if showLabels
+        lb := label.new(zTimeR, isDemand ? patBot : patTop, tag + " " + str.tostring(zQualR) + (zFvgR ? " ⚡" : "") + (zSwpR ? " ⌁" : ""),
+             xloc = xloc.bar_time, style = isDemand ? label.style_label_up : label.style_label_down,
+             color = color.new(col, 20), textcolor = color.white, size = size.tiny,
+             tooltip = "Proximal: " + str.tostring(zProxR, format.mintick) + "\nDistal: " + str.tostring(zDistR, format.mintick) + "\nImbalance: " + (zFvgR ? "yes" : "no") + "\nLiquidity swept: " + (zSwpR ? "yes" : "no"))
+
+    array.push(zones, Zone.new(bx = bx, lb = lb, side = zSideR, state = 0, touches = 0, inside = false, prox = zProxR, dist = zDistR, qual = zQualR, tag = tag, bornT = zTimeR, fvg = zFvgR, sweep = zSwpR))
+
+    // Trim the oldest zone on this side once the registry is full.
+    liveOnSide = 0
+    for i = 0 to array.size(zones) - 1
+        zi = array.get(zones, i)
+        liveOnSide += (zi.side == zSideR ? 1 : 0)
+    if liveOnSide > maxZones
+        for i = 0 to array.size(zones) - 1
+            zi = array.get(zones, i)
+            if zi.side == zSideR
+                dropZone(i)
+                break
+
+    alert("New " + tag + (isDemand ? " demand zone " : " supply zone ") + str.tostring(zProxR, format.mintick) + " to " + str.tostring(zDistR, format.mintick), alert.freq_once_per_bar)
+
+drawn = newZone and not blocked
+alertcondition(drawn and zCodeR == 1, "New RBR demand zone", "Rally-Base-Rally demand zone formed on {{ticker}}")
+alertcondition(drawn and zCodeR == 2, "New DBR demand zone", "Drop-Base-Rally demand zone formed on {{ticker}}")
+alertcondition(drawn and zCodeR == 3, "New DBD supply zone", "Drop-Base-Drop supply zone formed on {{ticker}}")
+alertcondition(drawn and zCodeR == 4, "New RBD supply zone", "Rally-Base-Drop supply zone formed on {{ticker}}")
+alertcondition(drawn and zSideR ==  1, "New demand zone (any)", "A demand zone formed on {{ticker}}")
+alertcondition(drawn and zSideR == -1, "New supply zone (any)", "A supply zone formed on {{ticker}}")
+
+// ── Which zone is price standing in? ─────────────────────────────────────────
+// If several overlap, the best-scoring one is the level price is really at.
+Zone   act      = na
+int    actSide  = 0
+int    actQual  = 0
+int    actTouch = 0
+bool   actFvg   = false
+bool   actSweep = false
+string actTag   = ""
+float  actProx  = na
+float  actDist  = na
+
+if array.size(zones) > 0
+    bestQual = -1
+    for i = 0 to array.size(zones) - 1
+        z = array.get(zones, i)
+        if z.state < 2
+            top = math.max(z.prox, z.dist)
+            bot = math.min(z.prox, z.dist)
+            if close <= top and close >= bot and z.qual > bestQual
+                bestQual := z.qual
+                act      := z
+
+if not na(act)
+    actSide  := act.side
+    actProx  := act.prox
+    actDist  := act.dist
+    actQual  := act.qual
+    actTouch := act.touches
+    actTag   := act.tag
+    actFvg   := act.fvg
+    actSweep := act.sweep
+
+// ── The verdict ──────────────────────────────────────────────────────────────
+// Five gates, and every one has to open: a level, a higher timeframe that
+// agrees, price on the cheap side of its own range, a zone with life left in
+// it, and both faster timeframes leaning the same way.
+agreeLong  = not useMTF or (s1 >=  confMin and s2 >=  confMin)
+agreeShort = not useMTF or (s1 <= -confMin and s2 <= -confMin)
+biasLong   = not useBias or htfDir >= 0
+biasShort  = not useBias or htfDir <= 0
+locLong    = not useRange or inDiscount
+locShort   = not useRange or inPremium
+unspent    = actTouch <= maxTouch
+
+longOK  = actSide ==  1 and agreeLong and biasLong and locLong and unspent
+shortOK = actSide == -1 and agreeShort and biasShort and locShort and unspent
+fired   = longOK or shortOK
+conf    = fired ? int(math.round(0.5 * actQual + 0.25 * math.abs(s1) + 0.25 * math.abs(s2))) : 0
+
+risk    = math.abs(actProx - actDist)
+slPrice = actSide == 1 ? actDist - risk * 0.1 : actDist + risk * 0.1
+tpPrice = actSide == 1 ? close + rMult * (close - slPrice) : close - rMult * (slPrice - close)
+
+// Why the verdict is not a trade matters more than the fact that it is not.
+counterBias = actSide != 0 and useBias and ((actSide == 1 and htfDir < 0) or (actSide == -1 and htfDir > 0))
+wrongSide   = actSide != 0 and useRange and ((actSide == 1 and not inDiscount) or (actSide == -1 and not inPremium))
+spent       = actSide != 0 and not unspent
+verdict = longOK ? "LONG " + str.tostring(conf) + "%" : shortOK ? "SHORT " + str.tostring(conf) + "%" : counterBias ? "AGAINST BIAS" : spent ? "ZONE SPENT" : wrongSide ? "WRONG HALF" : actSide != 0 ? "WAIT" : "NO ZONE"
+vColor  = longOK ? demandCol : shortOK ? supplyCol : actSide != 0 ? color.orange : color.gray
+
+plotshape(showMarks and longOK and not longOK[1], "Confirmed long", shape.triangleup, location.belowbar, color = demandCol, size = size.small)
+plotshape(showMarks and shortOK and not shortOK[1], "Confirmed short", shape.triangledown, location.abovebar, color = supplyCol, size = size.small)
+
+if fired and not fired[1]
+    alert((longOK ? "LONG" : "SHORT") + " confirmed — " + actTag + " zone " + str.tostring(actQual) + ", touch " + str.tostring(actTouch) + " | bias " + str.tostring(htfDir) + " | range " + str.tostring(int(rangeLoc * 100)) + "% | " + tfConf1 + " " + str.tostring(s1) + " | " + tfConf2 + " " + str.tostring(s2) + " → " + str.tostring(conf) + "% | entry " + str.tostring(close, format.mintick) + " SL " + str.tostring(slPrice, format.mintick) + " TP " + str.tostring(tpPrice, format.mintick), alert.freq_once_per_bar)
+
+alertcondition(longOK and not longOK[1], "Confirmed LONG", "Every filter agrees on a long at {{ticker}}")
+alertcondition(shortOK and not shortOK[1], "Confirmed SHORT", "Every filter agrees on a short at {{ticker}}")
+
+// ── Did the verdicts actually work? ──────────────────────────────────────────
+// One position at a time, entered at the signal bar's close, resolved by
+// whichever of stop and target the bars reach first. When a single bar covers
+// both, the stop is assumed to have gone first — the honest assumption, and
+// the only one that keeps this from flattering itself.
+var bool  tOpen  = false
+var int   tSide  = 0
+var float tSL    = na
+var float tTP    = na
+var int   nWin   = 0
+var int   nLoss  = 0
+var float sumR   = 0.0
+
+if tOpen
+    hitSL = tSide == 1 ? low <= tSL : high >= tSL
+    hitTP = tSide == 1 ? high >= tTP : low <= tTP
+    if hitSL
+        nLoss := nLoss + 1
+        sumR  := sumR - 1.0
+        tOpen := false
+    else if hitTP
+        nWin  := nWin + 1
+        sumR  := sumR + rMult
+        tOpen := false
+
+if not tOpen and fired and not fired[1] and barstate.isconfirmed
+    tOpen := true
+    tSide := longOK ? 1 : -1
+    tSL   := slPrice
+    tTP   := tpPrice
+
+// ── Verdict panel ────────────────────────────────────────────────────────────
+arrow(int v) =>
+    v >= confMin ? "▲ " : v <= -confMin ? "▼ " : "• "
+
+biasCol(int v) =>
+    v >= confMin ? demandCol : v <= -confMin ? supplyCol : color.gray
+
+var table panel = na
+if barstate.islast
+    table.delete(panel)
+    if showTable
+        dCount = 0
+        sCount = 0
+        if array.size(zones) > 0
+            for i = 0 to array.size(zones) - 1
+                zi = array.get(zones, i)
+                dCount += (zi.side ==  1 ? 1 : 0)
+                sCount += (zi.side == -1 ? 1 : 0)
+
+        biasTxt = not useBias ? "off" : htfDir > 0 ? "▲ bullish" : htfDir < 0 ? "▼ bearish" : "• neutral"
+        biasClr = not useBias ? color.gray : htfDir > 0 ? demandCol : htfDir < 0 ? supplyCol : color.gray
+        locTxt  = str.tostring(int(rangeLoc * 100)) + "%  " + (inDiscount ? "discount" : inPremium ? "premium" : "mid range")
+        locClr  = inDiscount ? demandCol : inPremium ? supplyCol : color.gray
+        badges  = (actFvg ? " ⚡" : "") + (actSweep ? " ⌁" : "")
+        zoneTxt = na(act) ? "price is outside every zone" : actTag + (actSide == 1 ? " demand · " : " supply · ") + str.tostring(actQual) + " · touch " + str.tostring(actTouch) + badges
+        planTxt = fired ? str.tostring(close, format.mintick) + " / " + str.tostring(slPrice, format.mintick) + " / " + str.tostring(tpPrice, format.mintick) : "—"
+        closed  = nWin + nLoss
+        trackTxt = closed == 0 ? "no closed signals yet" : str.tostring(nWin) + "W / " + str.tostring(nLoss) + "L · " + str.tostring(int(math.round(100.0 * nWin / closed))) + "% · " + str.tostring(sumR, "#.0") + "R"
+        rows    = showTrack ? 10 : 9
+
+        panel := table.new(position.top_right, 2, rows, border_width = 1, frame_color = color.new(color.gray, 50), frame_width = 1)
+        table.cell(panel, 0, 0, "S&D MTF", text_color = color.gray, text_size = size.tiny, text_halign = text.align_left)
+        table.cell(panel, 1, 0, tfZone + " zones on " + timeframe.period + (barAccurate ? "" : " · live only"), text_color = barAccurate ? color.gray : color.orange, text_size = size.tiny)
+        table.cell(panel, 0, 1, "Bias " + tfBias, text_color = color.gray, text_size = size.tiny, text_halign = text.align_left)
+        table.cell(panel, 1, 1, biasTxt, text_color = biasClr, text_size = size.tiny)
+        table.cell(panel, 0, 2, "Range", text_color = color.gray, text_size = size.tiny, text_halign = text.align_left)
+        table.cell(panel, 1, 2, locTxt, text_color = locClr, text_size = size.tiny)
+        table.cell(panel, 0, 3, "Zones", text_color = color.gray, text_size = size.tiny, text_halign = text.align_left)
+        table.cell(panel, 1, 3, "D " + str.tostring(dCount) + "  ·  S " + str.tostring(sCount) + "  ·  " + str.tostring(foundTotal) + " found", text_color = color.gray, text_size = size.tiny)
+        table.cell(panel, 0, 4, "At", text_color = color.gray, text_size = size.tiny, text_halign = text.align_left)
+        table.cell(panel, 1, 4, zoneTxt, text_color = na(act) ? color.gray : (actSide == 1 ? demandCol : supplyCol), text_size = size.tiny)
+        table.cell(panel, 0, 5, tfConf1 + (c1Native ? " ·" : ""), text_color = color.gray, text_size = size.tiny, text_halign = text.align_left)
+        table.cell(panel, 1, 5, arrow(s1) + str.tostring(s1), text_color = biasCol(s1), text_size = size.tiny)
+        table.cell(panel, 0, 6, tfConf2 + (c2Native ? " ·" : ""), text_color = color.gray, text_size = size.tiny, text_halign = text.align_left)
+        table.cell(panel, 1, 6, arrow(s2) + str.tostring(s2), text_color = biasCol(s2), text_size = size.tiny)
+        table.cell(panel, 0, 7, "Verdict", text_color = color.gray, text_size = size.tiny, text_halign = text.align_left)
+        table.cell(panel, 1, 7, verdict, text_color = color.white, bgcolor = color.new(vColor, 25), text_size = size.small)
+        table.cell(panel, 0, 8, "E / SL / TP", text_color = color.gray, text_size = size.tiny, text_halign = text.align_left)
+        table.cell(panel, 1, 8, planTxt, text_color = fired ? vColor : color.gray, text_size = size.tiny)
+        if showTrack
+            table.cell(panel, 0, 9, "Track", text_color = color.gray, text_size = size.tiny, text_halign = text.align_left)
+            table.cell(panel, 1, 9, trackTxt, text_color = sumR > 0 ? demandCol : sumR < 0 ? supplyCol : color.gray, text_size = size.tiny)
