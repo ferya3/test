@@ -71,6 +71,7 @@ contiguous = input.bool(true, "Legs must touch the base", group = gP)
 needFVG    = input.bool(false, "Leg-out must leave an imbalance", group = gP, tooltip = "The three-candle gap a real departure leaves behind. On, only zones price ran away from are drawn.")
 sweepLook  = input.int(20, "Liquidity lookback", minval = 5, group = gP)
 maxTouch   = input.int(2, "Max touches before a zone is spent", minval = 1, maxval = 10, group = gP)
+driftMax   = input.float(0.55, "Base may drift × its own range", minval = 0.1, maxval = 2.0, step = 0.05, group = gP, tooltip = "Candles stepping steadily one way are a slow decline, not a pause, and a box drawn over them spans the whole walk instead of a level. 1 and above accepts anything.")
 showRBR    = input.bool(true, "RBR — Rally-Base-Rally (demand, continuation)", group = gP)
 showDBD    = input.bool(true, "DBD — Drop-Base-Drop (supply, continuation)", group = gP)
 showDBR    = input.bool(true, "DBR — Drop-Base-Rally (demand, reversal)", group = gP)
@@ -89,6 +90,7 @@ rMult   = input.float(2.0, "Target (× risk)", minval = 0.5, step = 0.5, group =
 // ── Zones ────────────────────────────────────────────────────────────────────
 gZ          = "Zones"
 zoneEdge    = input.string("Bodies", "Proximal line from", options = ["Bodies", "Wicks"], group = gZ)
+distEdge    = input.string("Wicks", "Distal line from", options = ["Wicks", "Bodies"], group = gZ, tooltip = "Wicks is the textbook stop placement. Bodies keeps a zone from being stretched to twice its height by one stray wick — the departure still has to clear the wicks either way.")
 touchOn     = input.string("Wick", "Count a touch on", options = ["Wick", "Close"], group = gZ)
 breakOn     = input.string("Close", "Count a break on", options = ["Wick", "Close"], group = gZ)
 overlapMax  = input.float(0.60, "Skip a zone overlapping a fresh one by", minval = 0.0, maxval = 1.0, step = 0.05, group = gZ)
@@ -170,10 +172,13 @@ detectZone() =>
 
                 baseRng   = bHi - bLo
                 tightBase = baseRng <= baseRangeK * refRng
+                // Where the base ends against where it began: a pause returns
+                // to where it started, a slide does not.
+                flatBase  = math.abs(close[1] - open[n]) <= driftMax * math.max(baseRng, syminfo.mintick)
                 tol       = math.max(baseRng * 0.25, syminfo.mintick)
                 joined    = not contiguous or (close[n + 1] >= bLo - tol and close[n + 1] <= bHi + tol and open >= bLo - tol and open <= bHi + tol)
 
-                if allBase and tightBase and joined
+                if allBase and tightBase and flatBase and joined
                     departed = toDemand ? (not needBreak or close > bHi) : (not needBreak or close < bLo)
 
                     // The imbalance a real departure leaves: the leg-out never
@@ -199,7 +204,7 @@ detectZone() =>
                             oSwp  := swept
                             oCode := toDemand ? (legInBull ? 1 : 2) : (legInBull ? 4 : 3)
                             oProx := toDemand ? (zoneEdge == "Bodies" ? bTop : bHi) : (zoneEdge == "Bodies" ? bBot : bLo)
-                            oDist := toDemand ? bLo : bHi
+                            oDist := toDemand ? (distEdge == "Bodies" ? bBot : bLo) : (distEdge == "Bodies" ? bTop : bHi)
                             oLen  := n
                             oTIn  := time[n + 1]
                             oTBase:= time[n]
