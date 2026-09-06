@@ -1,29 +1,26 @@
 //@version=6
 // Supply & demand zones with a multi-timeframe verdict.
 //
-// All four bases — the continuation pair RBR and DBD, the reversal pair RBD
-// and DBR — found on the zone timeframe, filtered by the higher timeframe and
-// by where price sits in its own range, graded on the evidence institutions
-// leave behind, and confirmed on two faster timeframes before anything is
-// called a trade.
+// All four bases: the continuation pair RBR and DBD, the reversal pair RBD
+// and DBR. The leg that LEAVES a base decides what the base is — price left
+// upward, so the base is demand; downward, so it is supply — and the leg that
+// arrives only decides whether the setup continues the move or turns it.
 //
-// Four ideas hold it together:
+// The detector answers one question with four requirements and everything
+// else with a number. A pattern exists when an impulse leaves a run of
+// smaller candles that an impulse arrived at, and the departure closes clear
+// of them. That is all that is enforced. Whether the base was tight, flat,
+// brief, whether the departure tore a gap, whether the arrival swept the
+// swing before it — none of that decides existence, all of it decides the
+// score, and one threshold on that score is the only quality dial.
 //
-//   The leg that LEAVES a base decides what the base is. Price left upward,
-//   so the base is demand; downward, so it is supply. The leg that arrives
-//   only decides whether the setup continues the move or turns it.
+// The alternative, a dozen conditions each individually sensible and joined
+// by AND, is how a detector ends up finding nothing while every threshold
+// still looks reasonable on its own.
 //
-//   A base is judged against the two legs around it, never against a fixed
-//   ATR threshold. Whatever is small next to the impulse that made it and the
-//   impulse that left it is a base, on a quiet chart and a violent one alike.
-//
-//   Zones are always requested FROM the zone timeframe, so the script runs on
-//   any chart. Put it on 15m and the 4H zones arrive when each 4H bar closes —
-//   the honest direction for request.security — while entries are read on the
-//   chart itself. Put it on 4H and it behaves as it always did.
-//
-//   A level says WHERE, never WHEN. The verdict opens five gates or it is not
-//   a trade, and the panel names the gate that stayed shut.
+// Zones are requested FROM the zone timeframe, so the script runs on any
+// chart: on 15m the 4H zones arrive as each 4H bar closes, and entries are
+// read on the chart itself. On 4H it behaves as it always did.
 indicator("S&D MTF Verdict", "S&D MTF", overlay = true, max_bars_back = 500, max_boxes_count = 500, max_labels_count = 500)
 
 // ── Timeframes ───────────────────────────────────────────────────────────────
@@ -32,58 +29,44 @@ tfZone = input.timeframe("240", "Zone timeframe", group = gTF, tooltip = "Where 
 tfConf1= input.timeframe("15", "Confirmation 1", group = gTF)
 tfConf2= input.timeframe("5", "Confirmation 2", group = gTF)
 
+// ── What counts as a leg and a base ──────────────────────────────────────────
+// Four numbers, and they describe the shape rather than judge it. Loosen
+// legMult if the chart is quiet and nothing qualifies as an impulse; loosen
+// baseK if bases are being missed because their candles are not small enough
+// next to the legs.
+gD      = "Shape"
+volLen  = input.int(14, "Typical candle length", minval = 2, group = gD, tooltip = "How many bars make up the average candle that legs are measured against. Read one bar back, and an average of plain ranges rather than ATR, so a candle is never sized against a figure its own move inflated.")
+legBody = input.float(0.50, "Leg: min body / range", minval = 0.20, maxval = 0.95, step = 0.05, group = gD)
+legMult = input.float(0.90, "Leg: min range (× typical candle)", minval = 0.20, maxval = 4.0, step = 0.05, group = gD)
+baseK   = input.float(0.85, "Base: max candle range (× the legs)", minval = 0.20, maxval = 2.0, step = 0.05, group = gD, tooltip = "A base candle has to be visibly smaller than the impulses around it. Nothing else about the base is enforced — tightness, flatness and body size are scored instead.")
+minBase = input.int(1, "Min base candles", minval = 1, maxval = 10, group = gD)
+maxBase = input.int(6, "Max base candles", minval = 1, maxval = 10, group = gD)
+
+// ── Quality ──────────────────────────────────────────────────────────────────
+// One dial. Every structural pattern is found; this decides which are drawn.
+gQ        = "Quality"
+tune      = input.string("Show all", "Quality filter", options = ["Show all", "Decent", "Good", "Best", "Custom"], group = gQ, tooltip = "Start on Show all and read the scores on the labels. Once you can see which numbers correspond to the setups you would take, move the dial there — that is a decision made from your chart rather than from my defaults.")
+cMinScore = input.int(40, "Min zone score (Custom)", minval = 0, maxval = 100, group = gQ)
+sweepLook = input.int(20, "Liquidity lookback", minval = 5, group = gQ, tooltip = "How far back to look for the swing the leg-in may have swept before the base formed. Scored, never required.")
+maxTouch  = input.int(2, "Max touches before a zone is spent", minval = 1, maxval = 10, group = gQ)
+showRBR   = input.bool(true, "RBR — Rally-Base-Rally (demand, continuation)", group = gQ)
+showDBD   = input.bool(true, "DBD — Drop-Base-Drop (supply, continuation)", group = gQ)
+showDBR   = input.bool(true, "DBR — Drop-Base-Rally (demand, reversal)", group = gQ)
+showRBD   = input.bool(true, "RBD — Rally-Base-Drop (supply, reversal)", group = gQ)
+
+minScore = tune == "Show all" ? 0 : tune == "Decent" ? 25 : tune == "Good" ? 45 : tune == "Best" ? 65 : cMinScore
+
 // ── Higher-timeframe bias ────────────────────────────────────────────────────
 gB      = "Higher-timeframe bias"
-useBias = input.bool(true, "Only trade with the higher timeframe", group = gB, tooltip = "A demand zone in a falling daily market is where longs go to die. Off, the verdict ignores the bigger picture.")
+useBias = input.bool(true, "Only trade with the higher timeframe", group = gB, tooltip = "A demand zone in a falling daily market is where longs go to die. This gates the verdict, never the drawing.")
 tfBias  = input.timeframe("D", "Bias timeframe", group = gB)
 biasEma = input.int(50, "Bias EMA", minval = 5, group = gB)
 
 // ── Range location ───────────────────────────────────────────────────────────
 gR       = "Range location"
-useRange = input.bool(true, "Buy the discount, sell the premium", group = gR, tooltip = "Measured where price is NOW, not where the zone was born, so a pullback into a continuation zone still counts as a discount.")
+useRange = input.bool(true, "Buy the discount, sell the premium", group = gR, tooltip = "Measured where price is NOW, not where the zone was born, so a pullback into a continuation zone still counts as a discount. Gates the verdict, never the drawing.")
 rangeLen = input.int(100, "Range lookback", minval = 20, group = gR)
-rangeCut = input.float(0.50, "Half of the range that counts", minval = 0.20, maxval = 0.80, step = 0.05, group = gR, tooltip = "0.5 = longs only in the lower half. 0.35 is the stricter read.")
-
-// ── Detection ────────────────────────────────────────────────────────────────
-gD     = "Detection"
-tune   = input.string("Loose", "Strictness", options = ["Loose", "Balanced", "Normal", "Strict", "Custom"], group = gD, tooltip = "Each step tightens five thresholds at once and they multiply, so one step can cut the count several times over. To tune, switch to Custom and move ONE number at a time, watching Found in the panel.")
-atrLen = input.int(14, "Volatility length", minval = 1, group = gD)
-legBase= input.string("Median candle", "Measure leg size against", options = ["Median candle", "ATR"], group = gD, tooltip = "ATR is an average, and the impulse candles this script hunts are exactly what drags it upward — so in a lively market ATR quietly disqualifies the very legs it should be finding. The median candle is what typical means to a reader, and it does not move when a few candles are huge.")
-
-gX        = "Custom thresholds (used only when Strictness = Custom)"
-cExcited  = input.float(0.55, "Leg: min body / range", minval = 0.20, maxval = 0.95, step = 0.05, group = gX)
-cLegAtr   = input.float(1.00, "Leg: min range (× the volatility measure)", minval = 0.20, step = 0.10, group = gX)
-cBaseBody = input.float(0.50, "Base: max body (× leg body)", minval = 0.10, maxval = 1.00, step = 0.05, group = gX)
-cBaseRng  = input.float(1.00, "Base: max range (× leg range)", minval = 0.20, maxval = 2.00, step = 0.10, group = gX)
-cMinScore = input.int(30, "Min zone score", minval = 0, maxval = 100, group = gX)
-
-// Five thresholds move together and they multiply: if each rejects a third
-// of what reaches it, one step down the list finds a sixth as many setups.
-// Hence Balanced — the gap between Loose and Normal was a cliff, and the
-// leg-size rule is most of it, since it has to be satisfied by both legs.
-// The leg rules decide HOW MANY setups exist; the base rules decide whether
-// they are any good. Loose therefore stays permissive about legs and spends
-// all of its tightening on the base — the count survives, the junk does not.
-excitedBody = tune == "Loose" ? 0.45 : tune == "Balanced" ? 0.50 : tune == "Normal" ? 0.55 : tune == "Strict" ? 0.62 : cExcited
-legAtrMin   = tune == "Loose" ? 0.70 : tune == "Balanced" ? 0.85 : tune == "Normal" ? 1.00 : tune == "Strict" ? 1.40 : cLegAtr
-baseBodyK   = tune == "Loose" ? 0.52 : tune == "Balanced" ? 0.51 : tune == "Normal" ? 0.50 : tune == "Strict" ? 0.35 : cBaseBody
-baseRangeK  = tune == "Loose" ? 1.05 : tune == "Balanced" ? 1.02 : tune == "Normal" ? 1.00 : tune == "Strict" ? 0.70 : cBaseRng
-minScore    = tune == "Loose" ? 12   : tune == "Balanced" ? 20   : tune == "Normal" ? 30   : tune == "Strict" ? 55   : cMinScore
-
-// ── Pattern ──────────────────────────────────────────────────────────────────
-gP         = "Pattern"
-minBase    = input.int(1, "Min base candles", minval = 1, maxval = 10, group = gP)
-maxBase    = input.int(6, "Max base candles", minval = 1, maxval = 10, group = gP)
-needBreak  = input.bool(true, "Leg-out must close beyond the base", group = gP)
-contiguous = input.bool(true, "Legs must touch the base", group = gP)
-needFVG    = input.bool(false, "Leg-out must leave an imbalance", group = gP, tooltip = "The three-candle gap a real departure leaves behind. On, only zones price ran away from are drawn.")
-sweepLook  = input.int(20, "Liquidity lookback", minval = 5, group = gP)
-maxTouch   = input.int(2, "Max touches before a zone is spent", minval = 1, maxval = 10, group = gP)
-driftMax   = input.float(0.55, "Base may drift × its own range", minval = 0.1, maxval = 2.0, step = 0.05, group = gP, tooltip = "Candles stepping steadily one way are a slow decline, not a pause, and a box drawn over them spans the whole walk instead of a level. 1 and above accepts anything.")
-showRBR    = input.bool(true, "RBR — Rally-Base-Rally (demand, continuation)", group = gP)
-showDBD    = input.bool(true, "DBD — Drop-Base-Drop (supply, continuation)", group = gP)
-showDBR    = input.bool(true, "DBR — Drop-Base-Rally (demand, reversal)", group = gP)
-showRBD    = input.bool(true, "RBD — Rally-Base-Drop (supply, reversal)", group = gP)
+rangeCut = input.float(0.50, "Half of the range that counts", minval = 0.20, maxval = 0.80, step = 0.05, group = gR)
 
 // ── Confirmation ─────────────────────────────────────────────────────────────
 gL      = "Confirmation"
@@ -102,7 +85,7 @@ distEdge    = input.string("Wicks", "Distal line from", options = ["Wicks", "Bod
 touchOn     = input.string("Wick", "Count a touch on", options = ["Wick", "Close"], group = gZ)
 breakOn     = input.string("Close", "Count a break on", options = ["Wick", "Close"], group = gZ)
 overlapMax  = input.float(0.60, "Skip a zone overlapping a fresh one by", minval = 0.0, maxval = 1.0, step = 0.05, group = gZ)
-maxAge      = input.int(300, "Retire a zone after N zone-bars", minval = 20, group = gZ, tooltip = "Counted in bars of the zone timeframe, so it means the same thing whatever chart you are on.")
+maxAge      = input.int(300, "Retire a zone after N zone-bars", minval = 20, group = gZ)
 extendRight = input.int(3, "Extend zone past the last bar", minval = 0, maxval = 100, group = gZ)
 anchorMode  = input.string("Auto", "Anchor boxes by", options = ["Auto", "Bar index", "Bar time"], group = gZ, tooltip = "Bar index is exact but only works when the chart IS the zone timeframe. Bar time is what lets a 4H zone land on a 15m chart. Auto picks the exact one whenever it can.")
 boxFromLeg  = input.bool(false, "Start the box at the leg-in candle", group = gZ, tooltip = "Off, the box covers exactly the base candles — which is what the zone is.")
@@ -121,24 +104,22 @@ fillAlpha  = input.int(85, "Zone fill transparency", minval = 0, maxval = 100, g
 showLabels = input.bool(true, "Label each zone", group = gS)
 showTable  = input.bool(true, "Show the verdict panel", group = gS)
 showMarks  = input.bool(true, "Mark confirmed entries", group = gS)
-showLegs   = input.bool(false, "Mark the legs that made each zone", group = gS, tooltip = "Puts in and out on the two impulse candles the detector actually used. Turn this on when a box looks like it starts on the wrong candle: it says immediately whether the drawing is off or the pattern the script found is not the one you are looking at.")
+showLegs   = input.bool(false, "Mark the legs that made each zone", group = gS, tooltip = "Puts in and out on the two impulse candles the detector actually used, so a box that looks wrong says immediately whether the drawing is off or the pattern found is not the one you are looking at.")
 showTrack  = input.bool(true, "Track how the verdicts resolved", group = gS)
 
 // ── Zone detection ───────────────────────────────────────────────────────────
-// Runs entirely inside the zone timeframe's context, so every history access
-// below is a zone-timeframe bar. Returns the zone the last closed bar formed,
-// or side 0 for nothing. The pattern name travels as a code because a tuple
-// of prices and flags crosses the timeframe boundary more cleanly than text.
+// Runs inside the zone timeframe's context, so every history access below is a
+// zone-timeframe bar. Returns whatever the last closed bar completed, or side
+// 0 for nothing. The pattern name travels as a code because a tuple of numbers
+// crosses the timeframe boundary more cleanly than text.
 detectZone() =>
     r     = high - low
     b     = math.abs(close - open)
     ratio = r > 0 ? b / r : 0.0
-    // Both read one bar back, so a candle is never measured against a figure
-    // its own range has already moved.
-    atrP  = ta.atr(atrLen)[1]
-    medP  = ta.median(r, atrLen)[1]
-    legRef= legBase == "ATR" ? atrP : medP
-    leg   = not na(legRef) and legRef > 0 and ratio >= excitedBody and r >= legAtrMin * legRef
+    // The average plain range, read one bar back: what a candle looks like
+    // around here, before this one had any say in it.
+    typ   = ta.sma(r, volLen)[1]
+    isLeg = not na(typ) and typ > 0 and ratio >= legBody and r >= legMult * typ
     bull  = close > open
     bear  = close < open
     swL   = ta.lowest(low, sweepLook)
@@ -156,71 +137,68 @@ detectZone() =>
     int   oTBase= 0    // open time of the first base candle
     int   oTOut = 0    // open time of the leg-out candle
 
-    if leg
+    if isLeg and (bull or bear)
         for n = minBase to maxBase
-            if oSide == 0 and leg[n + 1]
+            if oSide == 0 and isLeg[n + 1]
                 // The leg-out decides the side; the leg-in only names it.
                 bool legInBull = bull[n + 1]
                 bool toDemand  = bull
                 bool allowed   = toDemand ? (legInBull ? showRBR : showDBR) : (legInBull ? showRBD : showDBD)
 
-                // Measure the base against the smaller of the two legs, so one
-                // oversized leg cannot excuse a base that is really a third leg.
-                float legInBody = math.abs(close[n + 1] - open[n + 1])
-                float refBody   = math.max(math.min(b, legInBody), syminfo.mintick)
-                float refRng    = math.max(math.min(r, r[n + 1]), syminfo.mintick)
+                // Both legs get a say in how big "big" is here, so one
+                // oversized departure cannot excuse a base of any size.
+                float refRng  = math.max((r + r[n + 1]) / 2, syminfo.mintick)
+                float refBody = math.max((b + math.abs(close[n + 1] - open[n + 1])) / 2, syminfo.mintick)
 
-                bool  allBase = true
+                // The one thing a base must be: visibly smaller than the
+                // impulses on either side of it.
+                bool  small   = true
                 float bHi     = high[1]
                 float bLo     = low[1]
                 float bTop    = math.max(open[1], close[1])
                 float bBot    = math.min(open[1], close[1])
+                float bodySum = 0.0
                 for i = 1 to n
-                    allBase := allBase and (math.abs(close[i] - open[i]) <= baseBodyK * refBody) and ((high[i] - low[i]) <= baseRangeK * refRng)
+                    small   := small and ((high[i] - low[i]) <= baseK * refRng)
                     bHi     := math.max(bHi, high[i])
                     bLo     := math.min(bLo, low[i])
                     bTop    := math.max(bTop, math.max(open[i], close[i]))
                     bBot    := math.min(bBot, math.min(open[i], close[i]))
+                    bodySum += math.abs(close[i] - open[i])
 
-                baseRng   = bHi - bLo
-                tightBase = baseRng <= baseRangeK * refRng
-                // Where the base ends against where it began: a pause returns
-                // to where it started, a slide does not.
-                flatBase  = math.abs(close[1] - open[n]) <= driftMax * math.max(baseRng, syminfo.mintick)
-                tol       = math.max(baseRng * 0.25, syminfo.mintick)
-                joined    = not contiguous or (close[n + 1] >= bLo - tol and close[n + 1] <= bHi + tol and open >= bLo - tol and open <= bHi + tol)
+                baseRng = math.max(bHi - bLo, syminfo.mintick)
+                // The cluster as a whole has to fit inside one impulse too,
+                // or it is a range the price passed through, not a pause.
+                fits    = baseRng <= baseK * refRng
+                // And the departure has to close clear of the whole base.
+                cleared = toDemand ? close > bHi : close < bLo
 
-                if allBase and tightBase and flatBase and joined
-                    departed = toDemand ? (not needBreak or close > bHi) : (not needBreak or close < bLo)
-
-                    // The imbalance a real departure leaves: the leg-out never
-                    // trades back into the candle two bars behind it.
+                if allowed and small and fits and cleared
+                    // Everything from here is evidence, not permission.
                     gap = toDemand ? low > high[2] : high < low[2]
-
-                    // Did the leg-in take out the swing before it and get it
-                    // back? That is the liquidity the base was built on.
                     priorLow  = swL[n + 2]
                     priorHigh = swH[n + 2]
                     swept = toDemand ? (not na(priorLow) and math.min(bLo, low[n + 1]) < priorLow and close > priorLow) : (not na(priorHigh) and math.max(bHi, high[n + 1]) > priorHigh and close < priorHigh)
 
-                    if allowed and departed and (bull or bear) and (not needFVG or gap)
-                        depart = math.min(1.0, r / (2 * refRng))
-                        tight  = math.max(0.0, 1.0 - baseRng / refRng)
-                        few    = maxBase > minBase ? (maxBase - n) * 1.0 / (maxBase - minBase) : 1.0
-                        score  = int(math.round(30 * depart + 25 * tight + 15 * few + (gap ? 15 : 0) + (swept ? 15 : 0)))
+                    depart = math.min(1.0, r / (2 * refRng))                                  // how hard it left
+                    tight  = math.max(0.0, 1.0 - baseRng / refRng)                            // how small the base is
+                    flat   = math.max(0.0, 1.0 - math.abs(close[1] - open[n]) / baseRng)      // a pause, not a slide
+                    few    = maxBase > 1 ? (maxBase - n) * 1.0 / (maxBase - 1) : 1.0          // how briefly it paused
+                    quiet  = math.max(0.0, 1.0 - (bodySum / n) / refBody)                     // how little it did there
+                    score  = int(math.round(25 * depart + 20 * tight + 15 * flat + 10 * few + 10 * quiet + (gap ? 10 : 0) + (swept ? 10 : 0)))
 
-                        if score >= minScore
-                            oSide := toDemand ? 1 : -1
-                            oQual := score
-                            oFvg  := gap
-                            oSwp  := swept
-                            oCode := toDemand ? (legInBull ? 1 : 2) : (legInBull ? 4 : 3)
-                            oProx := toDemand ? (zoneEdge == "Bodies" ? bTop : bHi) : (zoneEdge == "Bodies" ? bBot : bLo)
-                            oDist := toDemand ? (distEdge == "Bodies" ? bBot : bLo) : (distEdge == "Bodies" ? bTop : bHi)
-                            oLen  := n
-                            oTIn  := time[n + 1]
-                            oTBase:= time[n]
-                            oTOut := time
+                    if score >= minScore
+                        oSide := toDemand ? 1 : -1
+                        oQual := score
+                        oFvg  := gap
+                        oSwp  := swept
+                        oCode := toDemand ? (legInBull ? 1 : 2) : (legInBull ? 4 : 3)
+                        oProx := toDemand ? (zoneEdge == "Bodies" ? bTop : bHi) : (zoneEdge == "Bodies" ? bBot : bLo)
+                        oDist := toDemand ? (distEdge == "Bodies" ? bBot : bLo) : (distEdge == "Bodies" ? bTop : bHi)
+                        oLen  := n
+                        oTIn  := time[n + 1]
+                        oTBase:= time[n]
+                        oTOut := time
     [oSide, oProx, oDist, oQual, oCode, oFvg, oSwp, oLen, oTIn, oTBase, oTOut]
 
 tagOf(int code) =>
