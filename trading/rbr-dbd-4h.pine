@@ -10,12 +10,16 @@
 // impulse that left it is a base. That keeps the pattern recognisable on a
 // quiet 4H forex chart and on a violent one, and it means no candle can fall
 // into a gap between the two definitions and silently kill a valid setup.
-indicator("RBR / DBD / RBD / DBR Zones (4H)", "S&D 4H", overlay = true, max_bars_back = 500, max_boxes_count = 500, max_labels_count = 500)
+//
+// The 4H chart says WHERE. It cannot say WHEN, so when price is standing in a
+// zone the script reads structure, trend and location on two lower timeframes
+// and only calls a trade when the level and both of them agree.
+indicator("S&D Zones + MTF Confirmation (4H)", "S&D MTF", overlay = true, max_bars_back = 500, max_boxes_count = 500, max_labels_count = 500)
 
 // ── Timeframe ────────────────────────────────────────────────────────────────
 gTF    = "Timeframe"
-lockTF = input.bool(true, "Detect on one timeframe only", group = gTF, tooltip = "Leave this on so the zones you see are the 4H zones. Turn it off to scan whatever chart you are on.")
-tfWant = input.timeframe("240", "Timeframe", group = gTF)
+lockTF = input.bool(true, "Detect zones on one timeframe only", group = gTF, tooltip = "Leave this on so the zones you see are the 4H zones. Turn it off to scan whatever chart you are on.")
+tfWant = input.timeframe("240", "Zone timeframe", group = gTF)
 
 // ── Detection ────────────────────────────────────────────────────────────────
 gD     = "Detection"
@@ -47,6 +51,18 @@ showDBD    = input.bool(true, "DBD — Drop-Base-Drop (supply, continuation)", g
 showDBR    = input.bool(true, "DBR — Drop-Base-Rally (demand, reversal)", group = gP)
 showRBD    = input.bool(true, "RBD — Rally-Base-Drop (supply, reversal)", group = gP)
 
+// ── Lower-timeframe confirmation ─────────────────────────────────────────────
+gL       = "Confirmation"
+useMTF   = input.bool(true, "Confirm on lower timeframes", group = gL)
+tfMid    = input.timeframe("15", "Mid timeframe", group = gL)
+tfFast   = input.timeframe("5", "Fast timeframe", group = gL)
+pivLen   = input.int(3, "Structure pivot length", minval = 1, maxval = 20, group = gL, tooltip = "How many bars either side of a swing before it counts as structure on the lower timeframe.")
+emaFast  = input.int(9, "Fast EMA", minval = 2, group = gL)
+emaSlow  = input.int(21, "Slow EMA", minval = 3, group = gL)
+locLen   = input.int(20, "Location lookback", minval = 5, group = gL)
+confMin  = input.int(30, "Min agreement score", minval = 0, maxval = 100, group = gL, tooltip = "Both lower timeframes must reach this, in the same direction as the zone, before the verdict turns into a trade.")
+rMult    = input.float(2.0, "Target (× risk)", minval = 0.5, step = 0.5, group = gL)
+
 // ── Zones ────────────────────────────────────────────────────────────────────
 gZ          = "Zones"
 zoneEdge    = input.string("Bodies", "Proximal line from", options = ["Bodies", "Wicks"], group = gZ, tooltip = "Bodies = tighter entry, Wicks = the full base range.")
@@ -65,7 +81,8 @@ supplyCol  = input.color(#ef5350, "Supply", group = gS)
 brokenCol  = input.color(#787b86, "Broken", group = gS)
 fillAlpha  = input.int(85, "Zone fill transparency", minval = 0, maxval = 100, group = gS)
 showLabels = input.bool(true, "Label each zone", group = gS)
-showTable  = input.bool(true, "Show the tuning panel", group = gS, tooltip = "Counts what the current settings actually find, so you can dial Strictness with numbers instead of guesswork.")
+showTable  = input.bool(true, "Show the verdict panel", group = gS)
+showMarks  = input.bool(true, "Mark confirmed entries", group = gS)
 
 // ── Candle measurements ──────────────────────────────────────────────────────
 // ATR is read one bar back so an explosive candle is measured against the
@@ -83,13 +100,47 @@ isBear = close < open
 tfOK      = not lockTF or timeframe.period == tfWant
 canDetect = tfOK and barstate.isconfirmed and maxBase >= minBase
 
+// ── Lower-timeframe bias ─────────────────────────────────────────────────────
+// Runs on whichever timeframe it is requested from and answers one question:
+// which way is this timeframe leaning right now, from -100 to +100. Structure
+// carries the most weight because a broken swing is a fact; the EMAs and where
+// price sits in its recent range only describe a lean.
+biasCalc() =>
+    e1 = ta.ema(close, emaFast)
+    e2 = ta.ema(close, emaSlow)
+    ph = ta.pivothigh(high, pivLen, pivLen)
+    pl = ta.pivotlow(low, pivLen, pivLen)
+    var float swingHi = na
+    var float swingLo = na
+    swingHi := na(ph) ? swingHi : ph
+    swingLo := na(pl) ? swingLo : pl
+    brokeUp   = not na(swingHi) and close > swingHi
+    brokeDown = not na(swingLo) and close < swingLo
+    structure = brokeUp ? 40.0 : brokeDown ? -40.0 : 0.0
+    trend     = e1 > e2 ? 30.0 : e1 < e2 ? -30.0 : 0.0
+    hi        = ta.highest(high, locLen)
+    lo        = ta.lowest(low, locLen)
+    pos       = hi > lo ? (close - lo) / (hi - lo) : 0.5
+    locScore  = (pos - 0.5) * 60.0
+    int(math.round(math.max(-100.0, math.min(100.0, structure + trend + locScore))))
+
+// Requested unconditionally — a request inside a branch is a request that
+// sometimes is not there at all.
+raw15 = request.security(syminfo.tickerid, tfMid,  biasCalc(), lookahead = barmerge.lookahead_off)
+raw5  = request.security(syminfo.tickerid, tfFast, biasCalc(), lookahead = barmerge.lookahead_off)
+ltfOK = timeframe.in_seconds(tfMid) < timeframe.in_seconds(timeframe.period) and timeframe.in_seconds(tfFast) < timeframe.in_seconds(timeframe.period)
+s15   = useMTF and ltfOK and not na(raw15) ? raw15 : 0
+s5    = useMTF and ltfOK and not na(raw5)  ? raw5  : 0
+
 // ── Live zone registry ───────────────────────────────────────────────────────
-var box[]   zBox   = array.new<box>()
-var label[] zLab   = array.new<label>()
-var int[]   zSide  = array.new<int>()      //  1 = demand, -1 = supply
-var int[]   zState = array.new<int>()      //  0 = fresh,   1 = tested, 2 = broken
-var float[] zProx  = array.new<float>()
-var float[] zDist  = array.new<float>()
+var box[]    zBox   = array.new<box>()
+var label[]  zLab   = array.new<label>()
+var int[]    zSide  = array.new<int>()      //  1 = demand, -1 = supply
+var int[]    zState = array.new<int>()      //  0 = fresh,   1 = tested, 2 = broken
+var float[]  zProx  = array.new<float>()
+var float[]  zDist  = array.new<float>()
+var int[]    zQual  = array.new<int>()
+var string[] zTag   = array.new<string>()
 
 dropZone(int i) =>
     box.delete(array.get(zBox, i))
@@ -100,6 +151,8 @@ dropZone(int i) =>
     array.remove(zState, i)
     array.remove(zProx, i)
     array.remove(zDist, i)
+    array.remove(zQual, i)
+    array.remove(zTag, i)
 
 // Walk the registry newest-first so a removal never shifts an index we have
 // yet to visit.
@@ -140,8 +193,8 @@ if array.size(zBox) > 0
 
 // ── Pattern detection ────────────────────────────────────────────────────────
 // The current bar is the leg-out. Behind it sit n base candles, and behind
-// those a leg-in pointing the same way. The smallest n that fits wins, so one
-// setup is never reported at several widths.
+// those a leg-in. The smallest n that fits wins, so one setup is never
+// reported at several widths.
 int    patSide  = 0
 int    patLen   = 0
 int    patScore = 0
@@ -161,9 +214,9 @@ if canDetect and isLeg
 
             // Measure the base against the smaller of the two legs, so one
             // oversized leg cannot excuse a base that is really a third leg.
-            float legInBody  = math.abs(close[n + 1] - open[n + 1])
-            float refBody    = math.max(math.min(body, legInBody), syminfo.mintick)
-            float refRng     = math.max(math.min(rng, rng[n + 1]), syminfo.mintick)
+            float legInBody = math.abs(close[n + 1] - open[n + 1])
+            float refBody   = math.max(math.min(body, legInBody), syminfo.mintick)
+            float refRng    = math.max(math.min(rng, rng[n + 1]), syminfo.mintick)
 
             bool  allBase = true
             float bHi     = high[1]
@@ -182,8 +235,8 @@ if canDetect and isLeg
             // range rather than a pause.
             tightBase = baseRng <= baseRangeK * refRng
             // No gap between the legs and the base they belong to.
-            tol     = math.max(baseRng * 0.25, syminfo.mintick)
-            joined  = not contiguous or (close[n + 1] >= bLo - tol and close[n + 1] <= bHi + tol and open >= bLo - tol and open <= bHi + tol)
+            tol    = math.max(baseRng * 0.25, syminfo.mintick)
+            joined = not contiguous or (close[n + 1] >= bLo - tol and close[n + 1] <= bHi + tol and open >= bLo - tol and open <= bHi + tol)
 
             if allBase and tightBase and joined
                 departed = toDemand ? (not needBreak or close > bHi) : (not needBreak or close < bLo)
@@ -242,6 +295,8 @@ if patSide != 0 and not blocked
     array.push(zState, 0)
     array.push(zProx, patProx)
     array.push(zDist, patDist)
+    array.push(zQual, patScore)
+    array.push(zTag, patName)
 
     // Trim the oldest zone on this side once the registry is full.
     liveOnSide = 0
@@ -263,7 +318,69 @@ alertcondition(drawn and patName == "RBD", "New RBD supply zone", "Rally-Base-Dr
 alertcondition(drawn and patSide ==  1, "New demand zone (any)", "A demand zone formed on {{ticker}}")
 alertcondition(drawn and patSide == -1, "New supply zone (any)", "A supply zone formed on {{ticker}}")
 
-// ── Tuning panel ─────────────────────────────────────────────────────────────
+// ── Which zone is price standing in? ─────────────────────────────────────────
+// If several overlap, the best-scoring one is the level price is really at.
+int    actIdx   = -1
+int    actSide  = 0
+int    actQual  = 0
+int    actState = 0
+string actTag   = ""
+float  actProx  = na
+float  actDist  = na
+
+if array.size(zSide) > 0
+    bestQual = -1
+    for i = 0 to array.size(zSide) - 1
+        if array.get(zState, i) < 2
+            p   = array.get(zProx, i)
+            d   = array.get(zDist, i)
+            top = math.max(p, d)
+            bot = math.min(p, d)
+            if close <= top and close >= bot and array.get(zQual, i) > bestQual
+                bestQual := array.get(zQual, i)
+                actIdx   := i
+    if actIdx >= 0
+        actSide  := array.get(zSide, actIdx)
+        actProx  := array.get(zProx, actIdx)
+        actDist  := array.get(zDist, actIdx)
+        actQual  := array.get(zQual, actIdx)
+        actState := array.get(zState, actIdx)
+        actTag   := array.get(zTag, actIdx)
+
+// ── The verdict ──────────────────────────────────────────────────────────────
+// The 4H level and both lower timeframes have to say the same thing. Anything
+// less is a level worth watching, not a trade.
+mtfReady   = not useMTF or ltfOK
+agreeLong  = not useMTF or (s15 >=  confMin and s5 >=  confMin)
+agreeShort = not useMTF or (s15 <= -confMin and s5 <= -confMin)
+longOK  = actSide ==  1 and mtfReady and agreeLong
+shortOK = actSide == -1 and mtfReady and agreeShort
+fired   = longOK or shortOK
+conf    = fired ? int(math.round(0.5 * actQual + 0.25 * math.abs(s15) + 0.25 * math.abs(s5))) : 0
+
+risk    = math.abs(actProx - actDist)
+slPrice = actSide == 1 ? actDist - risk * 0.1 : actDist + risk * 0.1
+tpPrice = actSide == 1 ? close + rMult * (close - slPrice) : close - rMult * (slPrice - close)
+
+verdict = longOK ? "LONG " + str.tostring(conf) + "%" : shortOK ? "SHORT " + str.tostring(conf) + "%" : actSide != 0 ? "WAIT" : "NO ZONE"
+vColor  = longOK ? demandCol : shortOK ? supplyCol : actSide != 0 ? color.orange : color.gray
+
+plotshape(showMarks and longOK and not longOK[1], "Confirmed long", shape.triangleup, location.belowbar, color = demandCol, size = size.small)
+plotshape(showMarks and shortOK and not shortOK[1], "Confirmed short", shape.triangledown, location.abovebar, color = supplyCol, size = size.small)
+
+if fired and not fired[1]
+    alert((longOK ? "LONG" : "SHORT") + " confirmed — " + actTag + " zone (" + str.tostring(actQual) + ") + " + tfMid + " " + str.tostring(s15) + " + " + tfFast + " " + str.tostring(s5) + " → " + str.tostring(conf) + "% | entry " + str.tostring(close, format.mintick) + " SL " + str.tostring(slPrice, format.mintick) + " TP " + str.tostring(tpPrice, format.mintick), alert.freq_once_per_bar)
+
+alertcondition(longOK and not longOK[1], "Confirmed LONG", "4H demand + 15m + 5m all agree on {{ticker}}")
+alertcondition(shortOK and not shortOK[1], "Confirmed SHORT", "4H supply + 15m + 5m all agree on {{ticker}}")
+
+// ── Verdict panel ────────────────────────────────────────────────────────────
+arrow(int v) =>
+    v >= confMin ? "▲ " : v <= -confMin ? "▼ " : "• "
+
+biasCol(int v) =>
+    v >= confMin ? demandCol : v <= -confMin ? supplyCol : color.gray
+
 var table panel = na
 if barstate.islast
     table.delete(panel)
@@ -275,19 +392,30 @@ if barstate.islast
                 side = array.get(zSide, i)
                 dCount += (side ==  1 ? 1 : 0)
                 sCount += (side == -1 ? 1 : 0)
-        panel := table.new(position.top_right, 2, 4, border_width = 1, frame_color = color.new(color.gray, 50), frame_width = 1)
-        table.cell(panel, 0, 0, "S&D 4H", text_color = color.gray, text_size = size.tiny)
+
+        stateTxt = actIdx < 0 ? "—" : actState == 0 ? "fresh" : "tested"
+        zoneTxt  = actIdx < 0 ? "price is outside every zone" : actTag + (actSide == 1 ? " demand · " : " supply · ") + str.tostring(actQual) + " · " + stateTxt
+        planTxt  = fired ? str.tostring(close, format.mintick) + " / " + str.tostring(slPrice, format.mintick) + " / " + str.tostring(tpPrice, format.mintick) : "—"
+
+        panel := table.new(position.top_right, 2, 7, border_width = 1, frame_color = color.new(color.gray, 50), frame_width = 1)
+        table.cell(panel, 0, 0, "S&D MTF", text_color = color.gray, text_size = size.tiny, text_halign = text.align_left)
         table.cell(panel, 1, 0, tfOK ? timeframe.period : timeframe.period + " ≠ " + tfWant, text_color = tfOK ? color.gray : color.orange, text_size = size.tiny)
-        table.cell(panel, 0, 1, "Demand", text_color = demandCol, text_size = size.tiny)
-        table.cell(panel, 1, 1, str.tostring(dCount), text_color = demandCol, text_size = size.tiny)
-        table.cell(panel, 0, 2, "Supply", text_color = supplyCol, text_size = size.tiny)
-        table.cell(panel, 1, 2, str.tostring(sCount), text_color = supplyCol, text_size = size.tiny)
-        table.cell(panel, 0, 3, "Found", text_color = color.gray, text_size = size.tiny)
-        table.cell(panel, 1, 3, str.tostring(foundTotal) + " (" + tune + ")", text_color = color.gray, text_size = size.tiny)
+        table.cell(panel, 0, 1, "Zones", text_color = color.gray, text_size = size.tiny, text_halign = text.align_left)
+        table.cell(panel, 1, 1, "D " + str.tostring(dCount) + "  ·  S " + str.tostring(sCount) + "  ·  " + str.tostring(foundTotal) + " found", text_color = color.gray, text_size = size.tiny)
+        table.cell(panel, 0, 2, "At", text_color = color.gray, text_size = size.tiny, text_halign = text.align_left)
+        table.cell(panel, 1, 2, zoneTxt, text_color = actIdx < 0 ? color.gray : (actSide == 1 ? demandCol : supplyCol), text_size = size.tiny)
+        table.cell(panel, 0, 3, tfMid, text_color = color.gray, text_size = size.tiny, text_halign = text.align_left)
+        table.cell(panel, 1, 3, ltfOK ? arrow(s15) + str.tostring(s15) : "not a lower timeframe", text_color = ltfOK ? biasCol(s15) : color.orange, text_size = size.tiny)
+        table.cell(panel, 0, 4, tfFast, text_color = color.gray, text_size = size.tiny, text_halign = text.align_left)
+        table.cell(panel, 1, 4, ltfOK ? arrow(s5) + str.tostring(s5) : "not a lower timeframe", text_color = ltfOK ? biasCol(s5) : color.orange, text_size = size.tiny)
+        table.cell(panel, 0, 5, "Verdict", text_color = color.gray, text_size = size.tiny, text_halign = text.align_left)
+        table.cell(panel, 1, 5, verdict, text_color = color.white, bgcolor = color.new(vColor, 25), text_size = size.small)
+        table.cell(panel, 0, 6, "E / SL / TP", text_color = color.gray, text_size = size.tiny, text_halign = text.align_left)
+        table.cell(panel, 1, 6, planTxt, text_color = fired ? vColor : color.gray, text_size = size.tiny)
 
 // An empty chart while the timeframe is locked usually means the wrong
 // timeframe, so say so instead of leaving it a mystery.
 var label warn = na
 if lockTF and not tfOK and barstate.islast
     label.delete(warn)
-    warn := label.new(bar_index, high, "S&D 4H is locked to " + tfWant + " — switch the chart, or turn the lock off in settings", style = label.style_label_down, color = color.new(color.orange, 10), textcolor = color.white, size = size.small)
+    warn := label.new(bar_index, high, "Zones are locked to " + tfWant + " — switch the chart, or turn the lock off in settings", style = label.style_label_down, color = color.new(color.orange, 10), textcolor = color.white, size = size.small)
