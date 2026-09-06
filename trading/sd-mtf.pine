@@ -94,6 +94,8 @@ breakOn     = input.string("Close", "Count a break on", options = ["Wick", "Clos
 overlapMax  = input.float(0.60, "Skip a zone overlapping a fresh one by", minval = 0.0, maxval = 1.0, step = 0.05, group = gZ)
 maxAge      = input.int(300, "Retire a zone after N zone-bars", minval = 20, group = gZ, tooltip = "Counted in bars of the zone timeframe, so it means the same thing whatever chart you are on.")
 extendRight = input.int(3, "Extend zone past the last bar", minval = 0, maxval = 100, group = gZ)
+anchorMode  = input.string("Auto", "Anchor boxes by", options = ["Auto", "Bar index", "Bar time"], group = gZ, tooltip = "Bar index is exact but only works when the chart IS the zone timeframe. Bar time is what lets a 4H zone land on a 15m chart. Auto picks the exact one whenever it can.")
+boxFromLeg  = input.bool(true, "Start the box at the leg-in candle", group = gZ, tooltip = "Off, the box covers only the base candles.")
 keepBroken  = input.bool(false, "Keep broken zones on the chart", group = gZ)
 maxZones    = input.int(20, "Max live zones per side", minval = 1, maxval = 100, group = gZ)
 
@@ -131,7 +133,9 @@ detectZone() =>
     bool  oSwp  = false
     float oProx = na
     float oDist = na
-    int   oTime = 0
+    int   oLen  = 0
+    int   oTIn  = 0    // open time of the leg-in candle
+    int   oTBase= 0    // open time of the first base candle
 
     if leg
         for n = minBase to maxBase
@@ -191,13 +195,16 @@ detectZone() =>
                             oCode := toDemand ? (legInBull ? 1 : 2) : (legInBull ? 4 : 3)
                             oProx := toDemand ? (zoneEdge == "Bodies" ? bTop : bHi) : (zoneEdge == "Bodies" ? bBot : bLo)
                             oDist := toDemand ? bLo : bHi
-                            oTime := time[n + 1]
-    [oSide, oProx, oDist, oQual, oCode, oFvg, oSwp, oTime]
+                            oLen  := n
+                            oTIn  := time[n + 1]
+                            oTBase:= time[n]
+    [oSide, oProx, oDist, oQual, oCode, oFvg, oSwp, oLen, oTIn, oTBase]
 
 tagOf(int code) =>
     code == 1 ? "RBR" : code == 2 ? "DBR" : code == 3 ? "DBD" : code == 4 ? "RBD" : ""
 
-[zSideR, zProxR, zDistR, zQualR, zCodeR, zFvgR, zSwpR, zTimeR] = request.security(syminfo.tickerid, tfZone, detectZone(), lookahead = barmerge.lookahead_off)
+[zSideR, zProxR, zDistR, zQualR, zCodeR, zFvgR, zSwpR, zLenR, zTInR, zTBaseR] = request.security(syminfo.tickerid, tfZone, detectZone(), lookahead = barmerge.lookahead_off)
+zTimeR = boxFromLeg ? zTInR : zTBaseR
 
 // ── Higher-timeframe bias ────────────────────────────────────────────────────
 // Two slow votes: where price sits against an average that must itself be
@@ -287,7 +294,13 @@ var array<Zone> zones = array.new<Zone>()
 
 chartMs = chartSec * 1000
 zoneMs  = timeframe.in_seconds(tfZone) * 1000
-rightT  = time + extendRight * chartMs
+
+// Bar indices are exact but only comparable when the chart IS the zone
+// timeframe; across timeframes only a timestamp survives the trip.
+sameTF    = tfZone == timeframe.period
+useIdx    = anchorMode == "Bar index" or (anchorMode == "Auto" and sameTF)
+rightEdge = useIdx ? bar_index + extendRight : time + extendRight * chartMs
+breakEdge = useIdx ? bar_index : time
 
 dropZone(int i) =>
     z = array.get(zones, i)
@@ -317,7 +330,7 @@ if array.size(zones) > 0
             z.state := 2
             box.set_bgcolor(z.bx, color.new(brokenCol, math.min(99, fillAlpha + 5)))
             box.set_border_color(z.bx, brokenCol)
-            box.set_right(z.bx, time)
+            box.set_right(z.bx, breakEdge)
             alert((z.side == 1 ? "Demand" : "Supply") + " zone broken at " + str.tostring(z.dist, format.mintick), alert.freq_once_per_bar)
             if not keepBroken
                 dropZone(i)
@@ -329,7 +342,7 @@ if array.size(zones) > 0
             if zoneMs > 0 and (time - z.bornT) / zoneMs > maxAge
                 dropZone(i)
             else
-                box.set_right(z.bx, rightT)
+                box.set_right(z.bx, rightEdge)
 
 // ── Taking delivery of a zone ────────────────────────────────────────────────
 // The request repeats its last answer on every chart bar inside one zone bar,
@@ -337,7 +350,13 @@ if array.size(zones) > 0
 var int lastZoneT = 0
 var int foundTotal = 0
 
-newZone = zSideR != 0 and zTimeR > lastZoneT and not na(zProxR) and not na(zDistR)
+// A request to a higher timeframe keeps answering from the bar still being
+// built. Taking delivery only when that bar has closed is the difference
+// between a zone and a guess that a half-formed candle happened to look like
+// one — and a guess still burns the key that would have let the real zone in.
+zoneBarClosed = ta.change(time(tfZone)) != 0 and barstate.isconfirmed
+
+newZone = zSideR != 0 and zoneBarClosed and zTimeR > lastZoneT and not na(zProxR) and not na(zDistR)
 patTop  = math.max(nz(zProxR), nz(zDistR))
 patBot  = math.min(nz(zProxR), nz(zDistR))
 
@@ -364,13 +383,14 @@ if newZone and not blocked
     grade    = zFvgR and zSwpR       // imbalance and liquidity: the A setup
     foundTotal += 1
 
-    bx = box.new(zTimeR, patTop, rightT, patBot, xloc = xloc.bar_time, border_color = col, border_width = grade ? 2 : 1, bgcolor = color.new(col, fillAlpha))
+    leftEdge = useIdx ? math.max(0, bar_index - zLenR - (boxFromLeg ? 1 : 0)) : zTimeR
+    bx = box.new(leftEdge, patTop, rightEdge, patBot, xloc = useIdx ? xloc.bar_index : xloc.bar_time, border_color = col, border_width = grade ? 2 : 1, bgcolor = color.new(col, fillAlpha))
     label lb = na
     if showLabels
-        lb := label.new(zTimeR, isDemand ? patBot : patTop, tag + " " + str.tostring(zQualR) + (zFvgR ? " ⚡" : "") + (zSwpR ? " ⌁" : ""),
-             xloc = xloc.bar_time, style = isDemand ? label.style_label_up : label.style_label_down,
+        lb := label.new(leftEdge, isDemand ? patBot : patTop, tag + " " + str.tostring(zQualR) + (zFvgR ? " ⚡" : "") + (zSwpR ? " ⌁" : ""),
+             xloc = useIdx ? xloc.bar_index : xloc.bar_time, style = isDemand ? label.style_label_up : label.style_label_down,
              color = color.new(col, 20), textcolor = color.white, size = size.tiny,
-             tooltip = "Proximal: " + str.tostring(zProxR, format.mintick) + "\nDistal: " + str.tostring(zDistR, format.mintick) + "\nImbalance: " + (zFvgR ? "yes" : "no") + "\nLiquidity swept: " + (zSwpR ? "yes" : "no"))
+             tooltip = "Base candles: " + str.tostring(zLenR) + "\nProximal: " + str.tostring(zProxR, format.mintick) + "\nDistal: " + str.tostring(zDistR, format.mintick) + "\nImbalance: " + (zFvgR ? "yes" : "no") + "\nLiquidity swept: " + (zSwpR ? "yes" : "no"))
 
     array.push(zones, Zone.new(bx = bx, lb = lb, side = zSideR, state = 0, touches = 0, inside = false, prox = zProxR, dist = zDistR, qual = zQualR, tag = tag, bornT = zTimeR, fvg = zFvgR, sweep = zSwpR))
 
