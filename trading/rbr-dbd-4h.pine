@@ -1,12 +1,16 @@
 //@version=6
-// Rally-Base-Rally (RBR) and Drop-Base-Drop (DBD) continuation zones.
+// All four supply & demand bases: the continuation pair RBR and DBD, and the
+// reversal pair RBD and DBR. The leg that LEAVES the base decides what the
+// base is — price left upward, so the base is demand; price left downward, so
+// the base is supply — and the leg that arrives only decides whether the setup
+// continues the move or turns it.
 //
 // A base is judged against the two legs that surround it, not against a fixed
 // ATR threshold: whatever is small next to the impulse that made it and the
 // impulse that left it is a base. That keeps the pattern recognisable on a
 // quiet 4H forex chart and on a violent one, and it means no candle can fall
 // into a gap between the two definitions and silently kill a valid setup.
-indicator("RBR / DBD Supply & Demand (4H)", "RBR/DBD", overlay = true, max_bars_back = 500, max_boxes_count = 500, max_labels_count = 500)
+indicator("RBR / DBD / RBD / DBR Zones (4H)", "S&D 4H", overlay = true, max_bars_back = 500, max_boxes_count = 500, max_labels_count = 500)
 
 // ── Timeframe ────────────────────────────────────────────────────────────────
 gTF    = "Timeframe"
@@ -38,8 +42,10 @@ minBase    = input.int(1, "Min base candles", minval = 1, maxval = 10, group = g
 maxBase    = input.int(6, "Max base candles", minval = 1, maxval = 10, group = gP)
 needBreak  = input.bool(true, "Leg-out must close beyond the base", group = gP)
 contiguous = input.bool(true, "Legs must touch the base", group = gP, tooltip = "Rejects a setup where the leg-in ends, or the leg-out starts, well away from the base — those are two separate moves, not one pattern.")
-showRBR    = input.bool(true, "Rally-Base-Rally (demand)", group = gP)
-showDBD    = input.bool(true, "Drop-Base-Drop (supply)", group = gP)
+showRBR    = input.bool(true, "RBR — Rally-Base-Rally (demand, continuation)", group = gP)
+showDBD    = input.bool(true, "DBD — Drop-Base-Drop (supply, continuation)", group = gP)
+showDBR    = input.bool(true, "DBR — Drop-Base-Rally (demand, reversal)", group = gP)
+showRBD    = input.bool(true, "RBD — Rally-Base-Drop (supply, reversal)", group = gP)
 
 // ── Zones ────────────────────────────────────────────────────────────────────
 gZ          = "Zones"
@@ -136,20 +142,25 @@ if array.size(zBox) > 0
 // The current bar is the leg-out. Behind it sit n base candles, and behind
 // those a leg-in pointing the same way. The smallest n that fits wins, so one
 // setup is never reported at several widths.
-int   patSide  = 0
-int   patLen   = 0
-int   patScore = 0
-float patProx  = na
-float patDist  = na
-float patTop   = na
-float patBot   = na
+int    patSide  = 0
+int    patLen   = 0
+int    patScore = 0
+string patName  = ""
+float  patProx  = na
+float  patDist  = na
+float  patTop   = na
+float  patBot   = na
 
 if canDetect and isLeg
     for n = minBase to maxBase
-        if patSide == 0 and isLeg[n + 1] and (isBull == isBull[n + 1])
-            // Both legs point the same way. Measure the base against the
-            // smaller of the two, so one oversized leg cannot excuse a base
-            // that is really just a third leg.
+        if patSide == 0 and isLeg[n + 1]
+            // The leg-out decides the side; the leg-in only names the pattern.
+            bool legInBull = isBull[n + 1]
+            bool toDemand  = isBull
+            bool allowed   = toDemand ? (legInBull ? showRBR : showDBR) : (legInBull ? showRBD : showDBD)
+
+            // Measure the base against the smaller of the two legs, so one
+            // oversized leg cannot excuse a base that is really a third leg.
             float legInBody  = math.abs(close[n + 1] - open[n + 1])
             float refBody    = math.max(math.min(body, legInBody), syminfo.mintick)
             float refRng     = math.max(math.min(rng, rng[n + 1]), syminfo.mintick)
@@ -175,10 +186,9 @@ if canDetect and isLeg
             joined  = not contiguous or (close[n + 1] >= bLo - tol and close[n + 1] <= bHi + tol and open >= bLo - tol and open <= bHi + tol)
 
             if allBase and tightBase and joined
-                rbr = showRBR and isBull and (not needBreak or close > bHi)
-                dbd = showDBD and isBear and (not needBreak or close < bLo)
+                departed = toDemand ? (not needBreak or close > bHi) : (not needBreak or close < bLo)
 
-                if rbr or dbd
+                if allowed and departed and (isBull or isBear)
                     // Quality: how hard price left, how tight the base was,
                     // and how few candles it spent there.
                     depart = math.min(1.0, rng / (2 * refRng))
@@ -187,13 +197,14 @@ if canDetect and isLeg
                     score  = int(math.round(40 * depart + 40 * tight + 20 * few))
 
                     if score >= minScore
-                        patSide  := rbr ? 1 : -1
+                        patSide  := toDemand ? 1 : -1
                         patLen   := n
                         patScore := score
-                        patProx  := rbr ? (zoneEdge == "Bodies" ? bTop : bHi) : (zoneEdge == "Bodies" ? bBot : bLo)
-                        patDist  := rbr ? bLo : bHi
-                        patTop   := rbr ? patProx : patDist
-                        patBot   := rbr ? patDist : patProx
+                        patName  := (legInBull ? "R" : "D") + "B" + (toDemand ? "R" : "D")
+                        patProx  := toDemand ? (zoneEdge == "Bodies" ? bTop : bHi) : (zoneEdge == "Bodies" ? bBot : bLo)
+                        patDist  := toDemand ? bLo : bHi
+                        patTop   := toDemand ? patProx : patDist
+                        patBot   := toDemand ? patDist : patProx
 
 // A fresh zone sitting on top of an untouched older one is the same level
 // twice; the older, deeper one is the one price actually turned from.
@@ -220,7 +231,7 @@ if patSide != 0 and not blocked
     bx = box.new(left, patTop, bar_index + extendRight, patBot, border_color = col, border_width = 1, bgcolor = color.new(col, fillAlpha))
     label lb = na
     if showLabels
-        lb := label.new(left, isDemand ? patBot : patTop, (isDemand ? "RBR " : "DBD ") + str.tostring(patScore),
+        lb := label.new(left, isDemand ? patBot : patTop, patName + " " + str.tostring(patScore),
              style = isDemand ? label.style_label_up : label.style_label_down,
              color = color.new(col, 20), textcolor = color.white, size = size.tiny,
              tooltip = "Base candles: " + str.tostring(patLen) + "\nProximal: " + str.tostring(patProx, format.mintick) + "\nDistal: " + str.tostring(patDist, format.mintick))
@@ -242,11 +253,15 @@ if patSide != 0 and not blocked
                 dropZone(i)
                 break
 
-    alert((isDemand ? "New RBR demand zone " : "New DBD supply zone ") + str.tostring(patProx, format.mintick) + " to " + str.tostring(patDist, format.mintick), alert.freq_once_per_bar)
+    alert("New " + patName + (isDemand ? " demand zone " : " supply zone ") + str.tostring(patProx, format.mintick) + " to " + str.tostring(patDist, format.mintick), alert.freq_once_per_bar)
 
 drawn = patSide != 0 and not blocked
-alertcondition(drawn and patSide ==  1, "New RBR demand zone", "Rally-Base-Rally demand zone formed on {{ticker}}")
-alertcondition(drawn and patSide == -1, "New DBD supply zone", "Drop-Base-Drop supply zone formed on {{ticker}}")
+alertcondition(drawn and patName == "RBR", "New RBR demand zone", "Rally-Base-Rally demand zone formed on {{ticker}}")
+alertcondition(drawn and patName == "DBR", "New DBR demand zone", "Drop-Base-Rally demand zone formed on {{ticker}}")
+alertcondition(drawn and patName == "DBD", "New DBD supply zone", "Drop-Base-Drop supply zone formed on {{ticker}}")
+alertcondition(drawn and patName == "RBD", "New RBD supply zone", "Rally-Base-Drop supply zone formed on {{ticker}}")
+alertcondition(drawn and patSide ==  1, "New demand zone (any)", "A demand zone formed on {{ticker}}")
+alertcondition(drawn and patSide == -1, "New supply zone (any)", "A supply zone formed on {{ticker}}")
 
 // ── Tuning panel ─────────────────────────────────────────────────────────────
 var table panel = na
@@ -261,7 +276,7 @@ if barstate.islast
                 dCount += (side ==  1 ? 1 : 0)
                 sCount += (side == -1 ? 1 : 0)
         panel := table.new(position.top_right, 2, 4, border_width = 1, frame_color = color.new(color.gray, 50), frame_width = 1)
-        table.cell(panel, 0, 0, "RBR/DBD", text_color = color.gray, text_size = size.tiny)
+        table.cell(panel, 0, 0, "S&D 4H", text_color = color.gray, text_size = size.tiny)
         table.cell(panel, 1, 0, tfOK ? timeframe.period : timeframe.period + " ≠ " + tfWant, text_color = tfOK ? color.gray : color.orange, text_size = size.tiny)
         table.cell(panel, 0, 1, "Demand", text_color = demandCol, text_size = size.tiny)
         table.cell(panel, 1, 1, str.tostring(dCount), text_color = demandCol, text_size = size.tiny)
@@ -275,4 +290,4 @@ if barstate.islast
 var label warn = na
 if lockTF and not tfOK and barstate.islast
     label.delete(warn)
-    warn := label.new(bar_index, high, "RBR/DBD is locked to " + tfWant + " — switch the chart, or turn the lock off in settings", style = label.style_label_down, color = color.new(color.orange, 10), textcolor = color.white, size = size.small)
+    warn := label.new(bar_index, high, "S&D 4H is locked to " + tfWant + " — switch the chart, or turn the lock off in settings", style = label.style_label_down, color = color.new(color.orange, 10), textcolor = color.white, size = size.small)
