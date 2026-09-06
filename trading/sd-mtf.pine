@@ -46,7 +46,7 @@ rangeCut = input.float(0.50, "Half of the range that counts", minval = 0.20, max
 
 // ── Detection ────────────────────────────────────────────────────────────────
 gD     = "Detection"
-tune   = input.string("Normal", "Strictness", options = ["Loose", "Normal", "Strict", "Custom"], group = gD)
+tune   = input.string("Balanced", "Strictness", options = ["Loose", "Balanced", "Normal", "Strict", "Custom"], group = gD, tooltip = "Each step tightens five thresholds at once and they multiply, so one step can cut the count several times over. Balanced sits between Loose and Normal for exactly that reason. To tune, switch to Custom and move ONE number at a time, watching Found in the panel.")
 atrLen = input.int(14, "ATR length", minval = 1, group = gD)
 
 gX        = "Custom thresholds (used only when Strictness = Custom)"
@@ -56,11 +56,15 @@ cBaseBody = input.float(0.50, "Base: max body (× leg body)", minval = 0.10, max
 cBaseRng  = input.float(1.00, "Base: max range (× leg range)", minval = 0.20, maxval = 2.00, step = 0.10, group = gX)
 cMinScore = input.int(30, "Min zone score", minval = 0, maxval = 100, group = gX)
 
-excitedBody = tune == "Loose" ? 0.45 : tune == "Normal" ? 0.55 : tune == "Strict" ? 0.62 : cExcited
-legAtrMin   = tune == "Loose" ? 0.70 : tune == "Normal" ? 1.00 : tune == "Strict" ? 1.40 : cLegAtr
-baseBodyK   = tune == "Loose" ? 0.65 : tune == "Normal" ? 0.50 : tune == "Strict" ? 0.35 : cBaseBody
-baseRangeK  = tune == "Loose" ? 1.30 : tune == "Normal" ? 1.00 : tune == "Strict" ? 0.70 : cBaseRng
-minScore    = tune == "Loose" ? 0    : tune == "Normal" ? 30   : tune == "Strict" ? 55   : cMinScore
+// Five thresholds move together and they multiply: if each rejects a third
+// of what reaches it, one step down the list finds a sixth as many setups.
+// Hence Balanced — the gap between Loose and Normal was a cliff, and the
+// leg-size rule is most of it, since it has to be satisfied by both legs.
+excitedBody = tune == "Loose" ? 0.45 : tune == "Balanced" ? 0.50 : tune == "Normal" ? 0.55 : tune == "Strict" ? 0.62 : cExcited
+legAtrMin   = tune == "Loose" ? 0.70 : tune == "Balanced" ? 0.85 : tune == "Normal" ? 1.00 : tune == "Strict" ? 1.40 : cLegAtr
+baseBodyK   = tune == "Loose" ? 0.65 : tune == "Balanced" ? 0.57 : tune == "Normal" ? 0.50 : tune == "Strict" ? 0.35 : cBaseBody
+baseRangeK  = tune == "Loose" ? 1.30 : tune == "Balanced" ? 1.15 : tune == "Normal" ? 1.00 : tune == "Strict" ? 0.70 : cBaseRng
+minScore    = tune == "Loose" ? 0    : tune == "Balanced" ? 15   : tune == "Normal" ? 30   : tune == "Strict" ? 55   : cMinScore
 
 // ── Pattern ──────────────────────────────────────────────────────────────────
 gP         = "Pattern"
