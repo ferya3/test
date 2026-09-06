@@ -95,7 +95,7 @@ overlapMax  = input.float(0.60, "Skip a zone overlapping a fresh one by", minval
 maxAge      = input.int(300, "Retire a zone after N zone-bars", minval = 20, group = gZ, tooltip = "Counted in bars of the zone timeframe, so it means the same thing whatever chart you are on.")
 extendRight = input.int(3, "Extend zone past the last bar", minval = 0, maxval = 100, group = gZ)
 anchorMode  = input.string("Auto", "Anchor boxes by", options = ["Auto", "Bar index", "Bar time"], group = gZ, tooltip = "Bar index is exact but only works when the chart IS the zone timeframe. Bar time is what lets a 4H zone land on a 15m chart. Auto picks the exact one whenever it can.")
-boxFromLeg  = input.bool(true, "Start the box at the leg-in candle", group = gZ, tooltip = "Off, the box covers only the base candles.")
+boxFromLeg  = input.bool(false, "Start the box at the leg-in candle", group = gZ, tooltip = "Off, the box covers exactly the base candles — which is what the zone is.")
 keepBroken  = input.bool(false, "Keep broken zones on the chart", group = gZ)
 maxZones    = input.int(20, "Max live zones per side", minval = 1, maxval = 100, group = gZ)
 
@@ -108,6 +108,7 @@ fillAlpha  = input.int(85, "Zone fill transparency", minval = 0, maxval = 100, g
 showLabels = input.bool(true, "Label each zone", group = gS)
 showTable  = input.bool(true, "Show the verdict panel", group = gS)
 showMarks  = input.bool(true, "Mark confirmed entries", group = gS)
+showLegs   = input.bool(false, "Mark the legs that made each zone", group = gS, tooltip = "Puts in and out on the two impulse candles the detector actually used. Turn this on when a box looks like it starts on the wrong candle: it says immediately whether the drawing is off or the pattern the script found is not the one you are looking at.")
 showTrack  = input.bool(true, "Track how the verdicts resolved", group = gS)
 
 // ── Zone detection ───────────────────────────────────────────────────────────
@@ -136,6 +137,7 @@ detectZone() =>
     int   oLen  = 0
     int   oTIn  = 0    // open time of the leg-in candle
     int   oTBase= 0    // open time of the first base candle
+    int   oTOut = 0    // open time of the leg-out candle
 
     if leg
         for n = minBase to maxBase
@@ -198,12 +200,13 @@ detectZone() =>
                             oLen  := n
                             oTIn  := time[n + 1]
                             oTBase:= time[n]
-    [oSide, oProx, oDist, oQual, oCode, oFvg, oSwp, oLen, oTIn, oTBase]
+                            oTOut := time
+    [oSide, oProx, oDist, oQual, oCode, oFvg, oSwp, oLen, oTIn, oTBase, oTOut]
 
 tagOf(int code) =>
     code == 1 ? "RBR" : code == 2 ? "DBR" : code == 3 ? "DBD" : code == 4 ? "RBD" : ""
 
-[zSideR, zProxR, zDistR, zQualR, zCodeR, zFvgR, zSwpR, zLenR, zTInR, zTBaseR] = request.security(syminfo.tickerid, tfZone, detectZone(), lookahead = barmerge.lookahead_off)
+[zSideR, zProxR, zDistR, zQualR, zCodeR, zFvgR, zSwpR, zLenR, zTInR, zTBaseR, zTOutR] = request.security(syminfo.tickerid, tfZone, detectZone(), lookahead = barmerge.lookahead_off)
 zTimeR = boxFromLeg ? zTInR : zTBaseR
 
 // ── Higher-timeframe bias ────────────────────────────────────────────────────
@@ -278,6 +281,8 @@ barAccurate = timeframe.in_seconds(tfZone) >= chartSec and timeframe.in_seconds(
 type Zone
     box    bx
     label  lb
+    label  lgIn
+    label  lgOut
     int    side        //  1 demand, -1 supply
     int    state       //  0 fresh, 1 tested, 2 broken
     int    touches
@@ -306,6 +311,8 @@ dropZone(int i) =>
     z = array.get(zones, i)
     box.delete(z.bx)
     label.delete(z.lb)
+    label.delete(z.lgIn)
+    label.delete(z.lgOut)
     array.remove(zones, i)
 
 // Walk the registry newest-first so a removal never shifts an index we have
@@ -381,18 +388,39 @@ if newZone and not blocked
     col      = isDemand ? demandCol : supplyCol
     tag      = tagOf(zCodeR)
     grade    = zFvgR and zSwpR       // imbalance and liquidity: the A setup
+    labelY   = isDemand ? patBot : patTop
+    labelSty = isDemand ? label.style_label_up : label.style_label_down
+    txt      = tag + " " + str.tostring(zQualR) + (zFvgR ? " ⚡" : "") + (zSwpR ? " ⌁" : "")
+    tip      = "Base candles: " + str.tostring(zLenR) + "\nProximal: " + str.tostring(zProxR, format.mintick) + "\nDistal: " + str.tostring(zDistR, format.mintick) + "\nImbalance: " + (zFvgR ? "yes" : "no") + "\nLiquidity swept: " + (zSwpR ? "yes" : "no")
     foundTotal += 1
 
-    leftEdge = useIdx ? math.max(0, bar_index - zLenR - (boxFromLeg ? 1 : 0)) : zTimeR
-    bx = box.new(leftEdge, patTop, rightEdge, patBot, xloc = useIdx ? xloc.bar_index : xloc.bar_time, border_color = col, border_width = grade ? 2 : 1, bgcolor = color.new(col, fillAlpha))
-    label lb = na
-    if showLabels
-        lb := label.new(leftEdge, isDemand ? patBot : patTop, tag + " " + str.tostring(zQualR) + (zFvgR ? " ⚡" : "") + (zSwpR ? " ⌁" : ""),
-             xloc = useIdx ? xloc.bar_index : xloc.bar_time, style = isDemand ? label.style_label_up : label.style_label_down,
-             color = color.new(col, 20), textcolor = color.white, size = size.tiny,
-             tooltip = "Base candles: " + str.tostring(zLenR) + "\nProximal: " + str.tostring(zProxR, format.mintick) + "\nDistal: " + str.tostring(zDistR, format.mintick) + "\nImbalance: " + (zFvgR ? "yes" : "no") + "\nLiquidity swept: " + (zSwpR ? "yes" : "no"))
+    box   bx    = na
+    label lb    = na
+    label lgIn  = na
+    label lgOut = na
 
-    array.push(zones, Zone.new(bx = bx, lb = lb, side = zSideR, state = 0, touches = 0, inside = false, prox = zProxR, dist = zDistR, qual = zQualR, tag = tag, bornT = zTimeR, fvg = zFvgR, sweep = zSwpR))
+    // Two addressings, two sets of calls: xloc wants a constant at the call
+    // site, and handing it a chosen value is how a script that reads fine
+    // fails to compile.
+    if useIdx
+        iLeft = math.max(0, bar_index - zLenR - (boxFromLeg ? 1 : 0))
+        iIn   = math.max(0, bar_index - zLenR - 1)
+        bx := box.new(iLeft, patTop, bar_index + extendRight, patBot, xloc = xloc.bar_index, border_color = col, border_width = grade ? 2 : 1, bgcolor = color.new(col, fillAlpha))
+        if showLabels
+            lb := label.new(iLeft, labelY, txt, xloc = xloc.bar_index, style = labelSty, color = color.new(col, 20), textcolor = color.white, size = size.tiny, tooltip = tip)
+        if showLegs
+            lgIn  := label.new(iIn, labelY, "in", xloc = xloc.bar_index, style = labelSty, color = color.new(col, 55), textcolor = color.white, size = size.tiny)
+            lgOut := label.new(bar_index, labelY, "out", xloc = xloc.bar_index, style = labelSty, color = color.new(col, 55), textcolor = color.white, size = size.tiny)
+    else
+        tRight = time + extendRight * chartMs
+        bx := box.new(zTimeR, patTop, tRight, patBot, xloc = xloc.bar_time, border_color = col, border_width = grade ? 2 : 1, bgcolor = color.new(col, fillAlpha))
+        if showLabels
+            lb := label.new(zTimeR, labelY, txt, xloc = xloc.bar_time, style = labelSty, color = color.new(col, 20), textcolor = color.white, size = size.tiny, tooltip = tip)
+        if showLegs
+            lgIn  := label.new(zTInR, labelY, "in", xloc = xloc.bar_time, style = labelSty, color = color.new(col, 55), textcolor = color.white, size = size.tiny)
+            lgOut := label.new(zTOutR, labelY, "out", xloc = xloc.bar_time, style = labelSty, color = color.new(col, 55), textcolor = color.white, size = size.tiny)
+
+    array.push(zones, Zone.new(bx = bx, lb = lb, lgIn = lgIn, lgOut = lgOut, side = zSideR, state = 0, touches = 0, inside = false, prox = zProxR, dist = zDistR, qual = zQualR, tag = tag, bornT = zTimeR, fvg = zFvgR, sweep = zSwpR))
 
     // Trim the oldest zone on this side once the registry is full.
     liveOnSide = 0
