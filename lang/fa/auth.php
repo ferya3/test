@@ -11,6 +11,9 @@ return [
     'no_access' => 'این حساب کاربری به پنل مدیریت دسترسی ندارد.',
 
     'two_factor' => [
-        'invalid' => 'کد وارد شده معتبر نیست.',
+        // The one cause the application cannot fix for the user is a clock:
+        // TOTP tolerates thirty seconds either way, so a phone or server that
+        // has drifted rejects every code with nothing to explain it.
+        'invalid' => 'کد وارد شده معتبر نیست. اگر کد را همین حالا از برنامه خوانده‌اید، ساعت دستگاه‌تان را بررسی کنید.',
     ],
 ];
