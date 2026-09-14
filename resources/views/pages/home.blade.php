@@ -89,7 +89,9 @@
                 </x-ui.button>
             </div>
 
-            <x-product.grid :products="$featuredProducts" :priority-count="0" />
+            {{-- Three across, not four: this strip shows six products, and four
+                 would leave a ragged row of two under a full one. --}}
+            <x-product.grid :products="$featuredProducts" :priority-count="0" :columns="3" />
         </x-layout.section>
     @endif
 

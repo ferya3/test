@@ -40,42 +40,29 @@
 
     <x-layout.section>
         {{--
-            Mobile first: on a phone the filter is a row of chips above the
-            grid, which is one thumb-reach and needs no drawer to open. From
-            `lg` it moves into a column beside the products, where there is room
-            for it to stay open.
-
-            One group, so it needs neither.
+            The filter bar sits above the grid rather than beside it. With one
+            or two questions to ask, a sidebar spent a quarter of every wide
+            screen on a column that was mostly empty — and that width is worth
+            more as a fourth product per row.
         --}}
-        <div class="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-10">
-            <div class="lg:w-56 lg:shrink-0">
-                <x-product.filters
-                    :filters="$filters"
-                    :facets="$facets"
-                    :groups="$filterGroups"
-                    :route="lroute('categories.show', ['category' => $category->slug])"
+        <x-product.filters
+            :filters="$filters"
+            :facets="$facets"
+            :groups="$filterGroups"
+            :route="lroute('categories.show', ['category' => $category->slug])"
+            :summary="__('ui.results_count', ['count' => $products->total()])"
+        />
+
+        <x-product.grid :products="$products">
+            <x-slot:empty>
+                <x-ui.empty-state
+                    :heading="__('product.empty.heading')"
+                    :body="__('product.empty.body')"
                 />
-            </div>
+            </x-slot:empty>
+        </x-product.grid>
 
-            <div class="min-w-0 flex-1">
-                <div class="mb-6 border-b border-border pb-4">
-                    <p class="text-body-sm text-text-muted">
-                        {{ __('ui.results_count', ['count' => $products->total()]) }}
-                    </p>
-                </div>
-
-                <x-product.grid :products="$products">
-                    <x-slot:empty>
-                        <x-ui.empty-state
-                            :heading="__('product.empty.heading')"
-                            :body="__('product.empty.body')"
-                        />
-                    </x-slot:empty>
-                </x-product.grid>
-
-                {{ $products->links() }}
-            </div>
-        </div>
+        {{ $products->links() }}
     </x-layout.section>
 
     @if ($category->description)
