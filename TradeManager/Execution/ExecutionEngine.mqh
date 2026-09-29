@@ -76,13 +76,13 @@ private:
    {
       switch(action)
       {
-         case ERR_RETRY_NOW:
+         case EXA_RETRY_NOW:
             ScheduleRetry(req, attempt + 1, m_cfg.retryDelayMs);
             break;
-         case ERR_RETRY_LATER:
+         case EXA_RETRY_LATER:
             ScheduleRetry(req, attempt + 1, m_cfg.laterDelayMs);
             break;
-         case ERR_REFRESH_STATE:
+         case EXA_REFRESH_STATE:
             m_refresh = true;
             m_retry.Cooldown(req, 1000);
             break;
@@ -97,7 +97,7 @@ private:
       out.req = req;
       out.success = false;
       out.deferred = false;
-      out.action = ERR_NO_RETRY;
+      out.action = EXA_NO_RETRY;
       out.retcode = 0;
       out.message = "";
 
@@ -123,7 +123,7 @@ private:
       out.action = action;
       out.message = m_errors.Describe(retcode);
 
-      if(action == ERR_SUCCESS)
+      if(action == EXA_SUCCESS)
       {
          out.success = true;
          m_retry.Clear(req.ticket, req.type);
@@ -167,7 +167,7 @@ public:
          out.req = req;
          out.success = false;
          out.deferred = true;
-         out.action = ERR_NO_RETRY;
+         out.action = EXA_NO_RETRY;
          out.retcode = 0;
          out.message = "deferred";
          return false;

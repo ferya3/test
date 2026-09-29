@@ -20,13 +20,13 @@ public:
 
    bool Validate(SExecRequest &req, string &why, ENUM_ERR_ACTION &action)
    {
-      action = ERR_NO_RETRY;
+      action = EXA_NO_RETRY;
 
       SPositionSnapshot pos;
       if(!m_broker.PositionByTicket(req.ticket, pos))
       {
          why = "position not found";
-         action = ERR_REFRESH_STATE;
+         action = EXA_REFRESH_STATE;
          return false;
       }
 
@@ -35,7 +35,7 @@ public:
       if(!m_broker.LoadRules(pos.symbol, rules, vol))
       {
          why = "symbol rules unavailable";
-         action = ERR_RETRY_LATER;
+         action = EXA_RETRY_LATER;
          return false;
       }
 
@@ -43,7 +43,7 @@ public:
       if(!m_broker.Tick(pos.symbol, bid, ask))
       {
          why = "no tick";
-         action = ERR_RETRY_LATER;
+         action = EXA_RETRY_LATER;
          return false;
       }
 
@@ -57,7 +57,7 @@ public:
             if(MathAbs(req.sl - pos.sl) < rules.point * 0.5)
             {
                why = "stop loss already at requested level";
-               action = ERR_REFRESH_STATE;
+               action = EXA_REFRESH_STATE;
                return false;
             }
             if(!rules.IsValidSL(isBuy, req.sl, bid, ask))
@@ -68,7 +68,7 @@ public:
             if(rules.IsFrozen(isBuy, pos.sl, pos.tp, bid, ask))
             {
                why = "position is inside the freeze level";
-               action = ERR_RETRY_LATER;
+               action = EXA_RETRY_LATER;
                return false;
             }
             return true;
@@ -85,7 +85,7 @@ public:
             if(rules.IsFrozen(isBuy, pos.sl, pos.tp, bid, ask))
             {
                why = "position is inside the freeze level";
-               action = ERR_RETRY_LATER;
+               action = EXA_RETRY_LATER;
                return false;
             }
             return true;
@@ -102,7 +102,7 @@ public:
             if(req.volume >= pos.volume - TM_EPS)
             {
                why = "partial volume covers the whole position";
-               action = ERR_REFRESH_STATE;
+               action = EXA_REFRESH_STATE;
                return false;
             }
             if(pos.volume - req.volume < vol.minVol - TM_EPS)
