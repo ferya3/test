@@ -4,7 +4,7 @@
 //| guard and crash recovery. It never opens trades.                 |
 //+------------------------------------------------------------------+
 #property copyright "TradeManager"
-#property version   "1.00"
+#property version   "1.30"
 #property description "Manages existing positions only: SL, break-even, trailing, partial close."
 
 #ifndef TM_ENGINE_MQH
@@ -3062,7 +3062,7 @@ public:
       ArrayResize(m_content, 0);
 
       Rect("bg", 0, 0, TM_PANEL_W, TM_PANEL_H, C'24,26,32', C'70,74,84');
-      Label("title", 8, 7, "TRADE MANAGER", clrWhite, 9);
+      Label("title", 8, 7, "TRADE MANAGER  v1.3 (SL/TP fields)", clrWhite, 9);
       Button("min", TM_PANEL_W - 30, 4, 22, 20, "_");
       SetButton("min", "_", C'55,58,66');
 
@@ -3345,7 +3345,9 @@ private:
       {
          if(i >= n)
          {
-            m_panel.SetRow(i, 0, "", clrSilver, 0.0, 0.0, 5);
+            const string hint = (i == 0) ? StringFormat("No managed positions (account has %d open; check magic / symbol scope)",
+                                                        m_broker.PositionCount()) : "";
+            m_panel.SetRow(i, 0, hint, C'240,190,80', 0.0, 0.0, 5);
             continue;
          }
          CManagedPosition *p = reg.At(i);

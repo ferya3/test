@@ -100,7 +100,9 @@ private:
       {
          if(i >= n)
          {
-            m_panel.SetRow(i, 0, "", clrSilver, 0.0, 0.0, 5);
+            const string hint = (i == 0) ? StringFormat("No managed positions (account has %d open; check magic / symbol scope)",
+                                                        m_broker.PositionCount()) : "";
+            m_panel.SetRow(i, 0, hint, C'240,190,80', 0.0, 0.0, 5);
             continue;
          }
          CManagedPosition *p = reg.At(i);

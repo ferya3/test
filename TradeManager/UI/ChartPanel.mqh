@@ -233,7 +233,7 @@ public:
       ArrayResize(m_content, 0);
 
       Rect("bg", 0, 0, TM_PANEL_W, TM_PANEL_H, C'24,26,32', C'70,74,84');
-      Label("title", 8, 7, "TRADE MANAGER", clrWhite, 9);
+      Label("title", 8, 7, "TRADE MANAGER  v1.3 (SL/TP fields)", clrWhite, 9);
       Button("min", TM_PANEL_W - 30, 4, 22, 20, "_");
       SetButton("min", "_", C'55,58,66');
 
