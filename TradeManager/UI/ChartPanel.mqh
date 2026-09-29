@@ -22,7 +22,7 @@ enum ENUM_PANEL_ACTION
    PANEL_BE_ALL,
    PANEL_CLOSE_HALF,
    PANEL_CLOSE_ALL,
-   PANEL_SET_LEVELS      // read the row with TakeLevels()
+   PANEL_SET_LEVELS      // Enter pressed in a SL/TP field; read the row with TakeLevels()
 };
 
 // Drawing and click handling only. It knows nothing about trading: the engine feeds it
@@ -34,8 +34,6 @@ private:
    int    m_y;
    bool   m_created;
    bool   m_minimized;
-   ulong  m_confirmHalfUntil;
-   ulong  m_confirmAllUntil;
    int    m_pendingRow;
    string m_content[];                 // hidden when the panel is minimized
 
@@ -153,19 +151,6 @@ private:
       ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, visible ? OBJ_ALL_PERIODS : OBJ_NO_PERIODS);
    }
 
-   // First click arms the button, a second click within 3 seconds confirms it.
-   bool Confirmed(ulong &until)
-   {
-      const ulong now = TM_NowMs();
-      if(now < until)
-      {
-         until = 0;
-         return true;
-      }
-      until = now + 3000;
-      return false;
-   }
-
    void ApplyVisibility()
    {
       for(int i = 0; i < ArraySize(m_content); i++)
@@ -176,7 +161,6 @@ private:
          Show(Name(RowId("row", i)), vis);
          Show(Name(RowId("sl", i)), vis);
          Show(Name(RowId("tp", i)), vis);
-         Show(Name(RowId("set", i)), vis);
       }
    }
 
@@ -217,7 +201,7 @@ public:
    CChartPanel()
    {
       m_x = 10; m_y = 20; m_created = false; m_minimized = false;
-      m_confirmHalfUntil = 0; m_confirmAllUntil = 0; m_pendingRow = -1;
+      m_pendingRow = -1;
       for(int i = 0; i < TM_PANEL_ROWS; i++)
       {
          m_rowText[i] = ""; m_rowColor[i] = clrSilver; m_rowTicket[i] = 0;
@@ -233,7 +217,7 @@ public:
       ArrayResize(m_content, 0);
 
       Rect("bg", 0, 0, TM_PANEL_W, TM_PANEL_H, C'24,26,32', C'70,74,84');
-      Label("title", 8, 7, "TRADE MANAGER  v1.3 (SL/TP fields)", clrWhite, 9);
+      Label("title", 8, 7, "TRADE MANAGER  v1.4", clrWhite, 9);
       Button("min", TM_PANEL_W - 30, 4, 22, 20, "_");
       SetButton("min", "_", C'55,58,66');
 
@@ -253,17 +237,15 @@ public:
       Button("closeall", 8 + 3*(aw+6), 116, aw, 22, "");  Track("closeall");
 
       Label("hdr",  8,   148, "POSITION", C'150,155,165', 8);   Track("hdr");
-      Label("hsl", 222,  148, "     SL", C'150,155,165', 8);   Track("hsl");
-      Label("htp", 302,  148, "     TP  (0 = none)", C'150,155,165', 8);   Track("htp");
+      Label("hsl", 222,  148, "SL", C'150,155,165', 8);   Track("hsl");
+      Label("htp", 328,  148, "TP   (Enter = apply, 0 = none)", C'150,155,165', 8);   Track("htp");
 
       for(int i = 0; i < TM_PANEL_ROWS; i++)
       {
          const int y = TM_PANEL_ROW_Y + i * TM_PANEL_ROW_H;
          Label(RowId("row", i), 8, y + 3, "", clrSilver, 8);
-         Edit(RowId("sl", i), 222, y, 76, 18);
-         Edit(RowId("tp", i), 302, y, 76, 18);
-         Button(RowId("set", i), 382, y, 44, 18, "SET");
-         SetButton(RowId("set", i), "SET", C'40,80,140');
+         Edit(RowId("sl", i), 222, y, 100, 18);
+         Edit(RowId("tp", i), 328, y, 100, 18);
       }
 
       m_created = true;
@@ -315,11 +297,10 @@ public:
       SetButton("trail",   trailOn   ? "TRAIL: ON"   : "TRAIL: OFF",   trailOn   ? on : off);
       SetButton("partial", partialOn ? "PARTIAL: ON" : "PARTIAL: OFF", partialOn ? on : off);
 
-      const ulong now = TM_NowMs();
       SetButton("pause",    paused ? "RESUME" : "PAUSE", paused ? C'170,120,20' : C'55,58,66');
       SetButton("beall",    "BE ALL", C'40,80,140');
-      SetButton("half",     now < m_confirmHalfUntil ? "CONFIRM?" : "CLOSE 50%", now < m_confirmHalfUntil ? C'190,60,60' : C'110,70,40');
-      SetButton("closeall", now < m_confirmAllUntil  ? "CONFIRM?" : "CLOSE ALL", now < m_confirmAllUntil  ? C'190,60,60' : C'130,40,40');
+      SetButton("half",     "CLOSE 50%", C'110,70,40');
+      SetButton("closeall", "CLOSE ALL", C'150,45,45');
 
       for(int i = 0; i < TM_PANEL_ROWS; i++)
       {
@@ -349,34 +330,27 @@ public:
          return PANEL_NONE;
       const string key = StringSubstr(sparam, StringLen(TM_PANEL_PREFIX));
 
-      // A field was edited: remember it so live values do not overwrite the typing.
-      if(id == CHARTEVENT_OBJECT_ENDEDIT)
+      const string kind = StringSubstr(key, 0, 2);
+      const bool isField = (kind == "sl" || kind == "tp");
+      const int fieldRow = isField ? (int)StringToInteger(StringSubstr(key, 2)) : -1;
+
+      if(isField && fieldRow >= 0 && fieldRow < TM_PANEL_ROWS)
       {
-         const string kind = StringSubstr(key, 0, 2);
-         if(kind == "sl" || kind == "tp")
+         // Clicking into a field starts an edit: stop refreshing this row so typing is not overwritten.
+         if(id == CHARTEVENT_OBJECT_CLICK)
+            m_rowDirty[fieldRow] = true;
+         // Enter (or leaving the field) ends the edit: apply it.
+         if(id == CHARTEVENT_OBJECT_ENDEDIT && m_rowTicket[fieldRow] != 0)
          {
-            const int row = (int)StringToInteger(StringSubstr(key, 2));
-            if(row >= 0 && row < TM_PANEL_ROWS)
-               m_rowDirty[row] = true;
+            m_rowDirty[fieldRow] = true;
+            m_pendingRow = fieldRow;
+            return PANEL_SET_LEVELS;
          }
          return PANEL_NONE;
       }
 
       if(id != CHARTEVENT_OBJECT_CLICK)
          return PANEL_NONE;
-
-      if(StringSubstr(key, 0, 3) == "set")
-      {
-         ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
-         const int row = (int)StringToInteger(StringSubstr(key, 3));
-         if(row < 0 || row >= TM_PANEL_ROWS || m_rowTicket[row] == 0)
-            return PANEL_NONE;
-         m_pendingRow = row;
-         return PANEL_SET_LEVELS;
-      }
-
-      if(StringSubstr(key, 0, 2) == "sl" || StringSubstr(key, 0, 2) == "tp")
-         return PANEL_NONE;               // click inside a field
 
       ObjectSetInteger(0, sparam, OBJPROP_STATE, false);   // buttons never stay pressed
 
@@ -392,8 +366,8 @@ public:
       if(key == "partial")  return PANEL_TOGGLE_PARTIAL;
       if(key == "pause")    return PANEL_TOGGLE_PAUSE;
       if(key == "beall")    return PANEL_BE_ALL;
-      if(key == "half")     return Confirmed(m_confirmHalfUntil) ? PANEL_CLOSE_HALF : PANEL_NONE;
-      if(key == "closeall") return Confirmed(m_confirmAllUntil)  ? PANEL_CLOSE_ALL  : PANEL_NONE;
+      if(key == "half")     return PANEL_CLOSE_HALF;
+      if(key == "closeall") return PANEL_CLOSE_ALL;
       return PANEL_NONE;
    }
 
@@ -412,10 +386,13 @@ public:
          Logger.Warn("Panel", "SL/TP must be plain numbers (digits and one dot); nothing was sent");
          return false;
       }
+      m_rowDirty[row] = false;              // live values take over again after the edit
+      const double half = 0.5 * MathPow(10.0, -m_rowDigits[row]);
+      if(MathAbs(s - m_rowSL[row]) < half && MathAbs(t - m_rowTP[row]) < half)
+         return false;                      // entered and left the field without changing anything
       ticket = m_rowTicket[row];
       sl = s;
       tp = t;
-      m_rowDirty[row] = false;
       return true;
    }
 };
