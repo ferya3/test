@@ -532,6 +532,7 @@ enum ENUM_EXEC_TYPE
 {
    EXEC_MODIFY_SL = 0,
    EXEC_MODIFY_TP,
+   EXEC_MODIFY_LEVELS,     // SL and TP together, 0 = none (manual use)
    EXEC_CLOSE,
    EXEC_PARTIAL_CLOSE
 };
@@ -542,6 +543,7 @@ string TM_ExecTypeText(const ENUM_EXEC_TYPE t)
    {
       case EXEC_MODIFY_SL:     return "MODIFY_SL";
       case EXEC_MODIFY_TP:     return "MODIFY_TP";
+      case EXEC_MODIFY_LEVELS: return "MODIFY_LEVELS";
       case EXEC_CLOSE:         return "CLOSE";
       case EXEC_PARTIAL_CLOSE: return "PARTIAL_CLOSE";
    }
@@ -560,13 +562,14 @@ struct SExecRequest
    int            level;      // partial level, -1 when not a partial
    int            flags;      // management flags to set on success
    bool           initial;    // sl becomes the position's initial SL on success
+   bool           manual;     // typed by the user: never retried, never put on cooldown
    string         reason;
 
    void Reset()
    {
       type = EXEC_MODIFY_SL; ticket = 0;
       sl = 0.0; tp = 0.0; volume = 0.0;
-      level = -1; flags = 0; initial = false; reason = "";
+      level = -1; flags = 0; initial = false; manual = false; reason = "";
    }
 };
 
@@ -584,6 +587,14 @@ public:
    {
       r.Reset();
       r.type = EXEC_MODIFY_TP; r.ticket = ticket; r.tp = tp; r.reason = reason;
+   }
+
+   // Explicit SL and TP for a position. 0 removes a level.
+   void ModifyLevels(const ulong ticket, const double sl, const double tp,
+                     const string reason, SExecRequest &r) const
+   {
+      r.Reset();
+      r.type = EXEC_MODIFY_LEVELS; r.ticket = ticket; r.sl = sl; r.tp = tp; r.reason = reason; r.manual = true;
    }
 
    void Close(const ulong ticket, const int level, const string reason, SExecRequest &r) const
@@ -1611,6 +1622,12 @@ public:
          case EXEC_MODIFY_TP:
             p.tp = req.tp;
             break;
+         case EXEC_MODIFY_LEVELS:
+            p.sl = req.sl;
+            p.tp = req.tp;
+            if(req.sl > 0.0 && p.initialSL <= 0.0 && p.IsRiskSideSL(req.sl))
+               p.SetInitialSL(req.sl);
+            break;
          case EXEC_PARTIAL_CLOSE:
             p.volume -= req.volume;
             p.MarkPartial(req.level);
@@ -2248,6 +2265,44 @@ public:
             return true;
          }
 
+         case EXEC_MODIFY_LEVELS:
+         {
+            if(req.sl < 0.0 || req.tp < 0.0)
+            {
+               why = "negative price";
+               return false;
+            }
+            if(req.sl > 0.0) req.sl = rules.NormalizePrice(req.sl);
+            if(req.tp > 0.0) req.tp = rules.NormalizePrice(req.tp);
+
+            const bool slChanged = MathAbs(req.sl - pos.sl) >= rules.point * 0.5;
+            const bool tpChanged = MathAbs(req.tp - pos.tp) >= rules.point * 0.5;
+            if(!slChanged && !tpChanged)
+            {
+               why = "levels already as requested";
+               return false;
+            }
+            // Only levels that actually change are checked: an untouched one may already
+            // sit inside the stop distance after the market moved.
+            if(slChanged && req.sl > 0.0 && !rules.IsValidSL(isBuy, req.sl, bid, ask))
+            {
+               why = StringFormat("SL %s violates minimum stop distance", DoubleToString(req.sl, rules.digits));
+               return false;
+            }
+            if(tpChanged && req.tp > 0.0 && !rules.IsValidTP(isBuy, req.tp, bid, ask))
+            {
+               why = StringFormat("TP %s violates minimum stop distance", DoubleToString(req.tp, rules.digits));
+               return false;
+            }
+            if(rules.IsFrozen(isBuy, pos.sl, pos.tp, bid, ask))
+            {
+               why = "position is inside the freeze level";
+               action = EXA_RETRY_LATER;
+               return false;
+            }
+            return true;
+         }
+
          case EXEC_PARTIAL_CLOSE:
          {
             req.volume = vol.Normalize(req.volume);
@@ -2329,6 +2384,7 @@ private:
       {
          case EXEC_MODIFY_SL:     m_broker.ModifyPosition(req.ticket, req.sl, live.tp); break;
          case EXEC_MODIFY_TP:     m_broker.ModifyPosition(req.ticket, live.sl, req.tp); break;
+         case EXEC_MODIFY_LEVELS: m_broker.ModifyPosition(req.ticket, req.sl, req.tp); break;
          case EXEC_CLOSE:         m_broker.ClosePosition(req.ticket, 0.0); break;
          case EXEC_PARTIAL_CLOSE: m_broker.ClosePosition(req.ticket, req.volume); break;
       }
@@ -2350,6 +2406,13 @@ private:
 
    void HandleFailure(const SExecRequest &req, const int attempt, const ENUM_ERR_ACTION action)
    {
+      // A request the user typed is reported and dropped, so they can correct it and try again at once.
+      if(req.manual)
+      {
+         if(action == EXA_REFRESH_STATE)
+            m_refresh = true;
+         return;
+      }
       switch(action)
       {
          case EXA_RETRY_NOW:
@@ -2438,7 +2501,7 @@ public:
    // Sends a request unless the same one is already waiting for a retry or cooling down.
    bool Submit(SExecRequest &req, SExecOutcome &out)
    {
-      if(m_retry.IsBlocked(req.ticket, req.type))
+      if(!req.manual && m_retry.IsBlocked(req.ticket, req.type))
       {
          out.req = req;
          out.success = false;
@@ -2690,6 +2753,27 @@ public:
       m_state.Flush();
    }
 
+   // SL/TP typed on the panel. Unlike automation, this may widen or remove a level;
+   // it is still checked against the broker's stop and freeze rules.
+   void ManualSetLevels(const ulong ticket, const double sl, const double tp)
+   {
+      string why;
+      if(!m_guard.CanAct(why))
+      {
+         Logger.Warn("Manual", "levels not sent: " + why);
+         return;
+      }
+      CRequestBuilder builder;
+      SExecRequest r;
+      builder.ModifyLevels(ticket, sl, tp, "manual levels", r);
+      SExecOutcome out;
+      if(m_exec.Submit(r, out))
+         m_protection.OnExecuted(out.req);
+      else
+         Logger.Warn("Manual", StringFormat("#%I64u SL/TP not applied: %s", ticket, out.message));
+      m_state.Flush();
+   }
+
    void ManualPartial(const double percent)
    {
       Logger.Info("Manual", StringFormat("close %.0f%% of every managed position", percent));
@@ -2748,11 +2832,14 @@ public:
 
 
 
+
 #define TM_PANEL_PREFIX "TMP_"
 #define TM_PANEL_ROWS   6
-#define TM_PANEL_W      340
-#define TM_PANEL_H      252
+#define TM_PANEL_W      440
+#define TM_PANEL_H      296
 #define TM_PANEL_H_MIN  30
+#define TM_PANEL_ROW_Y  166
+#define TM_PANEL_ROW_H  20
 
 enum ENUM_PANEL_ACTION
 {
@@ -2763,11 +2850,12 @@ enum ENUM_PANEL_ACTION
    PANEL_TOGGLE_PAUSE,
    PANEL_BE_ALL,
    PANEL_CLOSE_HALF,
-   PANEL_CLOSE_ALL
+   PANEL_CLOSE_ALL,
+   PANEL_SET_LEVELS      // read the row with TakeLevels()
 };
 
 // Drawing and click handling only. It knows nothing about trading: the engine feeds it
-// numbers with Render() and reacts to the action HandleEvent() returns.
+// numbers with SetRow()/Render() and reacts to the action HandleEvent() returns.
 class CChartPanel
 {
 private:
@@ -2777,11 +2865,19 @@ private:
    bool   m_minimized;
    ulong  m_confirmHalfUntil;
    ulong  m_confirmAllUntil;
-   string m_content[];          // objects hidden when the panel is minimized
+   int    m_pendingRow;
+   string m_content[];                 // hidden when the panel is minimized
+
    string m_rowText[TM_PANEL_ROWS];
    color  m_rowColor[TM_PANEL_ROWS];
+   ulong  m_rowTicket[TM_PANEL_ROWS];  // 0 = row unused
+   double m_rowSL[TM_PANEL_ROWS];
+   double m_rowTP[TM_PANEL_ROWS];
+   int    m_rowDigits[TM_PANEL_ROWS];
+   bool   m_rowDirty[TM_PANEL_ROWS];   // the user has typed in this row's fields
 
    string Name(const string id) const { return TM_PANEL_PREFIX + id; }
+   string RowId(const string kind, const int i) const { return kind + IntegerToString(i); }
 
    void Track(const string id)
    {
@@ -2842,6 +2938,24 @@ private:
       ObjectSetInteger(0, n, OBJPROP_STATE, false);
    }
 
+   void Edit(const string id, const int x, const int y, const int w, const int h)
+   {
+      Base(id, OBJ_EDIT);
+      const string n = Name(id);
+      ObjectSetInteger(0, n, OBJPROP_XDISTANCE, m_x + x);
+      ObjectSetInteger(0, n, OBJPROP_YDISTANCE, m_y + y);
+      ObjectSetInteger(0, n, OBJPROP_XSIZE, w);
+      ObjectSetInteger(0, n, OBJPROP_YSIZE, h);
+      ObjectSetInteger(0, n, OBJPROP_FONTSIZE, 8);
+      ObjectSetString(0, n, OBJPROP_FONT, "Consolas");
+      ObjectSetInteger(0, n, OBJPROP_ALIGN, ALIGN_RIGHT);
+      ObjectSetInteger(0, n, OBJPROP_READONLY, false);
+      ObjectSetInteger(0, n, OBJPROP_COLOR, clrWhite);
+      ObjectSetInteger(0, n, OBJPROP_BGCOLOR, C'38,42,52');
+      ObjectSetInteger(0, n, OBJPROP_BORDER_COLOR, C'90,90,90');
+      ObjectSetString(0, n, OBJPROP_TEXT, "0");
+   }
+
    void SetText(const string id, const string text, const color clr)
    {
       ObjectSetString(0, Name(id), OBJPROP_TEXT, text);
@@ -2853,6 +2967,19 @@ private:
       ObjectSetString(0, Name(id), OBJPROP_TEXT, text);
       ObjectSetInteger(0, Name(id), OBJPROP_BGCOLOR, bg);
       ObjectSetInteger(0, Name(id), OBJPROP_COLOR, clrWhite);
+   }
+
+   // Writes a field only when it differs, so a field being edited is not disturbed.
+   void SetEditText(const string id, const string text, const color bg)
+   {
+      if(ObjectGetString(0, Name(id), OBJPROP_TEXT) != text)
+         ObjectSetString(0, Name(id), OBJPROP_TEXT, text);
+      ObjectSetInteger(0, Name(id), OBJPROP_BGCOLOR, bg);
+   }
+
+   void Show(const string name, const bool visible)
+   {
+      ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, visible ? OBJ_ALL_PERIODS : OBJ_NO_PERIODS);
    }
 
    // First click arms the button, a second click within 3 seconds confirms it.
@@ -2868,21 +2995,63 @@ private:
       return false;
    }
 
+   void ApplyVisibility()
+   {
+      for(int i = 0; i < ArraySize(m_content); i++)
+         Show(m_content[i], !m_minimized);
+      for(int i = 0; i < TM_PANEL_ROWS; i++)
+      {
+         const bool vis = !m_minimized && m_rowTicket[i] != 0;
+         Show(Name(RowId("row", i)), vis);
+         Show(Name(RowId("sl", i)), vis);
+         Show(Name(RowId("tp", i)), vis);
+         Show(Name(RowId("set", i)), vis);
+      }
+   }
+
    void Layout()
    {
       ObjectSetInteger(0, Name("bg"), OBJPROP_YSIZE, m_minimized ? TM_PANEL_H_MIN : TM_PANEL_H);
       ObjectSetString(0, Name("min"), OBJPROP_TEXT, m_minimized ? "+" : "_");
-      const long tf = m_minimized ? OBJ_NO_PERIODS : OBJ_ALL_PERIODS;
-      for(int i = 0; i < ArraySize(m_content); i++)
-         ObjectSetInteger(0, m_content[i], OBJPROP_TIMEFRAMES, tf);
+      ApplyVisibility();
+   }
+
+   // Digits, at most one dot, or empty (= 0, "no level").
+   bool ParsePrice(string text, double &value) const
+   {
+      StringReplace(text, ",", ".");
+      StringTrimLeft(text);
+      StringTrimRight(text);
+      if(text == "")
+      {
+         value = 0.0;
+         return true;
+      }
+      int dots = 0;
+      for(int i = 0; i < StringLen(text); i++)
+      {
+         const ushort c = StringGetCharacter(text, i);
+         if(c == '.')
+            dots++;
+         else if(c < '0' || c > '9')
+            return false;
+      }
+      if(dots > 1)
+         return false;
+      value = StringToDouble(text);
+      return true;
    }
 
 public:
    CChartPanel()
    {
       m_x = 10; m_y = 20; m_created = false; m_minimized = false;
-      m_confirmHalfUntil = 0; m_confirmAllUntil = 0;
-      for(int i = 0; i < TM_PANEL_ROWS; i++) { m_rowText[i] = ""; m_rowColor[i] = clrSilver; }
+      m_confirmHalfUntil = 0; m_confirmAllUntil = 0; m_pendingRow = -1;
+      for(int i = 0; i < TM_PANEL_ROWS; i++)
+      {
+         m_rowText[i] = ""; m_rowColor[i] = clrSilver; m_rowTicket[i] = 0;
+         m_rowSL[i] = 0.0; m_rowTP[i] = 0.0; m_rowDigits[i] = 5; m_rowDirty[i] = false;
+      }
    }
 
    bool Create(const int x, const int y)
@@ -2901,21 +3070,29 @@ public:
       Label("l2", 8, 48, "", clrSilver, 9);   Track("l2");
       Label("l3", 8, 64, "", clrSilver, 9);   Track("l3");
 
-      const int tw = 104;
+      const int tw = 137;
       Button("be",      8,            88, tw, 22, "");  Track("be");
       Button("trail",   8 + tw + 6,   88, tw, 22, "");  Track("trail");
       Button("partial", 8 + 2*(tw+6), 88, tw, 22, "");  Track("partial");
 
-      const int aw = 76;
+      const int aw = 101;
       Button("pause",    8,            116, aw, 22, "");  Track("pause");
       Button("beall",    8 + aw + 6,   116, aw, 22, "");  Track("beall");
       Button("half",     8 + 2*(aw+6), 116, aw, 22, "");  Track("half");
       Button("closeall", 8 + 3*(aw+6), 116, aw, 22, "");  Track("closeall");
 
+      Label("hdr",  8,   148, "POSITION", C'150,155,165', 8);   Track("hdr");
+      Label("hsl", 222,  148, "     SL", C'150,155,165', 8);   Track("hsl");
+      Label("htp", 302,  148, "     TP  (0 = none)", C'150,155,165', 8);   Track("htp");
+
       for(int i = 0; i < TM_PANEL_ROWS; i++)
       {
-         Label("row" + IntegerToString(i), 8, 148 + i * 16, "", clrSilver, 8);
-         Track("row" + IntegerToString(i));
+         const int y = TM_PANEL_ROW_Y + i * TM_PANEL_ROW_H;
+         Label(RowId("row", i), 8, y + 3, "", clrSilver, 8);
+         Edit(RowId("sl", i), 222, y, 76, 18);
+         Edit(RowId("tp", i), 302, y, 76, 18);
+         Button(RowId("set", i), 382, y, 44, 18, "SET");
+         SetButton(RowId("set", i), "SET", C'40,80,140');
       }
 
       m_created = true;
@@ -2930,12 +3107,20 @@ public:
       m_created = false;
    }
 
-   void SetRow(const int index, const string text, const color clr)
+   // ticket 0 clears the row.
+   void SetRow(const int index, const ulong ticket, const string text, const color clr,
+               const double sl, const double tp, const int digits)
    {
       if(index < 0 || index >= TM_PANEL_ROWS)
          return;
-      m_rowText[index] = text;
-      m_rowColor[index] = clr;
+      if(m_rowTicket[index] != ticket)
+         m_rowDirty[index] = false;          // another position moved into this row
+      m_rowTicket[index] = ticket;
+      m_rowText[index]   = text;
+      m_rowColor[index]  = clr;
+      m_rowSL[index]     = sl;
+      m_rowTP[index]     = tp;
+      m_rowDigits[index] = digits;
    }
 
    void Render(const int positions, const double openRisk, const double openRiskPct,
@@ -2966,19 +3151,63 @@ public:
       SetButton("closeall", now < m_confirmAllUntil  ? "CONFIRM?" : "CLOSE ALL", now < m_confirmAllUntil  ? C'190,60,60' : C'130,40,40');
 
       for(int i = 0; i < TM_PANEL_ROWS; i++)
-         SetText("row" + IntegerToString(i), m_rowText[i], m_rowColor[i]);
-
+      {
+         SetText(RowId("row", i), m_rowText[i], m_rowColor[i]);
+         if(m_rowTicket[i] == 0)
+            continue;
+         if(m_rowDirty[i])
+         {
+            // Typed but not applied yet: keep the user's text, tint the fields.
+            SetEditText(RowId("sl", i), ObjectGetString(0, Name(RowId("sl", i)), OBJPROP_TEXT), C'80,64,20');
+            SetEditText(RowId("tp", i), ObjectGetString(0, Name(RowId("tp", i)), OBJPROP_TEXT), C'80,64,20');
+         }
+         else
+         {
+            SetEditText(RowId("sl", i), DoubleToString(m_rowSL[i], m_rowDigits[i]), C'38,42,52');
+            SetEditText(RowId("tp", i), DoubleToString(m_rowTP[i], m_rowDigits[i]), C'38,42,52');
+         }
+      }
+      ApplyVisibility();
       ChartRedraw();
    }
 
    // Call from OnChartEvent. Returns the action the engine should perform, if any.
    ENUM_PANEL_ACTION HandleEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
    {
-      if(!m_created || id != CHARTEVENT_OBJECT_CLICK || StringFind(sparam, TM_PANEL_PREFIX) != 0)
+      if(!m_created || StringFind(sparam, TM_PANEL_PREFIX) != 0)
+         return PANEL_NONE;
+      const string key = StringSubstr(sparam, StringLen(TM_PANEL_PREFIX));
+
+      // A field was edited: remember it so live values do not overwrite the typing.
+      if(id == CHARTEVENT_OBJECT_ENDEDIT)
+      {
+         const string kind = StringSubstr(key, 0, 2);
+         if(kind == "sl" || kind == "tp")
+         {
+            const int row = (int)StringToInteger(StringSubstr(key, 2));
+            if(row >= 0 && row < TM_PANEL_ROWS)
+               m_rowDirty[row] = true;
+         }
+         return PANEL_NONE;
+      }
+
+      if(id != CHARTEVENT_OBJECT_CLICK)
          return PANEL_NONE;
 
+      if(StringSubstr(key, 0, 3) == "set")
+      {
+         ObjectSetInteger(0, sparam, OBJPROP_STATE, false);
+         const int row = (int)StringToInteger(StringSubstr(key, 3));
+         if(row < 0 || row >= TM_PANEL_ROWS || m_rowTicket[row] == 0)
+            return PANEL_NONE;
+         m_pendingRow = row;
+         return PANEL_SET_LEVELS;
+      }
+
+      if(StringSubstr(key, 0, 2) == "sl" || StringSubstr(key, 0, 2) == "tp")
+         return PANEL_NONE;               // click inside a field
+
       ObjectSetInteger(0, sparam, OBJPROP_STATE, false);   // buttons never stay pressed
-      const string key = StringSubstr(sparam, StringLen(TM_PANEL_PREFIX));
 
       if(key == "min")
       {
@@ -2995,6 +3224,28 @@ public:
       if(key == "half")     return Confirmed(m_confirmHalfUntil) ? PANEL_CLOSE_HALF : PANEL_NONE;
       if(key == "closeall") return Confirmed(m_confirmAllUntil)  ? PANEL_CLOSE_ALL  : PANEL_NONE;
       return PANEL_NONE;
+   }
+
+   // After PANEL_SET_LEVELS: the ticket and the SL/TP typed on that row.
+   bool TakeLevels(ulong &ticket, double &sl, double &tp)
+   {
+      const int row = m_pendingRow;
+      m_pendingRow = -1;
+      if(row < 0 || row >= TM_PANEL_ROWS || m_rowTicket[row] == 0)
+         return false;
+
+      double s = 0.0, t = 0.0;
+      if(!ParsePrice(ObjectGetString(0, Name(RowId("sl", row)), OBJPROP_TEXT), s) ||
+         !ParsePrice(ObjectGetString(0, Name(RowId("tp", row)), OBJPROP_TEXT), t))
+      {
+         Logger.Warn("Panel", "SL/TP must be plain numbers (digits and one dot); nothing was sent");
+         return false;
+      }
+      ticket = m_rowTicket[row];
+      sl = s;
+      tp = t;
+      m_rowDirty[row] = false;
+      return true;
    }
 };
 
@@ -3092,20 +3343,17 @@ private:
 
       for(int i = 0; i < slots; i++)
       {
-         if(i == slots - 1 && n > slots)
-         {
-            m_panel.SetRow(i, StringFormat("... and %d more", n - slots + 1), clrSilver);
-            continue;
-         }
          if(i >= n)
          {
-            m_panel.SetRow(i, "", clrSilver);
+            m_panel.SetRow(i, 0, "", clrSilver, 0.0, 0.0, 5);
             continue;
          }
          CManagedPosition *p = reg.At(i);
-         m_panel.SetRow(i, StringFormat("#%I64u %s %s %.2f %9.2f %s", p.ticket, p.symbol,
-                        p.IsBuy() ? "B" : "S", p.volume, p.profit, TM_StateText(p.state)),
-                        p.profit >= 0.0 ? C'110,210,130' : C'235,110,110');
+         m_panel.SetRow(i, p.ticket,
+                        StringFormat("#%I64u %s %s %.2f %.2f", p.ticket, p.symbol,
+                                     p.IsBuy() ? "B" : "S", p.volume, p.profit),
+                        p.profit >= 0.0 ? C'110,210,130' : C'235,110,110',
+                        p.sl, p.tp, (int)SymbolInfoInteger(p.symbol, SYMBOL_DIGITS));
       }
 
       m_panel.Render(n, m_risk.exposure.openRiskMoney, m_risk.exposure.openRiskPct,
@@ -3168,7 +3416,7 @@ public:
 
    void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
    {
-      if(!InpShowPanel || id != CHARTEVENT_OBJECT_CLICK)
+      if(!InpShowPanel || (id != CHARTEVENT_OBJECT_CLICK && id != CHARTEVENT_OBJECT_ENDEDIT))
          return;
 
       switch(m_panel.HandleEvent(id, lparam, dparam, sparam))
@@ -3198,6 +3446,14 @@ public:
          case PANEL_CLOSE_ALL:
             m_dispatch.ManualCloseAll();
             break;
+         case PANEL_SET_LEVELS:
+         {
+            ulong ticket = 0;
+            double sl = 0.0, tp = 0.0;
+            if(m_panel.TakeLevels(ticket, sl, tp))
+               m_dispatch.ManualSetLevels(ticket, sl, tp);
+            break;
+         }
          default:
             break;
       }

@@ -5,6 +5,7 @@ enum ENUM_EXEC_TYPE
 {
    EXEC_MODIFY_SL = 0,
    EXEC_MODIFY_TP,
+   EXEC_MODIFY_LEVELS,     // SL and TP together, 0 = none (manual use)
    EXEC_CLOSE,
    EXEC_PARTIAL_CLOSE
 };
@@ -15,6 +16,7 @@ string TM_ExecTypeText(const ENUM_EXEC_TYPE t)
    {
       case EXEC_MODIFY_SL:     return "MODIFY_SL";
       case EXEC_MODIFY_TP:     return "MODIFY_TP";
+      case EXEC_MODIFY_LEVELS: return "MODIFY_LEVELS";
       case EXEC_CLOSE:         return "CLOSE";
       case EXEC_PARTIAL_CLOSE: return "PARTIAL_CLOSE";
    }
@@ -33,13 +35,14 @@ struct SExecRequest
    int            level;      // partial level, -1 when not a partial
    int            flags;      // management flags to set on success
    bool           initial;    // sl becomes the position's initial SL on success
+   bool           manual;     // typed by the user: never retried, never put on cooldown
    string         reason;
 
    void Reset()
    {
       type = EXEC_MODIFY_SL; ticket = 0;
       sl = 0.0; tp = 0.0; volume = 0.0;
-      level = -1; flags = 0; initial = false; reason = "";
+      level = -1; flags = 0; initial = false; manual = false; reason = "";
    }
 };
 
@@ -57,6 +60,14 @@ public:
    {
       r.Reset();
       r.type = EXEC_MODIFY_TP; r.ticket = ticket; r.tp = tp; r.reason = reason;
+   }
+
+   // Explicit SL and TP for a position. 0 removes a level.
+   void ModifyLevels(const ulong ticket, const double sl, const double tp,
+                     const string reason, SExecRequest &r) const
+   {
+      r.Reset();
+      r.type = EXEC_MODIFY_LEVELS; r.ticket = ticket; r.sl = sl; r.tp = tp; r.reason = reason; r.manual = true;
    }
 
    void Close(const ulong ticket, const int level, const string reason, SExecRequest &r) const

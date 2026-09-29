@@ -91,6 +91,44 @@ public:
             return true;
          }
 
+         case EXEC_MODIFY_LEVELS:
+         {
+            if(req.sl < 0.0 || req.tp < 0.0)
+            {
+               why = "negative price";
+               return false;
+            }
+            if(req.sl > 0.0) req.sl = rules.NormalizePrice(req.sl);
+            if(req.tp > 0.0) req.tp = rules.NormalizePrice(req.tp);
+
+            const bool slChanged = MathAbs(req.sl - pos.sl) >= rules.point * 0.5;
+            const bool tpChanged = MathAbs(req.tp - pos.tp) >= rules.point * 0.5;
+            if(!slChanged && !tpChanged)
+            {
+               why = "levels already as requested";
+               return false;
+            }
+            // Only levels that actually change are checked: an untouched one may already
+            // sit inside the stop distance after the market moved.
+            if(slChanged && req.sl > 0.0 && !rules.IsValidSL(isBuy, req.sl, bid, ask))
+            {
+               why = StringFormat("SL %s violates minimum stop distance", DoubleToString(req.sl, rules.digits));
+               return false;
+            }
+            if(tpChanged && req.tp > 0.0 && !rules.IsValidTP(isBuy, req.tp, bid, ask))
+            {
+               why = StringFormat("TP %s violates minimum stop distance", DoubleToString(req.tp, rules.digits));
+               return false;
+            }
+            if(rules.IsFrozen(isBuy, pos.sl, pos.tp, bid, ask))
+            {
+               why = "position is inside the freeze level";
+               action = EXA_RETRY_LATER;
+               return false;
+            }
+            return true;
+         }
+
          case EXEC_PARTIAL_CLOSE:
          {
             req.volume = vol.Normalize(req.volume);

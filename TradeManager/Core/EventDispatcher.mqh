@@ -172,6 +172,27 @@ public:
       m_state.Flush();
    }
 
+   // SL/TP typed on the panel. Unlike automation, this may widen or remove a level;
+   // it is still checked against the broker's stop and freeze rules.
+   void ManualSetLevels(const ulong ticket, const double sl, const double tp)
+   {
+      string why;
+      if(!m_guard.CanAct(why))
+      {
+         Logger.Warn("Manual", "levels not sent: " + why);
+         return;
+      }
+      CRequestBuilder builder;
+      SExecRequest r;
+      builder.ModifyLevels(ticket, sl, tp, "manual levels", r);
+      SExecOutcome out;
+      if(m_exec.Submit(r, out))
+         m_protection.OnExecuted(out.req);
+      else
+         Logger.Warn("Manual", StringFormat("#%I64u SL/TP not applied: %s", ticket, out.message));
+      m_state.Flush();
+   }
+
    void ManualPartial(const double percent)
    {
       Logger.Info("Manual", StringFormat("close %.0f%% of every managed position", percent));

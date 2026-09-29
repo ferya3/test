@@ -53,6 +53,7 @@ private:
       {
          case EXEC_MODIFY_SL:     m_broker.ModifyPosition(req.ticket, req.sl, live.tp); break;
          case EXEC_MODIFY_TP:     m_broker.ModifyPosition(req.ticket, live.sl, req.tp); break;
+         case EXEC_MODIFY_LEVELS: m_broker.ModifyPosition(req.ticket, req.sl, req.tp); break;
          case EXEC_CLOSE:         m_broker.ClosePosition(req.ticket, 0.0); break;
          case EXEC_PARTIAL_CLOSE: m_broker.ClosePosition(req.ticket, req.volume); break;
       }
@@ -74,6 +75,13 @@ private:
 
    void HandleFailure(const SExecRequest &req, const int attempt, const ENUM_ERR_ACTION action)
    {
+      // A request the user typed is reported and dropped, so they can correct it and try again at once.
+      if(req.manual)
+      {
+         if(action == EXA_REFRESH_STATE)
+            m_refresh = true;
+         return;
+      }
       switch(action)
       {
          case EXA_RETRY_NOW:
@@ -162,7 +170,7 @@ public:
    // Sends a request unless the same one is already waiting for a retry or cooling down.
    bool Submit(SExecRequest &req, SExecOutcome &out)
    {
-      if(m_retry.IsBlocked(req.ticket, req.type))
+      if(!req.manual && m_retry.IsBlocked(req.ticket, req.type))
       {
          out.req = req;
          out.success = false;

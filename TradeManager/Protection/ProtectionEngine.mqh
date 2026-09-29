@@ -130,6 +130,12 @@ public:
          case EXEC_MODIFY_TP:
             p.tp = req.tp;
             break;
+         case EXEC_MODIFY_LEVELS:
+            p.sl = req.sl;
+            p.tp = req.tp;
+            if(req.sl > 0.0 && p.initialSL <= 0.0 && p.IsRiskSideSL(req.sl))
+               p.SetInitialSL(req.sl);
+            break;
          case EXEC_PARTIAL_CLOSE:
             p.volume -= req.volume;
             p.MarkPartial(req.level);

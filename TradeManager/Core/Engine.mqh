@@ -98,20 +98,17 @@ private:
 
       for(int i = 0; i < slots; i++)
       {
-         if(i == slots - 1 && n > slots)
-         {
-            m_panel.SetRow(i, StringFormat("... and %d more", n - slots + 1), clrSilver);
-            continue;
-         }
          if(i >= n)
          {
-            m_panel.SetRow(i, "", clrSilver);
+            m_panel.SetRow(i, 0, "", clrSilver, 0.0, 0.0, 5);
             continue;
          }
          CManagedPosition *p = reg.At(i);
-         m_panel.SetRow(i, StringFormat("#%I64u %s %s %.2f %9.2f %s", p.ticket, p.symbol,
-                        p.IsBuy() ? "B" : "S", p.volume, p.profit, TM_StateText(p.state)),
-                        p.profit >= 0.0 ? C'110,210,130' : C'235,110,110');
+         m_panel.SetRow(i, p.ticket,
+                        StringFormat("#%I64u %s %s %.2f %.2f", p.ticket, p.symbol,
+                                     p.IsBuy() ? "B" : "S", p.volume, p.profit),
+                        p.profit >= 0.0 ? C'110,210,130' : C'235,110,110',
+                        p.sl, p.tp, (int)SymbolInfoInteger(p.symbol, SYMBOL_DIGITS));
       }
 
       m_panel.Render(n, m_risk.exposure.openRiskMoney, m_risk.exposure.openRiskPct,
@@ -174,7 +171,7 @@ public:
 
    void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
    {
-      if(!InpShowPanel || id != CHARTEVENT_OBJECT_CLICK)
+      if(!InpShowPanel || (id != CHARTEVENT_OBJECT_CLICK && id != CHARTEVENT_OBJECT_ENDEDIT))
          return;
 
       switch(m_panel.HandleEvent(id, lparam, dparam, sparam))
@@ -204,6 +201,14 @@ public:
          case PANEL_CLOSE_ALL:
             m_dispatch.ManualCloseAll();
             break;
+         case PANEL_SET_LEVELS:
+         {
+            ulong ticket = 0;
+            double sl = 0.0, tp = 0.0;
+            if(m_panel.TakeLevels(ticket, sl, tp))
+               m_dispatch.ManualSetLevels(ticket, sl, tp);
+            break;
+         }
          default:
             break;
       }
