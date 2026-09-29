@@ -18,6 +18,98 @@ public:
 
    void Attach(CBrokerAdapter *broker) { m_broker = broker; }
 
+   // Checks a new order against lot rules, the market and the broker's stop distance.
+   // Prices and volume are normalized in place. maxLot <= 0 means no cap.
+   bool ValidateOrder(SOrderRequest &req, const double maxLot, string &why)
+   {
+      SSymbolRules rules;
+      SVolumeRules vol;
+      if(!m_broker.LoadRules(req.symbol, rules, vol))
+      {
+         why = "symbol rules unavailable";
+         return false;
+      }
+      double bid, ask;
+      if(!m_broker.Tick(req.symbol, bid, ask))
+      {
+         why = "no tick";
+         return false;
+      }
+
+      const bool isBuy = (req.type == ORDER_TYPE_BUY || req.type == ORDER_TYPE_BUY_LIMIT || req.type == ORDER_TYPE_BUY_STOP);
+      const bool pending = (req.type != ORDER_TYPE_BUY && req.type != ORDER_TYPE_SELL);
+      const double minD = rules.MinStopDistance();
+      const double tol = rules.point * 0.5;
+
+      const double requested = req.volume;
+      req.volume = vol.Normalize(requested);
+      if(req.volume <= 0.0)
+      {
+         why = StringFormat("lot %.2f is below the minimum %.2f (step %.2f)", requested, vol.minVol, vol.step);
+         return false;
+      }
+      if(maxLot > 0.0 && req.volume > maxLot + TM_EPS)
+      {
+         why = StringFormat("lot %.2f exceeds the order cap %.2f", req.volume, maxLot);
+         return false;
+      }
+      if(req.sl < 0.0 || req.tp < 0.0 || req.price < 0.0)
+      {
+         why = "negative price";
+         return false;
+      }
+      if(req.sl > 0.0) req.sl = rules.NormalizePrice(req.sl);
+      if(req.tp > 0.0) req.tp = rules.NormalizePrice(req.tp);
+
+      double ref;                         // the level SL and TP are measured from
+      if(pending)
+      {
+         if(req.price <= 0.0)
+         {
+            why = "a pending order needs a price";
+            return false;
+         }
+         req.price = rules.NormalizePrice(req.price);
+         bool ok = false;
+         switch(req.type)
+         {
+            case ORDER_TYPE_BUY_LIMIT:  ok = (ask - req.price >= minD - tol) && req.price < ask; break;
+            case ORDER_TYPE_BUY_STOP:   ok = (req.price - ask >= minD - tol) && req.price > ask; break;
+            case ORDER_TYPE_SELL_LIMIT: ok = (req.price - bid >= minD - tol) && req.price > bid; break;
+            case ORDER_TYPE_SELL_STOP:  ok = (bid - req.price >= minD - tol) && req.price < bid; break;
+         }
+         if(!ok)
+         {
+            why = StringFormat("%s price %s is on the wrong side of the market or closer than %d points",
+                               TM_OrderText(req.type), DoubleToString(req.price, rules.digits), (int)rules.stopsPoints);
+            return false;
+         }
+         ref = req.price;
+      }
+      else
+         ref = isBuy ? bid : ask;
+
+      if(req.sl > 0.0)
+      {
+         const double d = isBuy ? ref - req.sl : req.sl - ref;
+         if(d <= 0.0 || d < minD - tol)
+         {
+            why = StringFormat("SL %s is on the wrong side or closer than %d points", DoubleToString(req.sl, rules.digits), (int)rules.stopsPoints);
+            return false;
+         }
+      }
+      if(req.tp > 0.0)
+      {
+         const double d = isBuy ? req.tp - ref : ref - req.tp;
+         if(d <= 0.0 || d < minD - tol)
+         {
+            why = StringFormat("TP %s is on the wrong side or closer than %d points", DoubleToString(req.tp, rules.digits), (int)rules.stopsPoints);
+            return false;
+         }
+      }
+      return true;
+   }
+
    bool Validate(SExecRequest &req, string &why, ENUM_ERR_ACTION &action)
    {
       action = EXA_NO_RETRY;

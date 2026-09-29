@@ -26,6 +26,7 @@ private:
    bool  m_closeAllOnTrip;
    bool  m_paused;
    double m_beOffsetR;
+   long   m_orderMagic;
 
    void ApplySuccesses(SExecOutcome &done[])
    {
@@ -126,7 +127,7 @@ public:
    {
       m_positions = NULL; m_protection = NULL; m_risk = NULL; m_guard = NULL; m_exec = NULL; m_state = NULL;
       m_lastPassMs = 0; m_minPassMs = 100; m_deferMs = 3000; m_closeAllOnTrip = false;
-      m_paused = false; m_beOffsetR = 0.0;
+      m_paused = false; m_beOffsetR = 0.0; m_orderMagic = 0;
    }
 
    void Attach(CPositionEngine *positions, CProtectionEngine *protection, CRiskEngine *risk,
@@ -148,6 +149,25 @@ public:
    // While paused, no automatic action is taken; manual actions still work.
    void SetPaused(const bool paused) { m_paused = paused; }
    bool IsPaused() const { return m_paused; }
+
+   void SetOrderMagic(const long magic) { m_orderMagic = magic; }
+
+   // Entry typed on the panel. Automation never calls this.
+   bool ManualOrder(const ENUM_ORDER_TYPE type, const double lot, const double price,
+                    const double sl, const double tp, const string symbol, string &msg)
+   {
+      string why;
+      if(!m_guard.CanOpen(why))
+      {
+         msg = TM_OrderText(type) + " blocked: " + why;
+         Logger.Warn("Order", msg);
+         return false;
+      }
+      SOrderRequest r;
+      r.type = type; r.symbol = symbol; r.volume = lot; r.price = price;
+      r.sl = sl; r.tp = tp; r.magic = m_orderMagic; r.comment = "TradeManager";
+      return m_exec.PlaceOrder(r, msg);
+   }
 
    void ManualCloseAll()
    {

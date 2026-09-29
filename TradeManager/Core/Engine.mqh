@@ -84,10 +84,12 @@ private:
       ex.retryDelayMs = InpRetryDelayMs;
       ex.laterDelayMs = InpRetryDelayMs * 10;
       ex.cooldownMs   = InpCooldownMs;
+      ex.maxOrderLot  = InpMaxOrderLot;
       m_exec.Configure(ex);
 
       m_dispatch.Configure(InpMinProcessMs, InpCooldownMs, InpCloseAllOnTrip, InpBEOffsetR);
 
+      m_dispatch.SetOrderMagic(InpMagicFilter >= 0 ? InpMagicFilter : 0);
       m_sessions.Configure(InpSydneyStart, InpSydneyEnd, InpTokyoStart, InpTokyoEnd,
                            InpLondonStart, InpLondonEnd, InpNewYorkStart, InpNewYorkEnd);
    }
@@ -158,7 +160,7 @@ public:
       m_state.Flush();
       if(InpShowPanel)
          m_panel.Create((int)m_storage.LoadValue("PANEL_X", InpPanelX),
-                        (int)m_storage.LoadValue("PANEL_Y", InpPanelY));
+                        (int)m_storage.LoadValue("PANEL_Y", InpPanelY), InpDefaultLot);
       UpdatePanel();
       Logger.Info("Engine", StringFormat("started, managing %d position(s)", m_positions.Registry().Count()));
       return INIT_SUCCEEDED;
@@ -223,6 +225,20 @@ public:
          case PANEL_CLOSE_ALL:
             m_dispatch.ManualCloseAll();
             break;
+         case PANEL_ORDER:
+         {
+            ENUM_ORDER_TYPE type = ORDER_TYPE_BUY;
+            double lot = 0.0, price = 0.0, sl = 0.0, tp = 0.0;
+            if(m_panel.TakeOrder(type, lot, price, sl, tp))
+            {
+               string msg;
+               const bool ok = m_dispatch.ManualOrder(type, lot, price, sl, tp, _Symbol, msg);
+               m_panel.SetStatus(msg, ok ? C'110,210,130' : C'235,110,110');
+            }
+            else
+               m_panel.SetStatus("Order fields must be plain numbers and the lot above 0", C'240,190,80');
+            break;
+         }
          case PANEL_SET_LEVELS:
          {
             ulong ticket = 0;

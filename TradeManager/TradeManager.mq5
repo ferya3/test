@@ -1,11 +1,12 @@
 //+------------------------------------------------------------------+
 //| TradeManager.mq5                                                 |
 //| Position manager: break-even, trailing, partial closes, risk     |
-//| guard and crash recovery. It never opens trades.                 |
+//| guard and crash recovery. Automation never opens trades; the     |
+//| panel has manual BUY / SELL / pending order buttons.             |
 //+------------------------------------------------------------------+
 #property copyright "TradeManager"
-#property version   "1.50"
-#property description "Manages existing positions only: SL, break-even, trailing, partial close."
+#property version   "1.60"
+#property description "Manages open positions (SL, break-even, trailing, partial close). New orders only from the panel buttons."
 
 #include "Core/Engine.mqh"
 

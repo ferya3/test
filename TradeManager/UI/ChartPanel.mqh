@@ -8,10 +8,10 @@
 #define TM_PANEL_PREFIX "TMP_"
 #define TM_PANEL_ROWS   6
 #define TM_PANEL_W      440
-#define TM_PANEL_H      330
+#define TM_PANEL_H      440
 #define TM_PANEL_H_MIN  30
 #define TM_PANEL_TITLE_H 28
-#define TM_PANEL_ROW_Y  202
+#define TM_PANEL_ROW_Y  312
 #define TM_PANEL_ROW_H  20
 
 enum ENUM_PANEL_ACTION
@@ -24,6 +24,7 @@ enum ENUM_PANEL_ACTION
    PANEL_BE_ALL,
    PANEL_CLOSE_HALF,
    PANEL_CLOSE_ALL,
+   PANEL_ORDER,          // a BUY/SELL/pending button; read the fields with TakeOrder()
    PANEL_SET_LEVELS      // Enter pressed in a SL/TP field; read the row with TakeLevels()
 };
 
@@ -37,6 +38,7 @@ private:
    bool   m_created;
    bool   m_minimized;
    int    m_pendingRow;
+   ENUM_ORDER_TYPE m_orderType;
    string m_all[];                     // every object, so a drag can move them together
    bool   m_dragging;
    int    m_dragDX;
@@ -250,6 +252,7 @@ public:
    {
       m_x = 10; m_y = 20; m_created = false; m_minimized = false;
       m_pendingRow = -1;
+      m_orderType = ORDER_TYPE_BUY;
       m_dragging = false; m_dragDX = 0; m_dragDY = 0; m_scrollLocked = false; m_scrollWas = true;
       for(int i = 0; i < TM_PANEL_ROWS; i++)
       {
@@ -258,7 +261,7 @@ public:
       }
    }
 
-   bool Create(const int x, const int y)
+   bool Create(const int x, const int y, const double defaultLot)
    {
       Destroy();
       m_x = x;
@@ -278,7 +281,7 @@ public:
 
       Rect("bg", 0, 0, TM_PANEL_W, TM_PANEL_H, C'24,26,32', C'70,74,84');
       Rect("bar", 0, 0, TM_PANEL_W, TM_PANEL_TITLE_H, C'40,44,54', C'70,74,84');
-      Label("title", 8, 7, "TRADE MANAGER  v1.5   (drag this bar to move)", clrWhite, 9);
+      Label("title", 8, 7, "TRADE MANAGER  v1.6   (drag this bar to move)", clrWhite, 9);
       Button("min", TM_PANEL_W - 30, 4, 22, 20, "_");
       SetButton("min", "_", C'55,58,66');
 
@@ -303,9 +306,39 @@ public:
       Button("half",     8 + 2*(aw+6), 152, aw, 22, "");  Track("half");
       Button("closeall", 8 + 3*(aw+6), 152, aw, 22, "");  Track("closeall");
 
-      Label("hdr",  8,   184, "POSITION", C'150,155,165', 8);   Track("hdr");
-      Label("hsl", 222,  184, "SL", C'150,155,165', 8);   Track("hsl");
-      Label("htp", 328,  184, "TP   (Enter = apply, 0 = none)", C'150,155,165', 8);   Track("htp");
+      // ---- order entry
+      Label("c_lot", 8,   184, "LOT", C'150,155,165', 8);             Track("c_lot");
+      Label("c_px",  74,  184, "PRICE (pending)", C'150,155,165', 8); Track("c_px");
+      Label("c_sl",  198, 184, "SL", C'150,155,165', 8);              Track("c_sl");
+      Label("c_tp",  316, 184, "TP", C'150,155,165', 8);              Track("c_tp");
+      Edit("olot", 8,   198, 60,  20);  Track("olot");
+      Edit("opx",  74,  198, 118, 20);  Track("opx");
+      Edit("osl",  198, 198, 112, 20);  Track("osl");
+      Edit("otp",  316, 198, 112, 20);  Track("otp");
+      ObjectSetString(0, Name("olot"), OBJPROP_TEXT, DoubleToString(defaultLot, 2));
+      ObjectSetString(0, Name("opx"), OBJPROP_TEXT, "");
+      ObjectSetString(0, Name("osl"), OBJPROP_TEXT, "");
+      ObjectSetString(0, Name("otp"), OBJPROP_TEXT, "");
+
+      Button("buy",  8,   224, 209, 24, "BUY");   Track("buy");
+      Button("sell", 223, 224, 205, 24, "SELL");  Track("sell");
+      SetButton("buy",  "BUY",  C'28,130,70');
+      SetButton("sell", "SELL", C'185,55,55');
+
+      Button("buylimit",  8,   252, 101, 22, "BUY LIMIT");   Track("buylimit");
+      Button("buystop",   115, 252, 101, 22, "BUY STOP");    Track("buystop");
+      Button("selllimit", 222, 252, 101, 22, "SELL LIMIT");  Track("selllimit");
+      Button("sellstop",  329, 252, 99,  22, "SELL STOP");   Track("sellstop");
+      SetButton("buylimit",  "BUY LIMIT",  C'30,95,62');
+      SetButton("buystop",   "BUY STOP",   C'30,95,62');
+      SetButton("selllimit", "SELL LIMIT", C'130,48,48');
+      SetButton("sellstop",  "SELL STOP",  C'130,48,48');
+
+      Label("ostat", 8, 280, "", clrSilver, 8);  Track("ostat");
+
+      Label("hdr",  8,   294, "POSITION", C'150,155,165', 8);   Track("hdr");
+      Label("hsl", 222,  294, "SL", C'150,155,165', 8);   Track("hsl");
+      Label("htp", 328,  294, "TP   (Enter = apply, 0 = none)", C'150,155,165', 8);   Track("htp");
 
       for(int i = 0; i < TM_PANEL_ROWS; i++)
       {
@@ -332,6 +365,29 @@ public:
 
    int X() const { return m_x; }
    int Y() const { return m_y; }
+
+   void SetStatus(const string text, const color clr)
+   {
+      if(!m_created)
+         return;
+      SetText("ostat", text, clr);
+      ChartRedraw();
+   }
+
+   // After PANEL_ORDER: the order type of the pressed button and the typed fields.
+   // False if a field is not a plain number or the lot is not positive.
+   bool TakeOrder(ENUM_ORDER_TYPE &type, double &lot, double &price, double &sl, double &tp)
+   {
+      double l = 0.0, p = 0.0, s = 0.0, t = 0.0;
+      if(!ParsePrice(ObjectGetString(0, Name("olot"), OBJPROP_TEXT), l) ||
+         !ParsePrice(ObjectGetString(0, Name("opx"),  OBJPROP_TEXT), p) ||
+         !ParsePrice(ObjectGetString(0, Name("osl"),  OBJPROP_TEXT), s) ||
+         !ParsePrice(ObjectGetString(0, Name("otp"),  OBJPROP_TEXT), t) || l <= 0.0)
+         return false;
+      type = m_orderType;
+      lot = l; price = p; sl = s; tp = t;
+      return true;
+   }
 
    void SetClock(const string text, const color clr)
    {
@@ -491,6 +547,13 @@ public:
       if(key == "beall")    return PANEL_BE_ALL;
       if(key == "half")     return PANEL_CLOSE_HALF;
       if(key == "closeall") return PANEL_CLOSE_ALL;
+
+      if(key == "buy")       { m_orderType = ORDER_TYPE_BUY;        return PANEL_ORDER; }
+      if(key == "sell")      { m_orderType = ORDER_TYPE_SELL;       return PANEL_ORDER; }
+      if(key == "buylimit")  { m_orderType = ORDER_TYPE_BUY_LIMIT;  return PANEL_ORDER; }
+      if(key == "buystop")   { m_orderType = ORDER_TYPE_BUY_STOP;   return PANEL_ORDER; }
+      if(key == "selllimit") { m_orderType = ORDER_TYPE_SELL_LIMIT; return PANEL_ORDER; }
+      if(key == "sellstop")  { m_orderType = ORDER_TYPE_SELL_STOP;  return PANEL_ORDER; }
       return PANEL_NONE;
    }
 

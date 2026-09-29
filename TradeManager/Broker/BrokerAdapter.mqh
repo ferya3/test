@@ -140,10 +140,35 @@ public:
       return Finish();
    }
 
+   // Market (BUY / SELL) or pending (LIMIT / STOP) order. `price` is used by pending orders only.
+   bool SendOrder(const ENUM_ORDER_TYPE type, const string sym, const double volume, const double price,
+                  const double sl, const double tp, const long magic, const string comment)
+   {
+      ResetLastError();
+      m_trade.SetExpertMagicNumber((ulong)magic);
+      m_trade.SetTypeFillingBySymbol(sym);
+      switch(type)
+      {
+         case ORDER_TYPE_BUY:        m_trade.Buy(volume, sym, 0.0, sl, tp, comment); break;
+         case ORDER_TYPE_SELL:       m_trade.Sell(volume, sym, 0.0, sl, tp, comment); break;
+         case ORDER_TYPE_BUY_LIMIT:  m_trade.BuyLimit(volume, price, sym, sl, tp, ORDER_TIME_GTC, 0, comment); break;
+         case ORDER_TYPE_BUY_STOP:   m_trade.BuyStop(volume, price, sym, sl, tp, ORDER_TIME_GTC, 0, comment); break;
+         case ORDER_TYPE_SELL_LIMIT: m_trade.SellLimit(volume, price, sym, sl, tp, ORDER_TIME_GTC, 0, comment); break;
+         case ORDER_TYPE_SELL_STOP:  m_trade.SellStop(volume, price, sym, sl, tp, ORDER_TIME_GTC, 0, comment); break;
+         default:
+            m_retcode = 0;
+            m_error = 0;
+            return false;
+      }
+      return Finish();
+   }
+
    // volume <= 0 closes the whole position.
    bool ClosePosition(const ulong ticket, const double volume)
    {
       ResetLastError();
+      if(PositionSelectByTicket(ticket))
+         m_trade.SetTypeFillingBySymbol(PositionGetString(POSITION_SYMBOL));
       if(volume > 0.0)
          m_trade.PositionClosePartial(ticket, volume);
       else

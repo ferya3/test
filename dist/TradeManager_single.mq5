@@ -1,11 +1,12 @@
 //+------------------------------------------------------------------+
 //| TradeManager.mq5                                                 |
 //| Position manager: break-even, trailing, partial closes, risk     |
-//| guard and crash recovery. It never opens trades.                 |
+//| guard and crash recovery. Automation never opens trades; the     |
+//| panel has manual BUY / SELL / pending order buttons.             |
 //+------------------------------------------------------------------+
 #property copyright "TradeManager"
-#property version   "1.50"
-#property description "Manages existing positions only: SL, break-even, trailing, partial close."
+#property version   "1.60"
+#property description "Manages open positions (SL, break-even, trailing, partial close). New orders only from the panel buttons."
 
 #ifndef TM_ENGINE_MQH
 #define TM_ENGINE_MQH
@@ -340,10 +341,35 @@ public:
       return Finish();
    }
 
+   // Market (BUY / SELL) or pending (LIMIT / STOP) order. `price` is used by pending orders only.
+   bool SendOrder(const ENUM_ORDER_TYPE type, const string sym, const double volume, const double price,
+                  const double sl, const double tp, const long magic, const string comment)
+   {
+      ResetLastError();
+      m_trade.SetExpertMagicNumber((ulong)magic);
+      m_trade.SetTypeFillingBySymbol(sym);
+      switch(type)
+      {
+         case ORDER_TYPE_BUY:        m_trade.Buy(volume, sym, 0.0, sl, tp, comment); break;
+         case ORDER_TYPE_SELL:       m_trade.Sell(volume, sym, 0.0, sl, tp, comment); break;
+         case ORDER_TYPE_BUY_LIMIT:  m_trade.BuyLimit(volume, price, sym, sl, tp, ORDER_TIME_GTC, 0, comment); break;
+         case ORDER_TYPE_BUY_STOP:   m_trade.BuyStop(volume, price, sym, sl, tp, ORDER_TIME_GTC, 0, comment); break;
+         case ORDER_TYPE_SELL_LIMIT: m_trade.SellLimit(volume, price, sym, sl, tp, ORDER_TIME_GTC, 0, comment); break;
+         case ORDER_TYPE_SELL_STOP:  m_trade.SellStop(volume, price, sym, sl, tp, ORDER_TIME_GTC, 0, comment); break;
+         default:
+            m_retcode = 0;
+            m_error = 0;
+            return false;
+      }
+      return Finish();
+   }
+
    // volume <= 0 closes the whole position.
    bool ClosePosition(const ulong ticket, const double volume)
    {
       ResetLastError();
+      if(PositionSelectByTicket(ticket))
+         m_trade.SetTypeFillingBySymbol(PositionGetString(POSITION_SYMBOL));
       if(volume > 0.0)
          m_trade.PositionClosePartial(ticket, volume);
       else
@@ -573,6 +599,33 @@ struct SExecRequest
    }
 };
 
+// A new order typed on the panel. Never produced by the automation.
+struct SOrderRequest
+{
+   ENUM_ORDER_TYPE type;
+   string          symbol;
+   double          volume;
+   double          price;      // pending orders only
+   double          sl;         // 0 = none
+   double          tp;         // 0 = none
+   long            magic;
+   string          comment;
+};
+
+string TM_OrderText(const ENUM_ORDER_TYPE t)
+{
+   switch(t)
+   {
+      case ORDER_TYPE_BUY:        return "BUY";
+      case ORDER_TYPE_SELL:       return "SELL";
+      case ORDER_TYPE_BUY_LIMIT:  return "BUY LIMIT";
+      case ORDER_TYPE_BUY_STOP:   return "BUY STOP";
+      case ORDER_TYPE_SELL_LIMIT: return "SELL LIMIT";
+      case ORDER_TYPE_SELL_STOP:  return "SELL STOP";
+   }
+   return "ORDER";
+}
+
 class CRequestBuilder
 {
 public:
@@ -786,6 +839,10 @@ input int    InpDeviationPoints    = 20;      // Max deviation (points)
 input int    InpMaxRetries         = 3;       // Retries after a transient failure
 input int    InpRetryDelayMs       = 500;     // Delay before a retry (ms)
 input int    InpCooldownMs         = 3000;    // Pause after a failed or refused request (ms)
+
+input group "Order entry (panel buttons)"
+input double InpDefaultLot         = 0.01;    // Default lot shown in the panel
+input double InpMaxOrderLot        = 0.0;     // Refuse panel orders above this lot (0 = no cap)
 
 input group "Sessions (UTC hours, 0-23; adjust for daylight saving)"
 input int    InpSydneyStart        = 22;      // Sydney opens
@@ -1946,6 +2003,19 @@ public:
       return true;
    }
 
+   // New orders are refused while an account-level protection is active.
+   bool CanOpen(string &why) const
+   {
+      if(!CanAct(why))
+         return false;
+      if(m_state != PROT_NONE)
+      {
+         why = "protection active: " + TM_ProtectionText(m_state);
+         return false;
+      }
+      return true;
+   }
+
    // A stop may only move towards safety; it can never be widened or removed.
    bool CanModify(CManagedPosition *p, const double newSL, string &why) const
    {
@@ -2210,6 +2280,98 @@ public:
 
    void Attach(CBrokerAdapter *broker) { m_broker = broker; }
 
+   // Checks a new order against lot rules, the market and the broker's stop distance.
+   // Prices and volume are normalized in place. maxLot <= 0 means no cap.
+   bool ValidateOrder(SOrderRequest &req, const double maxLot, string &why)
+   {
+      SSymbolRules rules;
+      SVolumeRules vol;
+      if(!m_broker.LoadRules(req.symbol, rules, vol))
+      {
+         why = "symbol rules unavailable";
+         return false;
+      }
+      double bid, ask;
+      if(!m_broker.Tick(req.symbol, bid, ask))
+      {
+         why = "no tick";
+         return false;
+      }
+
+      const bool isBuy = (req.type == ORDER_TYPE_BUY || req.type == ORDER_TYPE_BUY_LIMIT || req.type == ORDER_TYPE_BUY_STOP);
+      const bool pending = (req.type != ORDER_TYPE_BUY && req.type != ORDER_TYPE_SELL);
+      const double minD = rules.MinStopDistance();
+      const double tol = rules.point * 0.5;
+
+      const double requested = req.volume;
+      req.volume = vol.Normalize(requested);
+      if(req.volume <= 0.0)
+      {
+         why = StringFormat("lot %.2f is below the minimum %.2f (step %.2f)", requested, vol.minVol, vol.step);
+         return false;
+      }
+      if(maxLot > 0.0 && req.volume > maxLot + TM_EPS)
+      {
+         why = StringFormat("lot %.2f exceeds the order cap %.2f", req.volume, maxLot);
+         return false;
+      }
+      if(req.sl < 0.0 || req.tp < 0.0 || req.price < 0.0)
+      {
+         why = "negative price";
+         return false;
+      }
+      if(req.sl > 0.0) req.sl = rules.NormalizePrice(req.sl);
+      if(req.tp > 0.0) req.tp = rules.NormalizePrice(req.tp);
+
+      double ref;                         // the level SL and TP are measured from
+      if(pending)
+      {
+         if(req.price <= 0.0)
+         {
+            why = "a pending order needs a price";
+            return false;
+         }
+         req.price = rules.NormalizePrice(req.price);
+         bool ok = false;
+         switch(req.type)
+         {
+            case ORDER_TYPE_BUY_LIMIT:  ok = (ask - req.price >= minD - tol) && req.price < ask; break;
+            case ORDER_TYPE_BUY_STOP:   ok = (req.price - ask >= minD - tol) && req.price > ask; break;
+            case ORDER_TYPE_SELL_LIMIT: ok = (req.price - bid >= minD - tol) && req.price > bid; break;
+            case ORDER_TYPE_SELL_STOP:  ok = (bid - req.price >= minD - tol) && req.price < bid; break;
+         }
+         if(!ok)
+         {
+            why = StringFormat("%s price %s is on the wrong side of the market or closer than %d points",
+                               TM_OrderText(req.type), DoubleToString(req.price, rules.digits), (int)rules.stopsPoints);
+            return false;
+         }
+         ref = req.price;
+      }
+      else
+         ref = isBuy ? bid : ask;
+
+      if(req.sl > 0.0)
+      {
+         const double d = isBuy ? ref - req.sl : req.sl - ref;
+         if(d <= 0.0 || d < minD - tol)
+         {
+            why = StringFormat("SL %s is on the wrong side or closer than %d points", DoubleToString(req.sl, rules.digits), (int)rules.stopsPoints);
+            return false;
+         }
+      }
+      if(req.tp > 0.0)
+      {
+         const double d = isBuy ? req.tp - ref : ref - req.tp;
+         if(d <= 0.0 || d < minD - tol)
+         {
+            why = StringFormat("TP %s is on the wrong side or closer than %d points", DoubleToString(req.tp, rules.digits), (int)rules.stopsPoints);
+            return false;
+         }
+      }
+      return true;
+   }
+
    bool Validate(SExecRequest &req, string &why, ENUM_ERR_ACTION &action)
    {
       action = EXA_NO_RETRY;
@@ -2363,6 +2525,7 @@ struct SExecutionConfig
    int retryDelayMs;     // for transient errors
    int laterDelayMs;     // for market-state errors
    int cooldownMs;       // after a non-retryable failure or after giving up
+   double maxOrderLot;   // cap for panel orders, 0 = none
 };
 
 struct SExecOutcome
@@ -2499,7 +2662,7 @@ public:
    {
       m_broker = NULL;
       m_refresh = false;
-      m_cfg.maxRetries = 3; m_cfg.retryDelayMs = 500; m_cfg.laterDelayMs = 5000; m_cfg.cooldownMs = 3000;
+      m_cfg.maxRetries = 3; m_cfg.retryDelayMs = 500; m_cfg.laterDelayMs = 5000; m_cfg.cooldownMs = 3000; m_cfg.maxOrderLot = 0.0;
    }
 
    void Attach(CBrokerAdapter *broker)
@@ -2574,6 +2737,30 @@ public:
       return r;
    }
 
+   // A new order from the panel. Validated, sent once, never retried: the user decides whether to press again.
+   bool PlaceOrder(SOrderRequest &req, string &msg)
+   {
+      string why;
+      if(!m_validator.ValidateOrder(req, m_cfg.maxOrderLot, why))
+      {
+         msg = TM_OrderText(req.type) + " rejected: " + why;
+         Logger.Warn("Order", msg);
+         return false;
+      }
+      m_broker.SendOrder(req.type, req.symbol, req.volume, req.price, req.sl, req.tp, req.magic, req.comment);
+      const uint rc = m_broker.LastRetcode();
+      const ENUM_ERR_ACTION action = m_errors.Classify(rc, m_broker.LastError());
+      if(action == EXA_SUCCESS)
+      {
+         msg = StringFormat("%s %.2f %s sent", TM_OrderText(req.type), req.volume, req.symbol);
+         Logger.Info("Order", msg);
+         return true;
+      }
+      msg = StringFormat("%s failed: %s", TM_OrderText(req.type), m_errors.Describe(rc));
+      Logger.Warn("Order", msg);
+      return false;
+   }
+
    // ---- convenience wrappers ------------------------------------------------
    bool ModifySL(const ulong ticket, const double sl, SExecOutcome &out)
    {
@@ -2625,6 +2812,7 @@ private:
    bool  m_closeAllOnTrip;
    bool  m_paused;
    double m_beOffsetR;
+   long   m_orderMagic;
 
    void ApplySuccesses(SExecOutcome &done[])
    {
@@ -2725,7 +2913,7 @@ public:
    {
       m_positions = NULL; m_protection = NULL; m_risk = NULL; m_guard = NULL; m_exec = NULL; m_state = NULL;
       m_lastPassMs = 0; m_minPassMs = 100; m_deferMs = 3000; m_closeAllOnTrip = false;
-      m_paused = false; m_beOffsetR = 0.0;
+      m_paused = false; m_beOffsetR = 0.0; m_orderMagic = 0;
    }
 
    void Attach(CPositionEngine *positions, CProtectionEngine *protection, CRiskEngine *risk,
@@ -2747,6 +2935,25 @@ public:
    // While paused, no automatic action is taken; manual actions still work.
    void SetPaused(const bool paused) { m_paused = paused; }
    bool IsPaused() const { return m_paused; }
+
+   void SetOrderMagic(const long magic) { m_orderMagic = magic; }
+
+   // Entry typed on the panel. Automation never calls this.
+   bool ManualOrder(const ENUM_ORDER_TYPE type, const double lot, const double price,
+                    const double sl, const double tp, const string symbol, string &msg)
+   {
+      string why;
+      if(!m_guard.CanOpen(why))
+      {
+         msg = TM_OrderText(type) + " blocked: " + why;
+         Logger.Warn("Order", msg);
+         return false;
+      }
+      SOrderRequest r;
+      r.type = type; r.symbol = symbol; r.volume = lot; r.price = price;
+      r.sl = sl; r.tp = tp; r.magic = m_orderMagic; r.comment = "TradeManager";
+      return m_exec.PlaceOrder(r, msg);
+   }
 
    void ManualCloseAll()
    {
@@ -2937,10 +3144,10 @@ public:
 #define TM_PANEL_PREFIX "TMP_"
 #define TM_PANEL_ROWS   6
 #define TM_PANEL_W      440
-#define TM_PANEL_H      330
+#define TM_PANEL_H      440
 #define TM_PANEL_H_MIN  30
 #define TM_PANEL_TITLE_H 28
-#define TM_PANEL_ROW_Y  202
+#define TM_PANEL_ROW_Y  312
 #define TM_PANEL_ROW_H  20
 
 enum ENUM_PANEL_ACTION
@@ -2953,6 +3160,7 @@ enum ENUM_PANEL_ACTION
    PANEL_BE_ALL,
    PANEL_CLOSE_HALF,
    PANEL_CLOSE_ALL,
+   PANEL_ORDER,          // a BUY/SELL/pending button; read the fields with TakeOrder()
    PANEL_SET_LEVELS      // Enter pressed in a SL/TP field; read the row with TakeLevels()
 };
 
@@ -2966,6 +3174,7 @@ private:
    bool   m_created;
    bool   m_minimized;
    int    m_pendingRow;
+   ENUM_ORDER_TYPE m_orderType;
    string m_all[];                     // every object, so a drag can move them together
    bool   m_dragging;
    int    m_dragDX;
@@ -3179,6 +3388,7 @@ public:
    {
       m_x = 10; m_y = 20; m_created = false; m_minimized = false;
       m_pendingRow = -1;
+      m_orderType = ORDER_TYPE_BUY;
       m_dragging = false; m_dragDX = 0; m_dragDY = 0; m_scrollLocked = false; m_scrollWas = true;
       for(int i = 0; i < TM_PANEL_ROWS; i++)
       {
@@ -3187,7 +3397,7 @@ public:
       }
    }
 
-   bool Create(const int x, const int y)
+   bool Create(const int x, const int y, const double defaultLot)
    {
       Destroy();
       m_x = x;
@@ -3207,7 +3417,7 @@ public:
 
       Rect("bg", 0, 0, TM_PANEL_W, TM_PANEL_H, C'24,26,32', C'70,74,84');
       Rect("bar", 0, 0, TM_PANEL_W, TM_PANEL_TITLE_H, C'40,44,54', C'70,74,84');
-      Label("title", 8, 7, "TRADE MANAGER  v1.5   (drag this bar to move)", clrWhite, 9);
+      Label("title", 8, 7, "TRADE MANAGER  v1.6   (drag this bar to move)", clrWhite, 9);
       Button("min", TM_PANEL_W - 30, 4, 22, 20, "_");
       SetButton("min", "_", C'55,58,66');
 
@@ -3232,9 +3442,39 @@ public:
       Button("half",     8 + 2*(aw+6), 152, aw, 22, "");  Track("half");
       Button("closeall", 8 + 3*(aw+6), 152, aw, 22, "");  Track("closeall");
 
-      Label("hdr",  8,   184, "POSITION", C'150,155,165', 8);   Track("hdr");
-      Label("hsl", 222,  184, "SL", C'150,155,165', 8);   Track("hsl");
-      Label("htp", 328,  184, "TP   (Enter = apply, 0 = none)", C'150,155,165', 8);   Track("htp");
+      // ---- order entry
+      Label("c_lot", 8,   184, "LOT", C'150,155,165', 8);             Track("c_lot");
+      Label("c_px",  74,  184, "PRICE (pending)", C'150,155,165', 8); Track("c_px");
+      Label("c_sl",  198, 184, "SL", C'150,155,165', 8);              Track("c_sl");
+      Label("c_tp",  316, 184, "TP", C'150,155,165', 8);              Track("c_tp");
+      Edit("olot", 8,   198, 60,  20);  Track("olot");
+      Edit("opx",  74,  198, 118, 20);  Track("opx");
+      Edit("osl",  198, 198, 112, 20);  Track("osl");
+      Edit("otp",  316, 198, 112, 20);  Track("otp");
+      ObjectSetString(0, Name("olot"), OBJPROP_TEXT, DoubleToString(defaultLot, 2));
+      ObjectSetString(0, Name("opx"), OBJPROP_TEXT, "");
+      ObjectSetString(0, Name("osl"), OBJPROP_TEXT, "");
+      ObjectSetString(0, Name("otp"), OBJPROP_TEXT, "");
+
+      Button("buy",  8,   224, 209, 24, "BUY");   Track("buy");
+      Button("sell", 223, 224, 205, 24, "SELL");  Track("sell");
+      SetButton("buy",  "BUY",  C'28,130,70');
+      SetButton("sell", "SELL", C'185,55,55');
+
+      Button("buylimit",  8,   252, 101, 22, "BUY LIMIT");   Track("buylimit");
+      Button("buystop",   115, 252, 101, 22, "BUY STOP");    Track("buystop");
+      Button("selllimit", 222, 252, 101, 22, "SELL LIMIT");  Track("selllimit");
+      Button("sellstop",  329, 252, 99,  22, "SELL STOP");   Track("sellstop");
+      SetButton("buylimit",  "BUY LIMIT",  C'30,95,62');
+      SetButton("buystop",   "BUY STOP",   C'30,95,62');
+      SetButton("selllimit", "SELL LIMIT", C'130,48,48');
+      SetButton("sellstop",  "SELL STOP",  C'130,48,48');
+
+      Label("ostat", 8, 280, "", clrSilver, 8);  Track("ostat");
+
+      Label("hdr",  8,   294, "POSITION", C'150,155,165', 8);   Track("hdr");
+      Label("hsl", 222,  294, "SL", C'150,155,165', 8);   Track("hsl");
+      Label("htp", 328,  294, "TP   (Enter = apply, 0 = none)", C'150,155,165', 8);   Track("htp");
 
       for(int i = 0; i < TM_PANEL_ROWS; i++)
       {
@@ -3261,6 +3501,29 @@ public:
 
    int X() const { return m_x; }
    int Y() const { return m_y; }
+
+   void SetStatus(const string text, const color clr)
+   {
+      if(!m_created)
+         return;
+      SetText("ostat", text, clr);
+      ChartRedraw();
+   }
+
+   // After PANEL_ORDER: the order type of the pressed button and the typed fields.
+   // False if a field is not a plain number or the lot is not positive.
+   bool TakeOrder(ENUM_ORDER_TYPE &type, double &lot, double &price, double &sl, double &tp)
+   {
+      double l = 0.0, p = 0.0, s = 0.0, t = 0.0;
+      if(!ParsePrice(ObjectGetString(0, Name("olot"), OBJPROP_TEXT), l) ||
+         !ParsePrice(ObjectGetString(0, Name("opx"),  OBJPROP_TEXT), p) ||
+         !ParsePrice(ObjectGetString(0, Name("osl"),  OBJPROP_TEXT), s) ||
+         !ParsePrice(ObjectGetString(0, Name("otp"),  OBJPROP_TEXT), t) || l <= 0.0)
+         return false;
+      type = m_orderType;
+      lot = l; price = p; sl = s; tp = t;
+      return true;
+   }
 
    void SetClock(const string text, const color clr)
    {
@@ -3420,6 +3683,13 @@ public:
       if(key == "beall")    return PANEL_BE_ALL;
       if(key == "half")     return PANEL_CLOSE_HALF;
       if(key == "closeall") return PANEL_CLOSE_ALL;
+
+      if(key == "buy")       { m_orderType = ORDER_TYPE_BUY;        return PANEL_ORDER; }
+      if(key == "sell")      { m_orderType = ORDER_TYPE_SELL;       return PANEL_ORDER; }
+      if(key == "buylimit")  { m_orderType = ORDER_TYPE_BUY_LIMIT;  return PANEL_ORDER; }
+      if(key == "buystop")   { m_orderType = ORDER_TYPE_BUY_STOP;   return PANEL_ORDER; }
+      if(key == "selllimit") { m_orderType = ORDER_TYPE_SELL_LIMIT; return PANEL_ORDER; }
+      if(key == "sellstop")  { m_orderType = ORDER_TYPE_SELL_STOP;  return PANEL_ORDER; }
       return PANEL_NONE;
    }
 
@@ -3529,10 +3799,12 @@ private:
       ex.retryDelayMs = InpRetryDelayMs;
       ex.laterDelayMs = InpRetryDelayMs * 10;
       ex.cooldownMs   = InpCooldownMs;
+      ex.maxOrderLot  = InpMaxOrderLot;
       m_exec.Configure(ex);
 
       m_dispatch.Configure(InpMinProcessMs, InpCooldownMs, InpCloseAllOnTrip, InpBEOffsetR);
 
+      m_dispatch.SetOrderMagic(InpMagicFilter >= 0 ? InpMagicFilter : 0);
       m_sessions.Configure(InpSydneyStart, InpSydneyEnd, InpTokyoStart, InpTokyoEnd,
                            InpLondonStart, InpLondonEnd, InpNewYorkStart, InpNewYorkEnd);
    }
@@ -3603,7 +3875,7 @@ public:
       m_state.Flush();
       if(InpShowPanel)
          m_panel.Create((int)m_storage.LoadValue("PANEL_X", InpPanelX),
-                        (int)m_storage.LoadValue("PANEL_Y", InpPanelY));
+                        (int)m_storage.LoadValue("PANEL_Y", InpPanelY), InpDefaultLot);
       UpdatePanel();
       Logger.Info("Engine", StringFormat("started, managing %d position(s)", m_positions.Registry().Count()));
       return INIT_SUCCEEDED;
@@ -3668,6 +3940,20 @@ public:
          case PANEL_CLOSE_ALL:
             m_dispatch.ManualCloseAll();
             break;
+         case PANEL_ORDER:
+         {
+            ENUM_ORDER_TYPE type = ORDER_TYPE_BUY;
+            double lot = 0.0, price = 0.0, sl = 0.0, tp = 0.0;
+            if(m_panel.TakeOrder(type, lot, price, sl, tp))
+            {
+               string msg;
+               const bool ok = m_dispatch.ManualOrder(type, lot, price, sl, tp, _Symbol, msg);
+               m_panel.SetStatus(msg, ok ? C'110,210,130' : C'235,110,110');
+            }
+            else
+               m_panel.SetStatus("Order fields must be plain numbers and the lot above 0", C'240,190,80');
+            break;
+         }
          case PANEL_SET_LEVELS:
          {
             ulong ticket = 0;

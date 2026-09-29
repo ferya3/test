@@ -97,6 +97,19 @@ public:
       return true;
    }
 
+   // New orders are refused while an account-level protection is active.
+   bool CanOpen(string &why) const
+   {
+      if(!CanAct(why))
+         return false;
+      if(m_state != PROT_NONE)
+      {
+         why = "protection active: " + TM_ProtectionText(m_state);
+         return false;
+      }
+      return true;
+   }
+
    // A stop may only move towards safety; it can never be widened or removed.
    bool CanModify(CManagedPosition *p, const double newSL, string &why) const
    {

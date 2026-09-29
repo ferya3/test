@@ -1,6 +1,6 @@
 # TradeManager (MT5 / MQL5)
 
-A position manager. It never opens trades and has no strategy, indicator, news or signal code.
+A position manager. The automation never opens trades and there is no strategy, indicator, news or signal code.
 It takes trades that already exist and manages them: initial SL, break-even, trailing, partial
 closes, account-level protection, and recovery after a restart.
 
@@ -50,6 +50,15 @@ Pipeline per pass: `registry -> ProtectionEngine -> RiskGuard -> ExecutionEngine
 - Drawdown uses a persisted equity high-water mark. Delete `TM_<login>_PEAK` to reset it.
 - Protection trips (daily loss, drawdown, equity, margin level) raise an alert and, if
   `InpCloseAllOnTrip` is set, close all managed positions once on the transition.
+
+## Manual order entry (panel)
+
+The panel has LOT / PRICE / SL / TP fields and BUY, SELL, BUY LIMIT, BUY STOP, SELL LIMIT and
+SELL STOP buttons for the chart symbol. There is no confirmation: one click sends the order.
+Blank SL/TP means none; PRICE is only used by pending orders. Orders are checked against lot
+rules, stop distance and side-of-market, refused while a protection is active, and never
+retried. `InpMaxOrderLot` caps the lot. New positions are then managed like any other
+(e.g. `InpDefaultSLPoints` gives them an SL). Pending orders are not listed or managed.
 
 ## Extending trailing
 

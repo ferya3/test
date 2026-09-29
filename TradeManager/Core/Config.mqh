@@ -47,6 +47,10 @@ input int    InpMaxRetries         = 3;       // Retries after a transient failu
 input int    InpRetryDelayMs       = 500;     // Delay before a retry (ms)
 input int    InpCooldownMs         = 3000;    // Pause after a failed or refused request (ms)
 
+input group "Order entry (panel buttons)"
+input double InpDefaultLot         = 0.01;    // Default lot shown in the panel
+input double InpMaxOrderLot        = 0.0;     // Refuse panel orders above this lot (0 = no cap)
+
 input group "Sessions (UTC hours, 0-23; adjust for daylight saving)"
 input int    InpSydneyStart        = 22;      // Sydney opens
 input int    InpSydneyEnd          = 7;       // Sydney closes

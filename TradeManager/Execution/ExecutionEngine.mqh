@@ -14,6 +14,7 @@ struct SExecutionConfig
    int retryDelayMs;     // for transient errors
    int laterDelayMs;     // for market-state errors
    int cooldownMs;       // after a non-retryable failure or after giving up
+   double maxOrderLot;   // cap for panel orders, 0 = none
 };
 
 struct SExecOutcome
@@ -150,7 +151,7 @@ public:
    {
       m_broker = NULL;
       m_refresh = false;
-      m_cfg.maxRetries = 3; m_cfg.retryDelayMs = 500; m_cfg.laterDelayMs = 5000; m_cfg.cooldownMs = 3000;
+      m_cfg.maxRetries = 3; m_cfg.retryDelayMs = 500; m_cfg.laterDelayMs = 5000; m_cfg.cooldownMs = 3000; m_cfg.maxOrderLot = 0.0;
    }
 
    void Attach(CBrokerAdapter *broker)
@@ -223,6 +224,30 @@ public:
       const bool r = m_refresh;
       m_refresh = false;
       return r;
+   }
+
+   // A new order from the panel. Validated, sent once, never retried: the user decides whether to press again.
+   bool PlaceOrder(SOrderRequest &req, string &msg)
+   {
+      string why;
+      if(!m_validator.ValidateOrder(req, m_cfg.maxOrderLot, why))
+      {
+         msg = TM_OrderText(req.type) + " rejected: " + why;
+         Logger.Warn("Order", msg);
+         return false;
+      }
+      m_broker.SendOrder(req.type, req.symbol, req.volume, req.price, req.sl, req.tp, req.magic, req.comment);
+      const uint rc = m_broker.LastRetcode();
+      const ENUM_ERR_ACTION action = m_errors.Classify(rc, m_broker.LastError());
+      if(action == EXA_SUCCESS)
+      {
+         msg = StringFormat("%s %.2f %s sent", TM_OrderText(req.type), req.volume, req.symbol);
+         Logger.Info("Order", msg);
+         return true;
+      }
+      msg = StringFormat("%s failed: %s", TM_OrderText(req.type), m_errors.Describe(rc));
+      Logger.Warn("Order", msg);
+      return false;
    }
 
    // ---- convenience wrappers ------------------------------------------------

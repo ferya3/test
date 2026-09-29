@@ -46,6 +46,33 @@ struct SExecRequest
    }
 };
 
+// A new order typed on the panel. Never produced by the automation.
+struct SOrderRequest
+{
+   ENUM_ORDER_TYPE type;
+   string          symbol;
+   double          volume;
+   double          price;      // pending orders only
+   double          sl;         // 0 = none
+   double          tp;         // 0 = none
+   long            magic;
+   string          comment;
+};
+
+string TM_OrderText(const ENUM_ORDER_TYPE t)
+{
+   switch(t)
+   {
+      case ORDER_TYPE_BUY:        return "BUY";
+      case ORDER_TYPE_SELL:       return "SELL";
+      case ORDER_TYPE_BUY_LIMIT:  return "BUY LIMIT";
+      case ORDER_TYPE_BUY_STOP:   return "BUY STOP";
+      case ORDER_TYPE_SELL_LIMIT: return "SELL LIMIT";
+      case ORDER_TYPE_SELL_STOP:  return "SELL STOP";
+   }
+   return "ORDER";
+}
+
 class CRequestBuilder
 {
 public:
