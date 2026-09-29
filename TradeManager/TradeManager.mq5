@@ -4,7 +4,7 @@
 //| guard and crash recovery. It never opens trades.                 |
 //+------------------------------------------------------------------+
 #property copyright "TradeManager"
-#property version   "1.40"
+#property version   "1.50"
 #property description "Manages existing positions only: SL, break-even, trailing, partial close."
 
 #include "Core/Engine.mqh"

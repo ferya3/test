@@ -47,6 +47,16 @@ input int    InpMaxRetries         = 3;       // Retries after a transient failu
 input int    InpRetryDelayMs       = 500;     // Delay before a retry (ms)
 input int    InpCooldownMs         = 3000;    // Pause after a failed or refused request (ms)
 
+input group "Sessions (UTC hours, 0-23; adjust for daylight saving)"
+input int    InpSydneyStart        = 22;      // Sydney opens
+input int    InpSydneyEnd          = 7;       // Sydney closes
+input int    InpTokyoStart         = 0;       // Tokyo opens
+input int    InpTokyoEnd           = 9;       // Tokyo closes
+input int    InpLondonStart        = 8;       // London opens
+input int    InpLondonEnd          = 17;      // London closes
+input int    InpNewYorkStart       = 13;      // New York opens
+input int    InpNewYorkEnd         = 22;      // New York closes
+
 input group "Runtime"
 input int    InpTimerMs            = 1000;    // Timer interval (ms)
 input int    InpMinProcessMs       = 100;     // Minimum time between protection passes (ms)

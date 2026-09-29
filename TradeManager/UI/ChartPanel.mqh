@@ -3,13 +3,15 @@
 
 #include "../Utils/TimeUtils.mqh"
 #include "../Utils/Logger.mqh"
+#include "../Utils/SessionClock.mqh"
 
 #define TM_PANEL_PREFIX "TMP_"
 #define TM_PANEL_ROWS   6
 #define TM_PANEL_W      440
-#define TM_PANEL_H      296
+#define TM_PANEL_H      330
 #define TM_PANEL_H_MIN  30
-#define TM_PANEL_ROW_Y  166
+#define TM_PANEL_TITLE_H 28
+#define TM_PANEL_ROW_Y  202
 #define TM_PANEL_ROW_H  20
 
 enum ENUM_PANEL_ACTION
@@ -35,6 +37,12 @@ private:
    bool   m_created;
    bool   m_minimized;
    int    m_pendingRow;
+   string m_all[];                     // every object, so a drag can move them together
+   bool   m_dragging;
+   int    m_dragDX;
+   int    m_dragDY;
+   bool   m_scrollLocked;
+   bool   m_scrollWas;
    string m_content[];                 // hidden when the panel is minimized
 
    string m_rowText[TM_PANEL_ROWS];
@@ -58,6 +66,9 @@ private:
    void Base(const string id, const ENUM_OBJECT type)
    {
       const string n = Name(id);
+      const int k = ArraySize(m_all);
+      ArrayResize(m_all, k + 1);
+      m_all[k] = n;
       ObjectCreate(0, n, type, 0, 0, 0);
       ObjectSetInteger(0, n, OBJPROP_CORNER, CORNER_LEFT_UPPER);
       ObjectSetInteger(0, n, OBJPROP_SELECTABLE, false);
@@ -197,11 +208,49 @@ private:
       return true;
    }
 
+   void LockScroll()
+   {
+      if(m_scrollLocked)
+         return;
+      m_scrollWas = (ChartGetInteger(0, CHART_MOUSE_SCROLL) != 0);
+      ChartSetInteger(0, CHART_MOUSE_SCROLL, false);
+      m_scrollLocked = true;
+   }
+
+   void UnlockScroll()
+   {
+      if(!m_scrollLocked)
+         return;
+      ChartSetInteger(0, CHART_MOUSE_SCROLL, m_scrollWas);
+      m_scrollLocked = false;
+   }
+
+   void MoveTo(int nx, int ny)
+   {
+      const int cw = (int)ChartGetInteger(0, CHART_WIDTH_IN_PIXELS);
+      const int ch = (int)ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS);
+      nx = MathMax(0, MathMin(nx, cw - 80));
+      ny = MathMax(0, MathMin(ny, ch - TM_PANEL_H_MIN));
+      const int dx = nx - m_x;
+      const int dy = ny - m_y;
+      if(dx == 0 && dy == 0)
+         return;
+      for(int i = 0; i < ArraySize(m_all); i++)
+      {
+         ObjectSetInteger(0, m_all[i], OBJPROP_XDISTANCE, ObjectGetInteger(0, m_all[i], OBJPROP_XDISTANCE) + dx);
+         ObjectSetInteger(0, m_all[i], OBJPROP_YDISTANCE, ObjectGetInteger(0, m_all[i], OBJPROP_YDISTANCE) + dy);
+      }
+      m_x = nx;
+      m_y = ny;
+      ChartRedraw();
+   }
+
 public:
    CChartPanel()
    {
       m_x = 10; m_y = 20; m_created = false; m_minimized = false;
       m_pendingRow = -1;
+      m_dragging = false; m_dragDX = 0; m_dragDY = 0; m_scrollLocked = false; m_scrollWas = true;
       for(int i = 0; i < TM_PANEL_ROWS; i++)
       {
          m_rowText[i] = ""; m_rowColor[i] = clrSilver; m_rowTicket[i] = 0;
@@ -215,30 +264,48 @@ public:
       m_x = x;
       m_y = y;
       ArrayResize(m_content, 0);
+      ArrayResize(m_all, 0);
+
+      // Keep the panel on screen even if the chart is smaller than when it was placed.
+      const int cw = (int)ChartGetInteger(0, CHART_WIDTH_IN_PIXELS);
+      const int ch = (int)ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS);
+      if(cw > 0) m_x = MathMax(0, MathMin(m_x, cw - 80));
+      if(ch > 0) m_y = MathMax(0, MathMin(m_y, ch - TM_PANEL_H_MIN));
+      m_x = MathMax(0, m_x);
+      m_y = MathMax(0, m_y);
+
+      ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true);
 
       Rect("bg", 0, 0, TM_PANEL_W, TM_PANEL_H, C'24,26,32', C'70,74,84');
-      Label("title", 8, 7, "TRADE MANAGER  v1.4", clrWhite, 9);
+      Rect("bar", 0, 0, TM_PANEL_W, TM_PANEL_TITLE_H, C'40,44,54', C'70,74,84');
+      Label("title", 8, 7, "TRADE MANAGER  v1.5   (drag this bar to move)", clrWhite, 9);
       Button("min", TM_PANEL_W - 30, 4, 22, 20, "_");
       SetButton("min", "_", C'55,58,66');
 
       Label("l1", 8, 32, "", clrSilver, 9);   Track("l1");
       Label("l2", 8, 48, "", clrSilver, 9);   Track("l2");
       Label("l3", 8, 64, "", clrSilver, 9);   Track("l3");
+      Label("clock", 8, 82, "", clrSilver, 8);   Track("clock");
+      for(int i = 0; i < TM_SESSIONS; i++)
+      {
+         Label(RowId("sess", i), 8 + i * 108, 98, "", clrGray, 8);
+         Track(RowId("sess", i));
+      }
 
       const int tw = 137;
-      Button("be",      8,            88, tw, 22, "");  Track("be");
-      Button("trail",   8 + tw + 6,   88, tw, 22, "");  Track("trail");
-      Button("partial", 8 + 2*(tw+6), 88, tw, 22, "");  Track("partial");
+      Button("be",      8,            124, tw, 22, "");  Track("be");
+      Button("trail",   8 + tw + 6,   124, tw, 22, "");  Track("trail");
+      Button("partial", 8 + 2*(tw+6), 124, tw, 22, "");  Track("partial");
 
       const int aw = 101;
-      Button("pause",    8,            116, aw, 22, "");  Track("pause");
-      Button("beall",    8 + aw + 6,   116, aw, 22, "");  Track("beall");
-      Button("half",     8 + 2*(aw+6), 116, aw, 22, "");  Track("half");
-      Button("closeall", 8 + 3*(aw+6), 116, aw, 22, "");  Track("closeall");
+      Button("pause",    8,            152, aw, 22, "");  Track("pause");
+      Button("beall",    8 + aw + 6,   152, aw, 22, "");  Track("beall");
+      Button("half",     8 + 2*(aw+6), 152, aw, 22, "");  Track("half");
+      Button("closeall", 8 + 3*(aw+6), 152, aw, 22, "");  Track("closeall");
 
-      Label("hdr",  8,   148, "POSITION", C'150,155,165', 8);   Track("hdr");
-      Label("hsl", 222,  148, "SL", C'150,155,165', 8);   Track("hsl");
-      Label("htp", 328,  148, "TP   (Enter = apply, 0 = none)", C'150,155,165', 8);   Track("htp");
+      Label("hdr",  8,   184, "POSITION", C'150,155,165', 8);   Track("hdr");
+      Label("hsl", 222,  184, "SL", C'150,155,165', 8);   Track("hsl");
+      Label("htp", 328,  184, "TP   (Enter = apply, 0 = none)", C'150,155,165', 8);   Track("htp");
 
       for(int i = 0; i < TM_PANEL_ROWS; i++)
       {
@@ -255,9 +322,65 @@ public:
 
    void Destroy()
    {
+      UnlockScroll();
       ObjectsDeleteAll(0, TM_PANEL_PREFIX);
       ArrayResize(m_content, 0);
+      ArrayResize(m_all, 0);
+      m_dragging = false;
       m_created = false;
+   }
+
+   int X() const { return m_x; }
+   int Y() const { return m_y; }
+
+   void SetClock(const string text, const color clr)
+   {
+      if(m_created)
+         SetText("clock", text, clr);
+   }
+
+   void SetSession(const int index, const string text, const color clr)
+   {
+      if(m_created && index >= 0 && index < TM_SESSIONS)
+         SetText(RowId("sess", index), text, clr);
+   }
+
+   // Moving is done by dragging the title bar; the chart must not scroll meanwhile.
+   // Returns 0 = nothing, 1 = dragging, 2 = the panel was just dropped (save its position).
+   int HandleMouse(const int id, const long &lparam, const double &dparam, const string &sparam)
+   {
+      if(!m_created || id != CHARTEVENT_MOUSE_MOVE)
+         return 0;
+
+      const int mx = (int)lparam;
+      const int my = (int)dparam;
+      const bool down = (((uint)StringToInteger(sparam)) & 1) != 0;
+      const bool onBar = (mx >= m_x && mx < m_x + TM_PANEL_W - 36 && my >= m_y && my < m_y + TM_PANEL_TITLE_H);
+
+      if(onBar || m_dragging)
+         LockScroll();
+      else
+         UnlockScroll();
+
+      if(down && !m_dragging && onBar)
+      {
+         m_dragging = true;
+         m_dragDX = mx - m_x;
+         m_dragDY = my - m_y;
+      }
+      if(down && m_dragging)
+      {
+         MoveTo(mx - m_dragDX, my - m_dragDY);
+         return 1;
+      }
+      if(!down && m_dragging)
+      {
+         m_dragging = false;
+         if(!onBar)
+            UnlockScroll();
+         return 2;
+      }
+      return 0;
    }
 
    // ticket 0 clears the row.

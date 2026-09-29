@@ -31,6 +31,14 @@ public:
          if(InpPartial1R < 0.0 || InpPartial2R < 0.0 || InpPartial3R < 0.0)
             { why = "partial levels must be >= 0"; return false; }
       }
+      int hours[8];
+      hours[0] = InpSydneyStart;  hours[1] = InpSydneyEnd;
+      hours[2] = InpTokyoStart;   hours[3] = InpTokyoEnd;
+      hours[4] = InpLondonStart;  hours[5] = InpLondonEnd;
+      hours[6] = InpNewYorkStart; hours[7] = InpNewYorkEnd;
+      for(int i = 0; i < 8; i++)
+         if(hours[i] < 0 || hours[i] > 23)
+            { why = "session hours must be between 0 and 23"; return false; }
       if(InpDefaultSLPoints < 0 || InpMaxRetries < 0 || InpRetryDelayMs < 0 || InpCooldownMs < 0)
          { why = "negative value in stop loss / execution settings"; return false; }
       return true;

@@ -6,6 +6,7 @@
 #include "StateManager.mqh"
 #include "EventDispatcher.mqh"
 #include "../UI/ChartPanel.mqh"
+#include "../Utils/SessionClock.mqh"
 
 // Owns and wires the modules. Holds no trading logic of its own.
 class CEngine
@@ -23,6 +24,7 @@ private:
    CEventDispatcher  m_dispatch;
    CLifecycle        m_life;
    CChartPanel       m_panel;
+   CSessionClock     m_sessions;
 
    void Wire()
    {
@@ -85,12 +87,20 @@ private:
       m_exec.Configure(ex);
 
       m_dispatch.Configure(InpMinProcessMs, InpCooldownMs, InpCloseAllOnTrip, InpBEOffsetR);
+
+      m_sessions.Configure(InpSydneyStart, InpSydneyEnd, InpTokyoStart, InpTokyoEnd,
+                           InpLondonStart, InpLondonEnd, InpNewYorkStart, InpNewYorkEnd);
    }
 
    void UpdatePanel()
    {
       if(!InpShowPanel)
          return;
+
+      m_sessions.Update();
+      m_panel.SetClock(m_sessions.Clock(), m_sessions.Weekend() ? C'240,190,80' : clrSilver);
+      for(int s = 0; s < TM_SESSIONS; s++)
+         m_panel.SetSession(s, m_sessions.Text(s), m_sessions.IsOpen(s) ? C'110,210,130' : clrGray);
 
       CPositionRegistry *reg = m_positions.Registry();
       const int n = reg.Count();
@@ -147,7 +157,8 @@ public:
       m_risk.Refresh(true);
       m_state.Flush();
       if(InpShowPanel)
-         m_panel.Create(InpPanelX, InpPanelY);
+         m_panel.Create((int)m_storage.LoadValue("PANEL_X", InpPanelX),
+                        (int)m_storage.LoadValue("PANEL_Y", InpPanelY));
       UpdatePanel();
       Logger.Info("Engine", StringFormat("started, managing %d position(s)", m_positions.Registry().Count()));
       return INIT_SUCCEEDED;
@@ -173,6 +184,15 @@ public:
 
    void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
    {
+      if(InpShowPanel && id == CHARTEVENT_MOUSE_MOVE)
+      {
+         if(m_panel.HandleMouse(id, lparam, dparam, sparam) == 2)
+         {
+            m_storage.SaveValue("PANEL_X", m_panel.X());
+            m_storage.SaveValue("PANEL_Y", m_panel.Y());
+         }
+         return;
+      }
       if(!InpShowPanel || (id != CHARTEVENT_OBJECT_CLICK && id != CHARTEVENT_OBJECT_ENDEDIT))
          return;
 
