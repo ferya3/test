@@ -50,7 +50,9 @@ input int    InpCooldownMs         = 3000;    // Pause after a failed or refused
 input group "Runtime"
 input int    InpTimerMs            = 1000;    // Timer interval (ms)
 input int    InpMinProcessMs       = 100;     // Minimum time between protection passes (ms)
-input bool   InpShowPanel          = true;    // Show status on the chart
+input bool   InpShowPanel          = true;    // Show the control panel on the chart
+input int    InpPanelX             = 10;      // Panel X (pixels from left)
+input int    InpPanelY             = 20;      // Panel Y (pixels from top)
 input ENUM_TM_LOG_LEVEL InpLogLevel = TMLOG_INFO;  // Log level
 
 #endif

@@ -5,6 +5,7 @@
 #include "Lifecycle.mqh"
 #include "StateManager.mqh"
 #include "EventDispatcher.mqh"
+#include "../UI/ChartPanel.mqh"
 
 // Owns and wires the modules. Holds no trading logic of its own.
 class CEngine
@@ -21,6 +22,7 @@ private:
    CStateManager     m_state;
    CEventDispatcher  m_dispatch;
    CLifecycle        m_life;
+   CChartPanel       m_panel;
 
    void Wire()
    {
@@ -82,7 +84,7 @@ private:
       ex.cooldownMs   = InpCooldownMs;
       m_exec.Configure(ex);
 
-      m_dispatch.Configure(InpMinProcessMs, InpCooldownMs, InpCloseAllOnTrip);
+      m_dispatch.Configure(InpMinProcessMs, InpCooldownMs, InpCloseAllOnTrip, InpBEOffsetR);
    }
 
    void UpdatePanel()
@@ -91,22 +93,32 @@ private:
          return;
 
       CPositionRegistry *reg = m_positions.Registry();
-      string s = "Trade Manager\n";
-      s += StringFormat("Positions: %d   Open risk: %.2f (%.2f%%)   Daily P/L: %.2f (%.2f%%)\n",
-                        reg.Count(), m_risk.exposure.openRiskMoney, m_risk.exposure.openRiskPct,
-                        m_risk.account.dailyPL, m_risk.account.dailyPLPct);
-      s += StringFormat("Drawdown: %.2f%%   Protection: %s\n", m_risk.drawdownPct, TM_ProtectionText(m_guard.Status()));
+      const int n = reg.Count();
+      const int slots = TM_PANEL_ROWS;
 
-      const int shown = MathMin(reg.Count(), 10);
-      for(int i = 0; i < shown; i++)
+      for(int i = 0; i < slots; i++)
       {
+         if(i == slots - 1 && n > slots)
+         {
+            m_panel.SetRow(i, StringFormat("... and %d more", n - slots + 1), clrSilver);
+            continue;
+         }
+         if(i >= n)
+         {
+            m_panel.SetRow(i, "", clrSilver);
+            continue;
+         }
          CManagedPosition *p = reg.At(i);
-         s += StringFormat("#%I64u %s %s %.2f  P/L %.2f  %s\n", p.ticket, p.symbol,
-                           p.IsBuy() ? "BUY" : "SELL", p.volume, p.profit, TM_StateText(p.state));
+         m_panel.SetRow(i, StringFormat("#%I64u %s %s %.2f %9.2f %s", p.ticket, p.symbol,
+                        p.IsBuy() ? "B" : "S", p.volume, p.profit, TM_StateText(p.state)),
+                        p.profit >= 0.0 ? C'110,210,130' : C'235,110,110');
       }
-      if(reg.Count() > shown)
-         s += StringFormat("... and %d more\n", reg.Count() - shown);
-      Comment(s);
+
+      m_panel.Render(n, m_risk.exposure.openRiskMoney, m_risk.exposure.openRiskPct,
+                     m_risk.account.dailyPL, m_risk.account.dailyPLPct, m_risk.drawdownPct,
+                     TM_ProtectionText(m_guard.Status()), m_guard.IsProtectionActive(),
+                     m_protection.BEEnabled(), m_protection.TrailingEnabled(), m_protection.PartialEnabled(),
+                     m_dispatch.IsPaused());
    }
 
 public:
@@ -135,6 +147,8 @@ public:
       m_positions.Synchronize();   // adopts open positions and recovers their state
       m_risk.Refresh(true);
       m_state.Flush();
+      if(InpShowPanel)
+         m_panel.Create(InpPanelX, InpPanelY);
       UpdatePanel();
       Logger.Info("Engine", StringFormat("started, managing %d position(s)", m_positions.Registry().Count()));
       return INIT_SUCCEEDED;
@@ -158,11 +172,49 @@ public:
       m_dispatch.HandleTradeTransaction(trans);
    }
 
+   void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
+   {
+      if(!InpShowPanel || id != CHARTEVENT_OBJECT_CLICK)
+         return;
+
+      switch(m_panel.HandleEvent(id, lparam, dparam, sparam))
+      {
+         case PANEL_TOGGLE_BE:
+            m_protection.SetBEEnabled(!m_protection.BEEnabled());
+            Logger.Info("Panel", StringFormat("break-even %s", m_protection.BEEnabled() ? "ON" : "OFF"));
+            break;
+         case PANEL_TOGGLE_TRAIL:
+            m_protection.SetTrailingEnabled(!m_protection.TrailingEnabled());
+            Logger.Info("Panel", StringFormat("trailing %s", m_protection.TrailingEnabled() ? "ON" : "OFF"));
+            break;
+         case PANEL_TOGGLE_PARTIAL:
+            m_protection.SetPartialEnabled(!m_protection.PartialEnabled());
+            Logger.Info("Panel", StringFormat("partial close %s", m_protection.PartialEnabled() ? "ON" : "OFF"));
+            break;
+         case PANEL_TOGGLE_PAUSE:
+            m_dispatch.SetPaused(!m_dispatch.IsPaused());
+            Logger.Info("Panel", m_dispatch.IsPaused() ? "automation paused" : "automation resumed");
+            break;
+         case PANEL_BE_ALL:
+            m_dispatch.ManualBreakEven();
+            break;
+         case PANEL_CLOSE_HALF:
+            m_dispatch.ManualPartial(50.0);
+            break;
+         case PANEL_CLOSE_ALL:
+            m_dispatch.ManualCloseAll();
+            break;
+         default:
+            break;
+      }
+      UpdatePanel();
+   }
+
    void Shutdown(const int reason)
    {
       m_life.StopTimer();
       m_state.Flush();
-      Comment("");
+      m_panel.Destroy();
       Logger.Info("Engine", StringFormat("stopped (reason %d)", reason));
    }
 };

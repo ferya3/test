@@ -27,6 +27,8 @@ public:
    }
 
    void Configure(const SPartialConfig &cfg) { m_cfg = cfg; }
+   void SetEnabled(const bool on) { m_cfg.enabled = on; }
+   bool Enabled() const { return m_cfg.enabled; }
 
    bool Propose(CManagedPosition *p, const SSymbolRules &rules, const SVolumeRules &vol,
                 const double bid, const double ask, SExecRequest &req)

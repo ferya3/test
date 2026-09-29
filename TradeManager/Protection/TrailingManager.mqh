@@ -80,14 +80,15 @@ public:
    {
       m_cfg = cfg;
       ReleaseProvider();
-      if(!cfg.enabled)
-         return;
       if(cfg.mode == TRAIL_PERCENT)
          m_provider = new CPercentTrailDistance(cfg.percent);
       else
          m_provider = new CFixedTrailDistance(cfg.distancePoints);
       m_ownsProvider = true;
    }
+
+   void SetEnabled(const bool on) { m_cfg.enabled = on; }
+   bool Enabled() const { return m_cfg.enabled; }
 
    // The caller keeps ownership of an external provider.
    void SetProvider(CTrailingDistance *provider)

@@ -24,6 +24,8 @@ private:
    ulong m_minPassMs;
    int   m_deferMs;
    bool  m_closeAllOnTrip;
+   bool  m_paused;
+   double m_beOffsetR;
 
    void ApplySuccesses(SExecOutcome &done[])
    {
@@ -101,14 +103,17 @@ private:
       m_risk.Refresh(false);
       EvaluateGuard();
 
-      SExecOutcome done[];
-      m_exec.ProcessRetries(done);
-      ApplySuccesses(done);
+      if(!m_paused)
+      {
+         SExecOutcome done[];
+         m_exec.ProcessRetries(done);
+         ApplySuccesses(done);
 
-      SExecRequest reqs[];
-      const int n = m_protection.Process(reqs);
-      for(int i = 0; i < n; i++)
-         Dispatch(reqs[i]);
+         SExecRequest reqs[];
+         const int n = m_protection.Process(reqs);
+         for(int i = 0; i < n; i++)
+            Dispatch(reqs[i]);
+      }
 
       m_state.Flush();
 
@@ -121,6 +126,7 @@ public:
    {
       m_positions = NULL; m_protection = NULL; m_risk = NULL; m_guard = NULL; m_exec = NULL; m_state = NULL;
       m_lastPassMs = 0; m_minPassMs = 100; m_deferMs = 3000; m_closeAllOnTrip = false;
+      m_paused = false; m_beOffsetR = 0.0;
    }
 
    void Attach(CPositionEngine *positions, CProtectionEngine *protection, CRiskEngine *risk,
@@ -130,11 +136,55 @@ public:
       m_guard = guard; m_exec = exec; m_state = state;
    }
 
-   void Configure(const int minPassMs, const int deferMs, const bool closeAllOnTrip)
+   void Configure(const int minPassMs, const int deferMs, const bool closeAllOnTrip, const double beOffsetR)
    {
+      m_beOffsetR = beOffsetR;
       m_minPassMs = (ulong)minPassMs;
       m_deferMs = deferMs;
       m_closeAllOnTrip = closeAllOnTrip;
+   }
+
+   // ---- manual actions (chart panel) ---------------------------------------
+   // While paused, no automatic action is taken; manual actions still work.
+   void SetPaused(const bool paused) { m_paused = paused; }
+   bool IsPaused() const { return m_paused; }
+
+   void ManualCloseAll()
+   {
+      Logger.Info("Manual", "close all managed positions");
+      CloseAllManaged("manual close all");
+   }
+
+   // Moves each stop to entry (+ configured offset). Positions not far enough in profit are refused by validation.
+   void ManualBreakEven()
+   {
+      Logger.Info("Manual", "break-even on all managed positions");
+      CRequestBuilder builder;
+      CPositionRegistry *reg = m_positions.Registry();
+      for(int i = 0; i < reg.Count(); i++)
+      {
+         CManagedPosition *p = reg.At(i);
+         const double lock = p.initialRisk * m_beOffsetR;
+         SExecRequest r;
+         builder.ModifySL(p.ticket, p.IsBuy() ? p.entry + lock : p.entry - lock, TM_FLAG_BE, "manual break-even", r);
+         Dispatch(r);
+      }
+      m_state.Flush();
+   }
+
+   void ManualPartial(const double percent)
+   {
+      Logger.Info("Manual", StringFormat("close %.0f%% of every managed position", percent));
+      CRequestBuilder builder;
+      CPositionRegistry *reg = m_positions.Registry();
+      for(int i = 0; i < reg.Count(); i++)
+      {
+         CManagedPosition *p = reg.At(i);
+         SExecRequest r;
+         builder.PartialClose(p.ticket, p.volume * percent / 100.0, -1, "manual partial", r);
+         Dispatch(r);
+      }
+      m_state.Flush();
    }
 
    // Tick: break-even, trailing, partials, retries.

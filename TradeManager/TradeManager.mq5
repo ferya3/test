@@ -33,6 +33,11 @@ void OnTradeTransaction(const MqlTradeTransaction &trans,
    Engine.OnTradeTransaction(trans, request, result);
 }
 
+void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
+{
+   Engine.OnChartEvent(id, lparam, dparam, sparam);
+}
+
 void OnDeinit(const int reason)
 {
    Engine.Shutdown(reason);

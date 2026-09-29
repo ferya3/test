@@ -47,6 +47,14 @@ public:
 
    CTrailingManager *Trailing() { return GetPointer(m_trailing); }
 
+   // Runtime switches (used by the chart panel).
+   void SetBEEnabled(const bool on)      { m_be.SetEnabled(on); }
+   void SetTrailingEnabled(const bool on){ m_trailing.SetEnabled(on); }
+   void SetPartialEnabled(const bool on) { m_partial.SetEnabled(on); }
+   bool BEEnabled() const                { return m_be.Enabled(); }
+   bool TrailingEnabled() const          { return m_trailing.Enabled(); }
+   bool PartialEnabled() const           { return m_partial.Enabled(); }
+
    // At most one request per position per pass:
    //   partial close  >  initial SL  >  the best of break-even / trailing
    int Process(SExecRequest &out[])

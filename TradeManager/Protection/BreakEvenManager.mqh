@@ -23,6 +23,8 @@ public:
    CBreakEvenManager() { m_cfg.enabled = false; m_cfg.triggerR = 1.0; m_cfg.offsetR = 0.0; }
 
    void Configure(const SBreakEvenConfig &cfg) { m_cfg = cfg; }
+   void SetEnabled(const bool on) { m_cfg.enabled = on; }
+   bool Enabled() const { return m_cfg.enabled; }
 
    bool Propose(CManagedPosition *p, const SSymbolRules &rules,
                 const double bid, const double ask, SExecRequest &req)
