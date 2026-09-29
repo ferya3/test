@@ -45,6 +45,7 @@ private:
    int    m_dragDY;
    bool   m_scrollLocked;
    bool   m_scrollWas;
+   bool   m_editing;                   // a LOT / PRICE / SL / TP entry field has focus
    string m_content[];                 // hidden when the panel is minimized
 
    string m_rowText[TM_PANEL_ROWS];
@@ -253,7 +254,7 @@ public:
       m_x = 10; m_y = 20; m_created = false; m_minimized = false;
       m_pendingRow = -1;
       m_orderType = ORDER_TYPE_BUY;
-      m_dragging = false; m_dragDX = 0; m_dragDY = 0; m_scrollLocked = false; m_scrollWas = true;
+      m_dragging = false; m_dragDX = 0; m_dragDY = 0; m_scrollLocked = false; m_scrollWas = true; m_editing = false;
       for(int i = 0; i < TM_PANEL_ROWS; i++)
       {
          m_rowText[i] = ""; m_rowColor[i] = clrSilver; m_rowTicket[i] = 0;
@@ -281,7 +282,7 @@ public:
 
       Rect("bg", 0, 0, TM_PANEL_W, TM_PANEL_H, C'24,26,32', C'70,74,84');
       Rect("bar", 0, 0, TM_PANEL_W, TM_PANEL_TITLE_H, C'40,44,54', C'70,74,84');
-      Label("title", 8, 7, "TRADE MANAGER  v1.6   (drag this bar to move)", clrWhite, 9);
+      Label("title", 8, 7, "TRADE MANAGER  v1.7   (drag this bar to move)", clrWhite, 9);
       Button("min", TM_PANEL_W - 30, 4, 22, 20, "_");
       SetButton("min", "_", C'55,58,66');
 
@@ -361,6 +362,35 @@ public:
       ArrayResize(m_all, 0);
       m_dragging = false;
       m_created = false;
+   }
+
+   // MT5 draws objects in creation order, so arrows the terminal adds when a trade opens or
+   // closes land on top of an older panel. Rebuilding the panel makes it the newest object again.
+   // Typed text and the status line are carried over. Returns false if now is a bad moment
+   // (dragging, or the user is typing) so the caller can try again later.
+   bool Raise(const double defaultLot)
+   {
+      if(!m_created || m_dragging || m_editing)
+         return false;
+      for(int i = 0; i < TM_PANEL_ROWS; i++)
+         if(m_rowDirty[i])
+            return false;
+
+      const string lot    = ObjectGetString(0, Name("olot"), OBJPROP_TEXT);
+      const string px     = ObjectGetString(0, Name("opx"),  OBJPROP_TEXT);
+      const string sl     = ObjectGetString(0, Name("osl"),  OBJPROP_TEXT);
+      const string tp     = ObjectGetString(0, Name("otp"),  OBJPROP_TEXT);
+      const string status = ObjectGetString(0, Name("ostat"), OBJPROP_TEXT);
+      const color  statusColor = (color)ObjectGetInteger(0, Name("ostat"), OBJPROP_COLOR);
+
+      Create(m_x, m_y, defaultLot);
+
+      ObjectSetString(0, Name("olot"), OBJPROP_TEXT, lot);
+      ObjectSetString(0, Name("opx"),  OBJPROP_TEXT, px);
+      ObjectSetString(0, Name("osl"),  OBJPROP_TEXT, sl);
+      ObjectSetString(0, Name("otp"),  OBJPROP_TEXT, tp);
+      SetText("ostat", status, statusColor);
+      return true;
    }
 
    int X() const { return m_x; }
@@ -508,6 +538,15 @@ public:
       if(!m_created || StringFind(sparam, TM_PANEL_PREFIX) != 0)
          return PANEL_NONE;
       const string key = StringSubstr(sparam, StringLen(TM_PANEL_PREFIX));
+
+      if(key == "olot" || key == "opx" || key == "osl" || key == "otp")
+      {
+         if(id == CHARTEVENT_OBJECT_CLICK)
+            m_editing = true;
+         else if(id == CHARTEVENT_OBJECT_ENDEDIT)
+            m_editing = false;
+         return PANEL_NONE;
+      }
 
       const string kind = StringSubstr(key, 0, 2);
       const bool isField = (kind == "sl" || kind == "tp");

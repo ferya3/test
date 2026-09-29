@@ -25,6 +25,8 @@ private:
    CLifecycle        m_life;
    CChartPanel       m_panel;
    CSessionClock     m_sessions;
+   ulong             m_raiseAt;         // when to rebuild the panel above new chart objects (0 = not pending)
+   int               m_lastObjTotal;
 
    void Wire()
    {
@@ -94,6 +96,28 @@ private:
                            InpLondonStart, InpLondonEnd, InpNewYorkStart, InpNewYorkEnd);
    }
 
+   // Trade arrows are created by the terminal after the panel, so they draw over it.
+   // A change in the chart object count, or a new deal, schedules a rebuild of the panel.
+   void KeepPanelOnTop()
+   {
+      if(!InpShowPanel || !InpKeepPanelOnTop)
+         return;
+      const ulong now = TM_NowMs();
+      const int total = ObjectsTotal(0);
+      if(total != m_lastObjTotal)
+      {
+         m_lastObjTotal = total;
+         if(m_raiseAt == 0)
+            m_raiseAt = now + 800;
+      }
+      if(m_raiseAt != 0 && now >= m_raiseAt && m_panel.Raise(InpDefaultLot))
+      {
+         m_raiseAt = 0;
+         m_lastObjTotal = ObjectsTotal(0);
+         UpdatePanel();
+      }
+   }
+
    void UpdatePanel()
    {
       if(!InpShowPanel)
@@ -133,6 +157,8 @@ private:
    }
 
 public:
+   CEngine() { m_raiseAt = 0; m_lastObjTotal = 0; }
+
    int Initialize()
    {
       Logger.SetLevel(InpLogLevel);
@@ -161,6 +187,7 @@ public:
       if(InpShowPanel)
          m_panel.Create((int)m_storage.LoadValue("PANEL_X", InpPanelX),
                         (int)m_storage.LoadValue("PANEL_Y", InpPanelY), InpDefaultLot);
+      m_lastObjTotal = ObjectsTotal(0);
       UpdatePanel();
       Logger.Info("Engine", StringFormat("started, managing %d position(s)", m_positions.Registry().Count()));
       return INIT_SUCCEEDED;
@@ -175,6 +202,7 @@ public:
    {
       m_dispatch.HandleTimer();
       UpdatePanel();
+      KeepPanelOnTop();
    }
 
    void OnTradeTransaction(const MqlTradeTransaction &trans,
@@ -182,6 +210,8 @@ public:
                            const MqlTradeResult &result)
    {
       m_dispatch.HandleTradeTransaction(trans);
+      if(trans.type == TRADE_TRANSACTION_DEAL_ADD)
+         m_raiseAt = TM_NowMs() + 1500;      // the arrow appears a moment after the deal
    }
 
    void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
