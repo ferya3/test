@@ -126,6 +126,10 @@ private:
       MqlTick t;
       if(!SymbolInfoTick(_Symbol, t))
          return;
+      const double floating = AccountInfoDouble(ACCOUNT_PROFIT);
+      const double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+      m_panel.SetFloating(floating, balance > 0.0 ? floating / balance * 100.0 : 0.0,
+                          AccountInfoString(ACCOUNT_CURRENCY));
       m_panel.SetPrice(_Symbol, t.bid, t.ask, (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS),
                        (int)SymbolInfoInteger(_Symbol, SYMBOL_SPREAD));
    }

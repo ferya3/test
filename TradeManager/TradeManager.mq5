@@ -5,7 +5,7 @@
 //| panel has manual BUY / SELL / pending order buttons.             |
 //+------------------------------------------------------------------+
 #property copyright "TradeManager"
-#property version   "1.90"
+#property version   "2.00"
 #property description "Manages open positions (SL, break-even, trailing, partial close). New orders only from the panel buttons."
 
 #include "Core/Engine.mqh"

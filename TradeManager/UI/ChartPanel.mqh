@@ -10,7 +10,7 @@
 #define TM_PANEL_W      440
 #define TM_PANEL_H      440
 #define TM_PANEL_H_MIN  30
-#define TM_PANEL_PRICE_H 56          // big price strip under the title bar
+#define TM_PANEL_PRICE_H 80          // big price + open P/L strip under the title bar
 #define TM_PANEL_TITLE_H 28
 #define TM_PANEL_ROW_Y  282
 #define TM_PANEL_ACT_Y  410
@@ -294,7 +294,7 @@ public:
       m_dy = 0;
       Rect("bg", 0, 0, TM_PANEL_W, TM_PANEL_H + TM_PANEL_PRICE_H, C'24,26,32', C'70,74,84');
       Rect("bar", 0, 0, TM_PANEL_W, TM_PANEL_TITLE_H, C'40,44,54', C'70,74,84');
-      Label("title", 8, 7, "TRADE MANAGER  v1.9   (drag this bar to move)", clrWhite, 9);
+      Label("title", 8, 7, "TRADE MANAGER  v2.0   (drag this bar to move)", clrWhite, 9);
       Button("min", TM_PANEL_W - 30, 4, 22, 20, "_");
       SetButton("min", "_", C'55,58,66');
 
@@ -303,6 +303,7 @@ public:
       Label("pcap2", 224, 32, "", C'150,155,165', 9);
       Label("pbid",  8,   46, "", clrWhite, m_priceFont);
       Label("pask",  224, 46, "", clrWhite, m_priceFont);
+      Label("pfloat", 8,  84, "", clrSilver, 16);
       m_dy = TM_PANEL_PRICE_H;
 
       Label("l1", 8, 32, "", clrSilver, 9);   Track("l1");
@@ -466,6 +467,15 @@ public:
          m_lastRedraw = now;
          ChartRedraw();
       }
+   }
+
+   // Total floating profit of the account right now (not the day total). Large, green / red.
+   void SetFloating(const double money, const double pctOfBalance, const string currency)
+   {
+      if(!m_created)
+         return;
+      const color clr = money > 0.0 ? C'110,210,130' : (money < 0.0 ? C'235,110,110' : C'170,175,185');
+      SetText("pfloat", StringFormat("OPEN P/L  %+.2f %s  (%+.2f%%)", money, currency, pctOfBalance), clr);
    }
 
    void SetClock(const string text, const color clr)
