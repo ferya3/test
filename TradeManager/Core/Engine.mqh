@@ -150,7 +150,7 @@ private:
       }
 
       m_panel.Render(n, m_risk.exposure.openRiskMoney, m_risk.exposure.openRiskPct,
-                     m_risk.account.dailyPL, m_risk.account.dailyPLPct, m_risk.drawdownPct,
+                     m_risk.account.balance, m_risk.account.dailyPL, m_risk.account.dailyPLPct, m_risk.drawdownPct,
                      TM_ProtectionText(m_guard.Status()), m_guard.IsProtectionActive(),
                      m_protection.BEEnabled(), m_protection.TrailingEnabled(), m_protection.PartialEnabled(),
                      m_dispatch.IsPaused());

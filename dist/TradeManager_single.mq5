@@ -5,7 +5,7 @@
 //| panel has manual BUY / SELL / pending order buttons.             |
 //+------------------------------------------------------------------+
 #property copyright "TradeManager"
-#property version   "1.70"
+#property version   "1.80"
 #property description "Manages open positions (SL, break-even, trailing, partial close). New orders only from the panel buttons."
 
 #ifndef TM_ENGINE_MQH
@@ -3148,7 +3148,8 @@ public:
 #define TM_PANEL_H      440
 #define TM_PANEL_H_MIN  30
 #define TM_PANEL_TITLE_H 28
-#define TM_PANEL_ROW_Y  312
+#define TM_PANEL_ROW_Y  282
+#define TM_PANEL_ACT_Y  410
 #define TM_PANEL_ROW_H  20
 
 enum ENUM_PANEL_ACTION
@@ -3419,7 +3420,7 @@ public:
 
       Rect("bg", 0, 0, TM_PANEL_W, TM_PANEL_H, C'24,26,32', C'70,74,84');
       Rect("bar", 0, 0, TM_PANEL_W, TM_PANEL_TITLE_H, C'40,44,54', C'70,74,84');
-      Label("title", 8, 7, "TRADE MANAGER  v1.7   (drag this bar to move)", clrWhite, 9);
+      Label("title", 8, 7, "TRADE MANAGER  v1.8   (drag this bar to move)", clrWhite, 9);
       Button("min", TM_PANEL_W - 30, 4, 22, 20, "_");
       SetButton("min", "_", C'55,58,66');
 
@@ -3439,44 +3440,44 @@ public:
       Button("partial", 8 + 2*(tw+6), 124, tw, 22, "");  Track("partial");
 
       const int aw = 101;
-      Button("pause",    8,            152, aw, 22, "");  Track("pause");
-      Button("beall",    8 + aw + 6,   152, aw, 22, "");  Track("beall");
-      Button("half",     8 + 2*(aw+6), 152, aw, 22, "");  Track("half");
-      Button("closeall", 8 + 3*(aw+6), 152, aw, 22, "");  Track("closeall");
+      Button("pause",    8,            TM_PANEL_ACT_Y, aw, 22, "");  Track("pause");
+      Button("beall",    8 + aw + 6,   TM_PANEL_ACT_Y, aw, 22, "");  Track("beall");
+      Button("half",     8 + 2*(aw+6), TM_PANEL_ACT_Y, aw, 22, "");  Track("half");
+      Button("closeall", 8 + 3*(aw+6), TM_PANEL_ACT_Y, aw, 22, "");  Track("closeall");
 
       // ---- order entry
-      Label("c_lot", 8,   184, "LOT", C'150,155,165', 8);             Track("c_lot");
-      Label("c_px",  74,  184, "PRICE (pending)", C'150,155,165', 8); Track("c_px");
-      Label("c_sl",  198, 184, "SL", C'150,155,165', 8);              Track("c_sl");
-      Label("c_tp",  316, 184, "TP", C'150,155,165', 8);              Track("c_tp");
-      Edit("olot", 8,   198, 60,  20);  Track("olot");
-      Edit("opx",  74,  198, 118, 20);  Track("opx");
-      Edit("osl",  198, 198, 112, 20);  Track("osl");
-      Edit("otp",  316, 198, 112, 20);  Track("otp");
+      Label("c_lot", 8,   154, "LOT", C'150,155,165', 8);             Track("c_lot");
+      Label("c_px",  74,  154, "PRICE (pending)", C'150,155,165', 8); Track("c_px");
+      Label("c_sl",  198, 154, "SL", C'150,155,165', 8);              Track("c_sl");
+      Label("c_tp",  316, 154, "TP", C'150,155,165', 8);              Track("c_tp");
+      Edit("olot", 8,   168, 60,  20);  Track("olot");
+      Edit("opx",  74,  168, 118, 20);  Track("opx");
+      Edit("osl",  198, 168, 112, 20);  Track("osl");
+      Edit("otp",  316, 168, 112, 20);  Track("otp");
       ObjectSetString(0, Name("olot"), OBJPROP_TEXT, DoubleToString(defaultLot, 2));
       ObjectSetString(0, Name("opx"), OBJPROP_TEXT, "");
       ObjectSetString(0, Name("osl"), OBJPROP_TEXT, "");
       ObjectSetString(0, Name("otp"), OBJPROP_TEXT, "");
 
-      Button("buy",  8,   224, 209, 24, "BUY");   Track("buy");
-      Button("sell", 223, 224, 205, 24, "SELL");  Track("sell");
-      SetButton("buy",  "BUY",  C'28,130,70');
-      SetButton("sell", "SELL", C'185,55,55');
+      Button("buy",  8,   194, 209, 24, "BUY MARKET");   Track("buy");
+      Button("sell", 223, 194, 205, 24, "SELL MARKET");  Track("sell");
+      SetButton("buy",  "BUY MARKET",  C'28,130,70');
+      SetButton("sell", "SELL MARKET", C'185,55,55');
 
-      Button("buylimit",  8,   252, 101, 22, "BUY LIMIT");   Track("buylimit");
-      Button("buystop",   115, 252, 101, 22, "BUY STOP");    Track("buystop");
-      Button("selllimit", 222, 252, 101, 22, "SELL LIMIT");  Track("selllimit");
-      Button("sellstop",  329, 252, 99,  22, "SELL STOP");   Track("sellstop");
+      Button("buylimit",  8,   222, 101, 22, "BUY LIMIT");   Track("buylimit");
+      Button("buystop",   115, 222, 101, 22, "BUY STOP");    Track("buystop");
+      Button("selllimit", 222, 222, 101, 22, "SELL LIMIT");  Track("selllimit");
+      Button("sellstop",  329, 222, 99,  22, "SELL STOP");   Track("sellstop");
       SetButton("buylimit",  "BUY LIMIT",  C'30,95,62');
       SetButton("buystop",   "BUY STOP",   C'30,95,62');
       SetButton("selllimit", "SELL LIMIT", C'130,48,48');
       SetButton("sellstop",  "SELL STOP",  C'130,48,48');
 
-      Label("ostat", 8, 280, "", clrSilver, 8);  Track("ostat");
+      Label("ostat", 8, 250, "", clrSilver, 8);  Track("ostat");
 
-      Label("hdr",  8,   294, "POSITION", C'150,155,165', 8);   Track("hdr");
-      Label("hsl", 222,  294, "SL", C'150,155,165', 8);   Track("hsl");
-      Label("htp", 328,  294, "TP   (Enter = apply, 0 = none)", C'150,155,165', 8);   Track("htp");
+      Label("hdr",  8,   264, "POSITION", C'150,155,165', 8);   Track("hdr");
+      Label("hsl", 222,  264, "SL", C'150,155,165', 8);   Track("hsl");
+      Label("htp", 328,  264, "TP   (Enter = apply, 0 = none)", C'150,155,165', 8);   Track("htp");
 
       for(int i = 0; i < TM_PANEL_ROWS; i++)
       {
@@ -3623,7 +3624,7 @@ public:
    }
 
    void Render(const int positions, const double openRisk, const double openRiskPct,
-               const double dailyPL, const double dailyPLPct, const double ddPct,
+               const double balance, const double dailyPL, const double dailyPLPct, const double ddPct,
                const string protection, const bool protectionActive,
                const bool beOn, const bool trailOn, const bool partialOn, const bool paused)
    {
@@ -3634,7 +3635,7 @@ public:
       const color off = C'70,72,80';
 
       SetText("l1", StringFormat("Positions %d   Open risk %.2f (%.2f%%)", positions, openRisk, openRiskPct), clrSilver);
-      SetText("l2", StringFormat("Daily P/L %.2f (%.2f%%)   DD %.2f%%", dailyPL, dailyPLPct, ddPct),
+      SetText("l2", StringFormat("Bal %.2f | Daily P/L %.2f (%.2f%%) | DD %.2f%%", balance, dailyPL, dailyPLPct, ddPct),
               dailyPL >= 0.0 ? C'110,210,130' : C'235,110,110');
       SetText("l3", "Protection: " + protection + (paused ? "   [PAUSED]" : ""),
               protectionActive ? C'235,110,110' : (paused ? C'240,190,80' : C'110,210,130'));
@@ -3905,7 +3906,7 @@ private:
       }
 
       m_panel.Render(n, m_risk.exposure.openRiskMoney, m_risk.exposure.openRiskPct,
-                     m_risk.account.dailyPL, m_risk.account.dailyPLPct, m_risk.drawdownPct,
+                     m_risk.account.balance, m_risk.account.dailyPL, m_risk.account.dailyPLPct, m_risk.drawdownPct,
                      TM_ProtectionText(m_guard.Status()), m_guard.IsProtectionActive(),
                      m_protection.BEEnabled(), m_protection.TrailingEnabled(), m_protection.PartialEnabled(),
                      m_dispatch.IsPaused());
