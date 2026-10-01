@@ -64,6 +64,7 @@ input int    InpNewYorkEnd         = 22;      // New York closes
 input group "Runtime"
 input int    InpTimerMs            = 1000;    // Timer interval (ms)
 input int    InpMinProcessMs       = 100;     // Minimum time between protection passes (ms)
+input int    InpPriceFontSize      = 24;      // Size of the big Bid/Ask price (10-28)
 input bool   InpKeepPanelOnTop    = true;    // Keep the panel above trade arrows drawn on the chart
 input bool   InpShowPanel          = true;    // Show the control panel on the chart
 input int    InpPanelX             = 10;      // Panel X (pixels from left)

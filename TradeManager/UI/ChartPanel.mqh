@@ -10,6 +10,7 @@
 #define TM_PANEL_W      440
 #define TM_PANEL_H      440
 #define TM_PANEL_H_MIN  30
+#define TM_PANEL_PRICE_H 56          // big price strip under the title bar
 #define TM_PANEL_TITLE_H 28
 #define TM_PANEL_ROW_Y  282
 #define TM_PANEL_ACT_Y  410
@@ -46,6 +47,13 @@ private:
    int    m_dragDY;
    bool   m_scrollLocked;
    bool   m_scrollWas;
+   int    m_dy;                        // vertical offset of everything below the price strip
+   int    m_priceFont;
+   double m_lastBid;
+   double m_lastAsk;
+   color  m_bidColor;
+   color  m_askColor;
+   ulong  m_lastRedraw;
    bool   m_editing;                   // a LOT / PRICE / SL / TP entry field has focus
    string m_content[];                 // hidden when the panel is minimized
 
@@ -85,7 +93,7 @@ private:
       Base(id, OBJ_RECTANGLE_LABEL);
       const string n = Name(id);
       ObjectSetInteger(0, n, OBJPROP_XDISTANCE, m_x + x);
-      ObjectSetInteger(0, n, OBJPROP_YDISTANCE, m_y + y);
+      ObjectSetInteger(0, n, OBJPROP_YDISTANCE, m_y + m_dy + y);
       ObjectSetInteger(0, n, OBJPROP_XSIZE, w);
       ObjectSetInteger(0, n, OBJPROP_YSIZE, h);
       ObjectSetInteger(0, n, OBJPROP_BGCOLOR, bg);
@@ -99,7 +107,7 @@ private:
       Base(id, OBJ_LABEL);
       const string n = Name(id);
       ObjectSetInteger(0, n, OBJPROP_XDISTANCE, m_x + x);
-      ObjectSetInteger(0, n, OBJPROP_YDISTANCE, m_y + y);
+      ObjectSetInteger(0, n, OBJPROP_YDISTANCE, m_y + m_dy + y);
       ObjectSetInteger(0, n, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER);
       ObjectSetInteger(0, n, OBJPROP_COLOR, clr);
       ObjectSetInteger(0, n, OBJPROP_FONTSIZE, size);
@@ -112,7 +120,7 @@ private:
       Base(id, OBJ_BUTTON);
       const string n = Name(id);
       ObjectSetInteger(0, n, OBJPROP_XDISTANCE, m_x + x);
-      ObjectSetInteger(0, n, OBJPROP_YDISTANCE, m_y + y);
+      ObjectSetInteger(0, n, OBJPROP_YDISTANCE, m_y + m_dy + y);
       ObjectSetInteger(0, n, OBJPROP_XSIZE, w);
       ObjectSetInteger(0, n, OBJPROP_YSIZE, h);
       ObjectSetInteger(0, n, OBJPROP_FONTSIZE, 8);
@@ -127,7 +135,7 @@ private:
       Base(id, OBJ_EDIT);
       const string n = Name(id);
       ObjectSetInteger(0, n, OBJPROP_XDISTANCE, m_x + x);
-      ObjectSetInteger(0, n, OBJPROP_YDISTANCE, m_y + y);
+      ObjectSetInteger(0, n, OBJPROP_YDISTANCE, m_y + m_dy + y);
       ObjectSetInteger(0, n, OBJPROP_XSIZE, w);
       ObjectSetInteger(0, n, OBJPROP_YSIZE, h);
       ObjectSetInteger(0, n, OBJPROP_FONTSIZE, 8);
@@ -181,7 +189,7 @@ private:
 
    void Layout()
    {
-      ObjectSetInteger(0, Name("bg"), OBJPROP_YSIZE, m_minimized ? TM_PANEL_H_MIN : TM_PANEL_H);
+      ObjectSetInteger(0, Name("bg"), OBJPROP_YSIZE, (m_minimized ? TM_PANEL_H_MIN : TM_PANEL_H) + TM_PANEL_PRICE_H);
       ObjectSetString(0, Name("min"), OBJPROP_TEXT, m_minimized ? "+" : "_");
       ApplyVisibility();
    }
@@ -256,6 +264,8 @@ public:
       m_pendingRow = -1;
       m_orderType = ORDER_TYPE_BUY;
       m_dragging = false; m_dragDX = 0; m_dragDY = 0; m_scrollLocked = false; m_scrollWas = true; m_editing = false;
+      m_dy = 0; m_priceFont = 24; m_lastBid = 0.0; m_lastAsk = 0.0;
+      m_bidColor = clrWhite; m_askColor = clrWhite; m_lastRedraw = 0;
       for(int i = 0; i < TM_PANEL_ROWS; i++)
       {
          m_rowText[i] = ""; m_rowColor[i] = clrSilver; m_rowTicket[i] = 0;
@@ -281,11 +291,19 @@ public:
 
       ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true);
 
-      Rect("bg", 0, 0, TM_PANEL_W, TM_PANEL_H, C'24,26,32', C'70,74,84');
+      m_dy = 0;
+      Rect("bg", 0, 0, TM_PANEL_W, TM_PANEL_H + TM_PANEL_PRICE_H, C'24,26,32', C'70,74,84');
       Rect("bar", 0, 0, TM_PANEL_W, TM_PANEL_TITLE_H, C'40,44,54', C'70,74,84');
-      Label("title", 8, 7, "TRADE MANAGER  v1.8   (drag this bar to move)", clrWhite, 9);
+      Label("title", 8, 7, "TRADE MANAGER  v1.9   (drag this bar to move)", clrWhite, 9);
       Button("min", TM_PANEL_W - 30, 4, 22, 20, "_");
       SetButton("min", "_", C'55,58,66');
+
+      // Big live price. Not tracked, so it stays visible when the panel is minimized.
+      Label("pcap1", 8,   32, "", C'150,155,165', 9);
+      Label("pcap2", 224, 32, "", C'150,155,165', 9);
+      Label("pbid",  8,   46, "", clrWhite, m_priceFont);
+      Label("pask",  224, 46, "", clrWhite, m_priceFont);
+      m_dy = TM_PANEL_PRICE_H;
 
       Label("l1", 8, 32, "", clrSilver, 9);   Track("l1");
       Label("l2", 8, 48, "", clrSilver, 9);   Track("l2");
@@ -418,6 +436,36 @@ public:
       type = m_orderType;
       lot = l; price = p; sl = s; tp = t;
       return true;
+   }
+
+   void SetPriceFont(const int size) { m_priceFont = MathMax(10, MathMin(size, 28)); }
+
+   // Bid and Ask in large type: green after an uptick, red after a downtick.
+   void SetPrice(const string symbol, const double bid, const double ask, const int digits, const int spreadPoints)
+   {
+      if(!m_created)
+         return;
+      const color up = C'110,210,130';
+      const color dn = C'235,110,110';
+      if(bid > m_lastBid)      m_bidColor = up;
+      else if(bid < m_lastBid) m_bidColor = dn;
+      if(ask > m_lastAsk)      m_askColor = up;
+      else if(ask < m_lastAsk) m_askColor = dn;
+      const bool changed = (bid != m_lastBid || ask != m_lastAsk);
+      m_lastBid = bid;
+      m_lastAsk = ask;
+
+      SetText("pcap1", symbol + "   BID", C'150,155,165');
+      SetText("pcap2", StringFormat("ASK   spread %d", spreadPoints), C'150,155,165');
+      SetText("pbid", DoubleToString(bid, digits), m_bidColor);
+      SetText("pask", DoubleToString(ask, digits), m_askColor);
+
+      const ulong now = TM_NowMs();
+      if(changed && now - m_lastRedraw >= 100)
+      {
+         m_lastRedraw = now;
+         ChartRedraw();
+      }
    }
 
    void SetClock(const string text, const color clr)

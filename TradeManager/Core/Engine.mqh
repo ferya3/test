@@ -118,11 +118,24 @@ private:
       }
    }
 
+   // Cheap enough to run on every tick: two labels, redraw throttled inside the panel.
+   void UpdatePrice()
+   {
+      if(!InpShowPanel)
+         return;
+      MqlTick t;
+      if(!SymbolInfoTick(_Symbol, t))
+         return;
+      m_panel.SetPrice(_Symbol, t.bid, t.ask, (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS),
+                       (int)SymbolInfoInteger(_Symbol, SYMBOL_SPREAD));
+   }
+
    void UpdatePanel()
    {
       if(!InpShowPanel)
          return;
 
+      UpdatePrice();
       m_sessions.Update();
       m_panel.SetClock(m_sessions.Clock(), m_sessions.Weekend() ? C'240,190,80' : clrSilver);
       for(int s = 0; s < TM_SESSIONS; s++)
@@ -185,8 +198,11 @@ public:
       m_risk.Refresh(true);
       m_state.Flush();
       if(InpShowPanel)
+      {
+         m_panel.SetPriceFont(InpPriceFontSize);
          m_panel.Create((int)m_storage.LoadValue("PANEL_X", InpPanelX),
                         (int)m_storage.LoadValue("PANEL_Y", InpPanelY), InpDefaultLot);
+      }
       m_lastObjTotal = ObjectsTotal(0);
       UpdatePanel();
       Logger.Info("Engine", StringFormat("started, managing %d position(s)", m_positions.Registry().Count()));
@@ -196,6 +212,7 @@ public:
    void OnTick()
    {
       m_dispatch.HandleTick();
+      UpdatePrice();
    }
 
    void OnTimer()
