@@ -118,6 +118,37 @@ private:
       }
    }
 
+   // Time left until the current candle of the chart's timeframe closes.
+   void UpdateCandleTimer()
+   {
+      const datetime open = iTime(_Symbol, _Period, 0);
+      if(open == 0)
+         return;
+      datetime close = open + PeriodSeconds(_Period);
+      if(_Period == PERIOD_MN1)                    // months are not a fixed number of seconds
+      {
+         MqlDateTime d;
+         TimeToStruct(open, d);
+         d.mon++;
+         if(d.mon > 12) { d.mon = 1; d.year++; }
+         d.day = 1; d.hour = 0; d.min = 0; d.sec = 0;
+         close = StructToTime(d);
+      }
+      const string tf = StringSubstr(EnumToString(_Period), 7);
+      const long left = (long)close - (long)TimeTradeServer();
+      if(left <= 0)
+      {
+         m_panel.SetCandle(tf + " candle  waiting for next bar", C'240,190,80');
+         return;
+      }
+      const int h = (int)(left / 3600);
+      const int m = (int)((left % 3600) / 60);
+      const int s = (int)(left % 60);
+      m_panel.SetCandle(StringFormat("%s candle  %s", tf, h > 0 ? StringFormat("%d:%02d:%02d", h, m, s)
+                                                                : StringFormat("%02d:%02d", m, s)),
+                        left <= 10 ? C'240,190,80' : C'200,205,215');
+   }
+
    // Cheap enough to run on every tick: two labels, redraw throttled inside the panel.
    void UpdatePrice()
    {
@@ -140,6 +171,7 @@ private:
          return;
 
       UpdatePrice();
+      UpdateCandleTimer();
       m_sessions.Update();
       m_panel.SetClock(m_sessions.Clock(), m_sessions.Weekend() ? C'240,190,80' : clrSilver);
       for(int s = 0; s < TM_SESSIONS; s++)
