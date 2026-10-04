@@ -18,6 +18,8 @@ private:
 
    string Span(const int minutes) const
    {
+      if(minutes >= 24 * 60)
+         return StringFormat("%dd%02dh", minutes / (24 * 60), (minutes % (24 * 60)) / 60);
       return StringFormat("%dh%02dm", minutes / 60, minutes % 60);
    }
 
@@ -52,6 +54,16 @@ public:
                   (dt.day_of_week == 5 && now >= 22 * 60) ||
                   (dt.day_of_week == 0 && now < 22 * 60);
 
+      // Minutes until the market reopens on Sunday 22:00 UTC (0 when it is open).
+      int untilReopen = 0;
+      if(m_weekend)
+      {
+         const int reopen = 22 * 60;
+         if(dt.day_of_week == 0)      untilReopen = reopen - now;
+         else if(dt.day_of_week == 6) untilReopen = (24 * 60 - now) + reopen;
+         else                         untilReopen = (24 * 60 - now) + 24 * 60 + reopen;   // Friday evening
+      }
+
       for(int i = 0; i < TM_SESSIONS; i++)
       {
          const int s = m_start[i] * 60;
@@ -60,7 +72,11 @@ public:
          m_open[i] = !m_weekend && (wraps ? (now >= s || now < e) : (now >= s && now < e));
 
          if(m_weekend)
-            m_text[i] = m_short[i] + " off";
+         {
+            // The first start of this session at or after the reopen.
+            const int firstStart = untilReopen + ((s - 22 * 60 + 24 * 60) % (24 * 60));
+            m_text[i] = m_short[i] + " off +" + Span(firstStart);
+         }
          else if(m_open[i])
             m_text[i] = m_short[i] + " ON  " + Span((e - now + 1440) % 1440);
          else
@@ -70,7 +86,7 @@ public:
       MqlDateTime sv;
       TimeToStruct(TimeCurrent(), sv);
       m_clock = StringFormat("UTC %02d:%02d   Server %02d:%02d%s", dt.hour, dt.min, sv.hour, sv.min,
-                             m_weekend ? "   MARKET CLOSED (weekend)" : "");
+                             m_weekend ? "   CLOSED, opens in " + Span(untilReopen) : "");
    }
 
    bool   Weekend() const { return m_weekend; }
