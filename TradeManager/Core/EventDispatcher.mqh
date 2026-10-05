@@ -62,13 +62,17 @@ private:
          m_protection.OnExecuted(out.req);
    }
 
-   void CloseAllManaged(const string reason)
+   // side: -1 = every position, POSITION_TYPE_BUY (0) = buys only, POSITION_TYPE_SELL (1) = sells only.
+   int CloseAllManaged(const string reason, const int side = -1)
    {
+      int sent = 0;
       CRequestBuilder builder;
       CPositionRegistry *reg = m_positions.Registry();
       for(int i = 0; i < reg.Count(); i++)
       {
          CManagedPosition *p = reg.At(i);
+         if(side >= 0 && (int)p.type != side)
+            continue;
          SExecRequest r;
          builder.Close(p.ticket, -1, reason, r);
          string why;
@@ -79,7 +83,9 @@ private:
          }
          SExecOutcome out;
          m_exec.Submit(r, out);
+         sent++;
       }
+      return sent;
    }
 
    void EvaluateGuard()
@@ -167,6 +173,14 @@ public:
       r.type = type; r.symbol = symbol; r.volume = lot; r.price = price;
       r.sl = sl; r.tp = tp; r.magic = m_orderMagic; r.comment = "TradeManager";
       return m_exec.PlaceOrder(r, msg);
+   }
+
+   // Closes every managed position of one direction, on every symbol in scope.
+   void ManualCloseSide(const bool buy)
+   {
+      const int n = CloseAllManaged(buy ? "manual close buys" : "manual close sells",
+                                    buy ? POSITION_TYPE_BUY : POSITION_TYPE_SELL);
+      Logger.Info("Manual", StringFormat("close %s: %d position(s)", buy ? "BUY" : "SELL", n));
    }
 
    void ManualCloseAll()

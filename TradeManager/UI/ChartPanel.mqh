@@ -8,7 +8,7 @@
 #define TM_PANEL_PREFIX "TMP_"
 #define TM_PANEL_ROWS   6
 #define TM_PANEL_W      440
-#define TM_PANEL_H      440
+#define TM_PANEL_H      468
 #define TM_PANEL_H_MIN  30
 #define TM_PANEL_PRICE_H 106         // big price, open P/L and candle timer under the title bar
 #define TM_PANEL_TITLE_H 28
@@ -26,6 +26,8 @@ enum ENUM_PANEL_ACTION
    PANEL_BE_ALL,
    PANEL_CLOSE_HALF,
    PANEL_CLOSE_ALL,
+   PANEL_CLOSE_BUY,
+   PANEL_CLOSE_SELL,
    PANEL_ORDER,          // a BUY/SELL/pending button; read the fields with TakeOrder()
    PANEL_SET_LEVELS      // Enter pressed in a SL/TP field; read the row with TakeLevels()
 };
@@ -294,7 +296,7 @@ public:
       m_dy = 0;
       Rect("bg", 0, 0, TM_PANEL_W, TM_PANEL_H + TM_PANEL_PRICE_H, C'24,26,32', C'70,74,84');
       Rect("bar", 0, 0, TM_PANEL_W, TM_PANEL_TITLE_H, C'40,44,54', C'70,74,84');
-      Label("title", 8, 7, "TRADE MANAGER  v2.2   (drag this bar to move)", clrWhite, 9);
+      Label("title", 8, 7, "TRADE MANAGER  v2.3   (drag this bar to move)", clrWhite, 9);
       Button("min", TM_PANEL_W - 30, 4, 22, 20, "_");
       SetButton("min", "_", C'55,58,66');
 
@@ -323,10 +325,16 @@ public:
       Button("partial", 8 + 2*(tw+6), 124, tw, 22, "");  Track("partial");
 
       const int aw = 101;
-      Button("pause",    8,            TM_PANEL_ACT_Y, aw, 22, "");  Track("pause");
-      Button("beall",    8 + aw + 6,   TM_PANEL_ACT_Y, aw, 22, "");  Track("beall");
-      Button("half",     8 + 2*(aw+6), TM_PANEL_ACT_Y, aw, 22, "");  Track("half");
-      Button("closeall", 8 + 3*(aw+6), TM_PANEL_ACT_Y, aw, 22, "");  Track("closeall");
+      // Close by direction sits above the bottom action row.
+      Button("closebuy",  8,   TM_PANEL_ACT_Y, 209, 22, "CLOSE BUY");   Track("closebuy");
+      Button("closesell", 223, TM_PANEL_ACT_Y, 205, 22, "CLOSE SELL");  Track("closesell");
+      SetButton("closebuy",  "CLOSE BUY",  C'30,95,62');
+      SetButton("closesell", "CLOSE SELL", C'130,48,48');
+
+      Button("pause",    8,            TM_PANEL_ACT_Y + 28, aw, 22, "");  Track("pause");
+      Button("beall",    8 + aw + 6,   TM_PANEL_ACT_Y + 28, aw, 22, "");  Track("beall");
+      Button("half",     8 + 2*(aw+6), TM_PANEL_ACT_Y + 28, aw, 22, "");  Track("half");
+      Button("closeall", 8 + 3*(aw+6), TM_PANEL_ACT_Y + 28, aw, 22, "");  Track("closeall");
 
       // ---- order entry
       Label("c_lot", 8,   154, "LOT", C'150,155,165', 8);             Track("c_lot");
@@ -483,6 +491,15 @@ public:
    {
       if(m_created)
          SetText("pcandle", text, clr);
+   }
+
+   // Shows how many managed positions each close button would affect.
+   void SetSideCounts(const int buys, const int sells)
+   {
+      if(!m_created)
+         return;
+      SetButton("closebuy",  StringFormat("CLOSE BUY (%d)", buys),   buys  > 0 ? C'30,130,70'  : C'45,60,52');
+      SetButton("closesell", StringFormat("CLOSE SELL (%d)", sells), sells > 0 ? C'185,55,55' : C'70,45,45');
    }
 
    void SetClock(const string text, const color clr)
@@ -652,6 +669,8 @@ public:
       if(key == "beall")    return PANEL_BE_ALL;
       if(key == "half")     return PANEL_CLOSE_HALF;
       if(key == "closeall") return PANEL_CLOSE_ALL;
+      if(key == "closebuy")  return PANEL_CLOSE_BUY;
+      if(key == "closesell") return PANEL_CLOSE_SELL;
 
       if(key == "buy")       { m_orderType = ORDER_TYPE_BUY;        return PANEL_ORDER; }
       if(key == "sell")      { m_orderType = ORDER_TYPE_SELL;       return PANEL_ORDER; }

@@ -198,6 +198,14 @@ private:
                         p.sl, p.tp, (int)SymbolInfoInteger(p.symbol, SYMBOL_DIGITS));
       }
 
+      int buys = 0, sells = 0;
+      for(int k = 0; k < n; k++)
+      {
+         if(reg.At(k).IsBuy()) buys++;
+         else                  sells++;
+      }
+      m_panel.SetSideCounts(buys, sells);
+
       m_panel.Render(n, m_risk.exposure.openRiskMoney, m_risk.exposure.openRiskPct,
                      m_risk.account.balance, m_risk.account.dailyPL, m_risk.account.dailyPLPct, m_risk.drawdownPct,
                      TM_ProtectionText(m_guard.Status()), m_guard.IsProtectionActive(),
@@ -307,6 +315,12 @@ public:
             break;
          case PANEL_CLOSE_ALL:
             m_dispatch.ManualCloseAll();
+            break;
+         case PANEL_CLOSE_BUY:
+            m_dispatch.ManualCloseSide(true);
+            break;
+         case PANEL_CLOSE_SELL:
+            m_dispatch.ManualCloseSide(false);
             break;
          case PANEL_ORDER:
          {
