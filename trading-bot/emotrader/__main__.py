@@ -90,7 +90,7 @@ def cmd_backtest(args, df, ppy):
         print(f"  {t.entry_time:%Y-%m-%d} → {t.exit_time:%Y-%m-%d}  {t.pnl_pct:+6.1%}  "
               f"خروج: {names.get(t.reason, t.reason):<7} حال هنگام ورود: {t.mood_at_entry}")
     if args.save_log:
-        r.log.to_csv(args.save_log)
+        r.log.to_csv(args.save_log, encoding="utf-8-sig")  # BOM تا اکسل فارسی را درست نشان دهد
         print(f"\nلاگ کامل (سرمایه، ترس، طمع، ...) ذخیره شد: {args.save_log}")
 
 
