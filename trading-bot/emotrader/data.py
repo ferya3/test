@@ -65,8 +65,15 @@ def fetch_exchange(exchange: str, symbol: str, timeframe: str = "1d", limit: int
         import ccxt
     except ImportError as e:
         raise SystemExit("برای داده‌ی زنده‌ی صرافی ابتدا نصب کنید:  pip install ccxt") from e
+    if not hasattr(ccxt, exchange):
+        raise SystemExit(f"صرافی «{exchange}» شناخته نشد. نمونه‌ها: kucoin, binance, okx, bybit, gateio")
     client = getattr(ccxt, exchange)()
-    rows = client.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
+    try:
+        rows = client.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
+    except ccxt.BadSymbol as e:
+        raise SystemExit(f"نماد «{symbol}» در {exchange} نیست. برای طلا: PAXG/USDT یا XAUT/USDT") from e
+    except ccxt.NetworkError as e:
+        raise SystemExit(f"اتصال به {exchange} برقرار نشد (شاید فیلتر است؛ VPN یا صرافی دیگری را امتحان کنید).") from e
     df = pd.DataFrame(rows, columns=["time", "open", "high", "low", "close", "volume"])
     df["time"] = pd.to_datetime(df["time"], unit="ms")
     return df.set_index("time")
