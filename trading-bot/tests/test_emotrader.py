@@ -20,6 +20,27 @@ class IndicatorTests(unittest.TestCase):
         self.assertEqual(rsi(close).iloc[-1], 100.0)
 
 
+class DataTests(unittest.TestCase):
+    def test_csv_round_trip_with_dates_and_ms_timestamps(self):
+        import os
+        import tempfile
+
+        from emotrader.data import load_csv
+
+        df = synthetic_market(50, seed=2)
+        with tempfile.TemporaryDirectory() as d:
+            dated = os.path.join(d, "dated.csv")
+            df.to_csv(dated)
+            self.assertEqual(len(load_csv(dated)), 50)
+
+            for name, step in (("ms", pd.Timedelta(milliseconds=1)), ("s", pd.Timedelta(seconds=1))):
+                path = os.path.join(d, f"{name}.csv")
+                out = df.reset_index()
+                out["time"] = (out["time"] - pd.Timestamp(0)) // step
+                out.to_csv(path, index=False)
+                self.assertEqual(load_csv(path).index[0], df.index[0])
+
+
 class AnalyzerTests(unittest.TestCase):
     def test_market_panic_reads_as_fear(self):
         calm = np.full(150, 100.0)

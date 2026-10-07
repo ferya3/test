@@ -48,8 +48,10 @@ def load_csv(path: str) -> pd.DataFrame:
     time_col = next((c for c in ("time", "date", "datetime", "timestamp") if c in df.columns), None)
     if time_col:
         col = df[time_col]
-        unit = "ms" if np.issubdtype(col.dtype, np.number) and col.max() > 1e11 else None
-        df[time_col] = pd.to_datetime(col, unit=unit) if unit else pd.to_datetime(col)
+        if pd.api.types.is_numeric_dtype(col):  # epoch: میلی‌ثانیه (صرافی‌ها) یا ثانیه
+            df[time_col] = pd.to_datetime(col, unit="ms" if col.max() > 1e11 else "s")
+        else:
+            df[time_col] = pd.to_datetime(col)
         df = df.set_index(time_col).rename_axis("time")
     missing = [c for c in REQUIRED if c not in df.columns]
     if missing:
