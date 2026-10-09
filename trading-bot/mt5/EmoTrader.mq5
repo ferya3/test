@@ -1,4 +1,4 @@
-//+------------------------------------------------------------------+
+﻿//+------------------------------------------------------------------+
 //|                                                    EmoTrader.mq5 |
 //|  Expert Advisor that analyses the market and trades with          |
 //|  simulated FEAR and GREED.                                        |
@@ -13,29 +13,37 @@
 //|                                                                  |
 //|  Default mode is ANALYZE ONLY: it never sends orders until you    |
 //|  switch Mode to "Auto trade". Test on a demo account first.       |
+//|                                                                  |
+//|  This file is UTF-8 (with BOM) because it contains Persian text.  |
 //+------------------------------------------------------------------+
 #property copyright "EmoTrader"
-#property version   "1.00"
+#property version   "1.10"
 #property description "Fear & greed trading robot. Default mode: analyze only (no orders)."
 #property description "Attach to a gold chart (XAUUSD). Analysis timeframe is set in inputs."
 
 #include <Trade\Trade.mqh>
 
 //--- enums ----------------------------------------------------------
+enum ENUM_EMO_LANG
+  {
+   EMO_LANG_FA = 0, // فارسی
+   EMO_LANG_EN = 1  // English
+  };
+
 enum ENUM_EMO_MODE
   {
-   EMO_ANALYZE_ONLY = 0, // Analyze only (signals + alerts, no orders)
-   EMO_AUTO_TRADE   = 1  // Auto trade
+   EMO_ANALYZE_ONLY = 0, // فقط تحلیل (سیگنال و هشدار، بدون معامله)
+   EMO_AUTO_TRADE   = 1  // معامله خودکار
   };
 
 enum ENUM_EMO_PERSONALITY
   {
-   EMO_ROBOT     = 0, // Robot (no emotions)
-   EMO_BALANCED  = 1, // Balanced
-   EMO_EMOTIONAL = 2, // Emotional (follows the crowd, panic sells)
-   EMO_BUFFETT   = 3, // Contrarian (Buffett)
-   EMO_COWARD    = 4, // Coward
-   EMO_CUSTOM    = 5  // Custom (use the values below)
+   EMO_ROBOT     = 0, // ربات بی‌احساس
+   EMO_BALANCED  = 1, // متعادل
+   EMO_EMOTIONAL = 2, // احساسی (پیرو جمع، فروش هیجانی)
+   EMO_BUFFETT   = 3, // خلاف‌جهت (بافت)
+   EMO_COWARD    = 4, // ترسو
+   EMO_CUSTOM    = 5  // سفارشی (مقادیر پایین)
   };
 
 enum ENUM_EMO_ACTION
@@ -47,37 +55,54 @@ enum ENUM_EMO_ACTION
   };
 
 //--- inputs ---------------------------------------------------------
-input group "General"
-input ENUM_EMO_MODE        InpMode        = EMO_ANALYZE_ONLY; // Mode
-input ENUM_EMO_PERSONALITY InpPersonality = EMO_BALANCED;     // Personality
-input ENUM_TIMEFRAMES      InpTimeframe   = PERIOD_M5;        // Analysis timeframe
-input bool                 InpAllowShort  = true;             // Allow sell trades
-input ulong                InpMagic       = 20261009;         // Magic number
+input group "عمومی"
+input ENUM_EMO_LANG        InpLanguage    = EMO_LANG_FA;      // زبان پنل
+input ENUM_EMO_MODE        InpMode        = EMO_ANALYZE_ONLY; // حالت
+input ENUM_EMO_PERSONALITY InpPersonality = EMO_BALANCED;     // شخصیت ربات
+input ENUM_TIMEFRAMES      InpTimeframe   = PERIOD_M5;        // تایم‌فریم تحلیل
+input bool                 InpAllowShort  = true;             // اجازه معامله فروش
+input ulong                InpMagic       = 20261009;         // مجیک نامبر
 
-input group "Risk"
-input double InpRiskPercent     = 0.5;  // Risk per trade (% of equity)
-input double InpStopATR         = 2.0;  // Stop loss (x ATR)
-input double InpTakeProfitATR   = 3.0;  // Take profit (x ATR)
-input double InpEntryThreshold  = 0.30; // Entry threshold (signal score 0..1)
-input double InpExitThreshold   = 0.10; // Exit when score turns against position by this much
-input double InpMaxSpreadATR    = 0.25; // Max spread (x ATR) allowed to open a trade
-input int    InpMaxTradesPerDay = 10;   // Max new trades per day
-input double InpDailyLossPct    = 3.0;  // Stop opening trades after this daily loss (%)
+input group "مدیریت ریسک"
+input double InpRiskPercent     = 0.5;  // ریسک هر معامله (درصد سرمایه)
+input double InpStopATR         = 2.0;  // حد ضرر (ضریب ATR)
+input double InpTakeProfitATR   = 3.0;  // حد سود (ضریب ATR)
+input double InpEntryThreshold  = 0.30; // آستانه ورود (امتیاز ۰ تا ۱)
+input double InpExitThreshold   = 0.10; // آستانه خروج وقتی امتیاز برخلاف پوزیشن شود
+input double InpMaxSpreadATR    = 0.25; // حداکثر اسپرد مجاز (ضریب ATR)
+input int    InpMaxTradesPerDay = 10;   // حداکثر معامله در روز
+input double InpDailyLossPct    = 3.0;  // توقف بعد از این درصد ضرر روزانه
 
-input group "Custom personality"
-input double InpFearSensitivity  = 1.0;  // Fear sensitivity (0..2)
-input double InpGreedSensitivity = 1.0;  // Greed sensitivity (0..2)
-input double InpDiscipline       = 0.6;  // Discipline (1 = ignore emotions, 0 = fully emotional)
-input double InpContrarian       = 0.3;  // Contrarian (1 = against the crowd)
-input double InpMemory           = 0.85; // Emotional memory per bar (0..1)
+input group "شخصیت سفارشی"
+input double InpFearSensitivity  = 1.0;  // حساسیت به ترس (۰ تا ۲)
+input double InpGreedSensitivity = 1.0;  // حساسیت به طمع (۰ تا ۲)
+input double InpDiscipline       = 0.6;  // انضباط (۱ = بی‌احساس، ۰ = کاملا احساسی)
+input double InpContrarian       = 0.3;  // خلاف‌جهت بودن (۱ = کاملا خلاف جمع)
+input double InpMemory           = 0.85; // حافظه احساسی در هر کندل (۰ تا ۱)
 
-input group "Alerts"
-input bool InpAlerts = true;  // Popup alert on new signal
-input bool InpPush   = false; // Push notification to phone (set MetaQuotes ID in terminal)
+input group "هشدارها"
+input bool InpAlerts = true;  // هشدار پاپ‌آپ روی سیگنال جدید
+input bool InpPush   = false; // نوتیفیکیشن روی گوشی
 
 //--- constants ------------------------------------------------------
 #define EMO_LOOKBACK 130   // bars needed to analyse one bar
 #define EMO_WARMUP   300   // bars replayed at start to build the mood
+
+// panel geometry
+#define PNL_X      10
+#define PNL_Y      22
+#define PNL_W      500
+#define PNL_ROW_H  19
+#define PNL_PREFIX "EMO_"
+
+#define CLR_BG      C'16,20,28'
+#define CLR_BORDER  C'212,170,70'
+#define CLR_TITLE   C'160,170,188'
+#define CLR_TEXT    C'235,238,245'
+#define CLR_SECTION C'230,190,90'
+#define CLR_GOOD    C'70,205,125'
+#define CLR_BAD     C'240,95,95'
+#define CLR_WARN    C'240,180,70'
 
 //--- types ----------------------------------------------------------
 struct SAnalysis
@@ -102,7 +127,8 @@ struct SDecision
    double sizeMult;
    double stopAtr;
    double tpAtr;
-   string note;
+   string note;    // main reason (no numbers, so Persian renders cleanly)
+   string note2;   // extra remark (FOMO, contrarian view)
   };
 
 //--- globals --------------------------------------------------------
@@ -114,7 +140,6 @@ double   gEmaF[], gEmaS[], gSma[], gRsi[], gMacdM[], gMacdS[], gBbU[], gBbL[], g
 long     gVol[];
 
 // personality
-string   gPersonalityName;
 double   gFearSens, gGreedSens, gDiscipline, gContrarian, gMemory;
 
 // emotional state
@@ -132,7 +157,25 @@ double    gEntryRisk = 0.0;   // money at risk on the open trade
 int       gDay = -1;
 double    gDayStartEquity = 0.0;
 int       gTradesToday = 0;
-string    gLastEvent = "";
+string    gEventText = "";    // last event, words only
+string    gEventValue = "";   // last event, numbers only
+
+// panel
+int       gRow = 0;
+int       gPanelRows = 0;
+
+//+------------------------------------------------------------------+
+//| language                                                         |
+//+------------------------------------------------------------------+
+bool IsFa()
+  {
+   return InpLanguage == EMO_LANG_FA;
+  }
+
+string L(const string fa, const string en)
+  {
+   return IsFa() ? fa : en;
+  }
 
 //+------------------------------------------------------------------+
 //| small math helpers                                               |
@@ -160,23 +203,26 @@ string Bar(const double v, const int width = 20)
    int n = (int)MathRound(Clamp(v, 0.0, 1.0) * width);
    string s = "[";
    for(int i = 0; i < width; i++)
-      s += (i < n ? "#" : "-");
+      s += (i < n ? "|" : ".");
    return s + "]";
   }
 
+//+------------------------------------------------------------------+
+//| words                                                            |
+//+------------------------------------------------------------------+
 string FgLabel(const double v)
   {
-   if(v < 20) return "EXTREME FEAR";
-   if(v < 40) return "FEAR";
-   if(v < 60) return "NEUTRAL";
-   if(v < 80) return "GREED";
-   return "EXTREME GREED";
+   if(v < 20) return L("ترس شدید", "EXTREME FEAR");
+   if(v < 40) return L("ترس", "FEAR");
+   if(v < 60) return L("خنثی", "NEUTRAL");
+   if(v < 80) return L("طمع", "GREED");
+   return L("طمع شدید", "EXTREME GREED");
   }
 
-string Mood()
+string MoodEn()
   {
    if(gFear > 0.8)  return "PANIC";
-   if(gGreed > 0.8) return "EUPHORIC / FOMO";
+   if(gGreed > 0.8) return "FOMO";
    double b = gGreed - gFear;
    if(b < -0.35) return "SCARED";
    if(b < -0.10) return "CAUTIOUS";
@@ -185,15 +231,58 @@ string Mood()
    return "GREEDY";
   }
 
+string Mood()
+  {
+   string en = MoodEn();
+   if(!IsFa())
+      return en;
+   if(en == "PANIC")    return "وحشت‌زده";
+   if(en == "FOMO")     return "سرمست / فومو";
+   if(en == "SCARED")   return "ترسیده";
+   if(en == "CAUTIOUS") return "محتاط";
+   if(en == "CALM")     return "آرام";
+   if(en == "EAGER")    return "مشتاق";
+   return "طمع‌کار";
+  }
+
+color MoodColor()
+  {
+   double b = gGreed - gFear;
+   if(b < -0.10) return CLR_BAD;
+   if(b > 0.10)  return CLR_GOOD;
+   return CLR_TEXT;
+  }
+
 string ActionName(const int a)
   {
    switch(a)
      {
-      case ACT_BUY:   return "BUY";
-      case ACT_SELL:  return "SELL";
-      case ACT_CLOSE: return "CLOSE";
+      case ACT_BUY:   return L("خرید", "BUY");
+      case ACT_SELL:  return L("فروش", "SELL");
+      case ACT_CLOSE: return L("بستن پوزیشن", "CLOSE");
      }
-   return "HOLD";
+   return L("صبر", "HOLD");
+  }
+
+color ActionColor(const int a)
+  {
+   if(a == ACT_BUY)   return CLR_GOOD;
+   if(a == ACT_SELL)  return CLR_BAD;
+   if(a == ACT_CLOSE) return CLR_WARN;
+   return CLR_TEXT;
+  }
+
+string PersonalityName()
+  {
+   switch(InpPersonality)
+     {
+      case EMO_ROBOT:     return L("ربات بی‌احساس", "Robot");
+      case EMO_EMOTIONAL: return L("احساسی", "Emotional");
+      case EMO_BUFFETT:   return L("خلاف‌جهت (بافت)", "Contrarian");
+      case EMO_COWARD:    return L("ترسو", "Coward");
+      case EMO_CUSTOM:    return L("سفارشی", "Custom");
+     }
+   return L("متعادل", "Balanced");
   }
 
 //+------------------------------------------------------------------+
@@ -201,19 +290,18 @@ string ActionName(const int a)
 //+------------------------------------------------------------------+
 void ApplyPersonality()
   {
-   // name, fear sens, greed sens, discipline, contrarian, memory
+   // fear sens, greed sens, discipline, contrarian, memory
    switch(InpPersonality)
      {
       case EMO_ROBOT:
-         gPersonalityName = "Robot";      gFearSens = 1.0; gGreedSens = 1.0; gDiscipline = 1.0;  gContrarian = 0.3; gMemory = 0.85; break;
+         gFearSens = 1.0; gGreedSens = 1.0; gDiscipline = 1.0;  gContrarian = 0.3; gMemory = 0.85; break;
       case EMO_EMOTIONAL:
-         gPersonalityName = "Emotional";  gFearSens = 1.4; gGreedSens = 1.4; gDiscipline = 0.15; gContrarian = 0.0; gMemory = 0.90; break;
+         gFearSens = 1.4; gGreedSens = 1.4; gDiscipline = 0.15; gContrarian = 0.0; gMemory = 0.90; break;
       case EMO_BUFFETT:
-         gPersonalityName = "Contrarian"; gFearSens = 0.7; gGreedSens = 0.9; gDiscipline = 0.5;  gContrarian = 0.9; gMemory = 0.90; break;
+         gFearSens = 0.7; gGreedSens = 0.9; gDiscipline = 0.5;  gContrarian = 0.9; gMemory = 0.90; break;
       case EMO_COWARD:
-         gPersonalityName = "Coward";     gFearSens = 1.8; gGreedSens = 0.5; gDiscipline = 0.3;  gContrarian = 0.1; gMemory = 0.85; break;
+         gFearSens = 1.8; gGreedSens = 0.5; gDiscipline = 0.3;  gContrarian = 0.1; gMemory = 0.85; break;
       case EMO_CUSTOM:
-         gPersonalityName = "Custom";
          gFearSens   = Clamp(InpFearSensitivity, 0.0, 3.0);
          gGreedSens  = Clamp(InpGreedSensitivity, 0.0, 3.0);
          gDiscipline = Clamp(InpDiscipline, 0.0, 1.0);
@@ -221,7 +309,7 @@ void ApplyPersonality()
          gMemory     = Clamp(InpMemory, 0.0, 0.99);
          break;
       default:
-         gPersonalityName = "Balanced";   gFearSens = 1.0; gGreedSens = 1.0; gDiscipline = 0.6;  gContrarian = 0.3; gMemory = 0.85; break;
+         gFearSens = 1.0; gGreedSens = 1.0; gDiscipline = 0.6;  gContrarian = 0.3; gMemory = 0.85; break;
      }
   }
 
@@ -383,6 +471,7 @@ void Decide(const SAnalysis &a, const int posDir, const double posAtr, SDecision
    double f = gFear, g = gGreed;
 
    d.panic     = false;
+   d.note2     = "";
    d.threshold = MathMax(0.05, InpEntryThreshold * (1.0 + w * (1.2 * f - 0.8 * g)));
    d.sizeMult  = Clamp(1.0 + w * (1.5 * g - 1.2 * f), 0.2, 2.5);
    d.stopAtr   = InpStopATR * (1.0 - 0.4 * w * f + 0.4 * w * g);
@@ -396,15 +485,16 @@ void Decide(const SAnalysis &a, const int posDir, const double posAtr, SDecision
         {
          d.action = ACT_CLOSE;
          d.panic  = true;
-         d.note   = "PANIC: fear beat reason, closing the losing trade";
+         d.note   = L("وحشت! ترس بر عقل غلبه کرد و معامله ضررده را می‌بندد",
+                      "PANIC: fear beat reason, closing the losing trade");
         }
       else if((posDir > 0 && a.score < -exitLevel) || (posDir < 0 && a.score > exitLevel))
         {
          d.action = ACT_CLOSE;
-         d.note   = StringFormat("Score %+.2f turned against the position", a.score);
+         d.note   = L("امتیاز تحلیل برخلاف پوزیشن چرخید", "Score turned against the position");
         }
       else
-         d.note = "Holding the position";
+         d.note = L("پوزیشن حفظ می‌شود", "Holding the position");
      }
    else
      {
@@ -415,20 +505,22 @@ void Decide(const SAnalysis &a, const int posDir, const double posAtr, SDecision
 
       if(d.action != ACT_HOLD)
         {
-         d.note = StringFormat("Score %+.2f passed threshold %.2f", a.score, d.threshold);
+         d.note = L("امتیاز تحلیل از آستانه ورود عبور کرد", "Score passed the entry threshold");
          if(g > f && d.threshold < InpEntryThreshold)
-            d.note += " (greed lowered the bar: a bit of FOMO)";
+            d.note2 = L("طمع آستانه را پایین آورد؛ کمی فومو در کار است", "Greed lowered the bar: a bit of FOMO");
         }
-      else if(MathAbs(a.score) >= InpEntryThreshold)
-         d.note = "Analysis says " + (a.score > 0 ? "BUY" : "SELL") + ", but fear says no";
+      else if(a.score >= InpEntryThreshold)
+         d.note = L("تحلیل می‌گوید بخر، اما ترس اجازه نمی‌دهد", "Analysis says BUY, but fear says no");
+      else if(InpAllowShort && a.score <= -InpEntryThreshold)
+         d.note = L("تحلیل می‌گوید بفروش، اما ترس اجازه نمی‌دهد", "Analysis says SELL, but fear says no");
       else
-         d.note = StringFormat("Signal too weak (%+.2f, needs %.2f)", a.score, d.threshold);
+         d.note = L("سیگنال به اندازه کافی قوی نیست", "Signal is too weak");
      }
 
    if(gContrarian > 0.6 && a.fg < 25.0)
-      d.note += " | Crowd is terrified: contrarian sees opportunity";
+      d.note2 = L("بازار در ترس شدید است؛ از نگاه خلاف‌جهت یعنی فرصت", "Crowd is terrified: contrarian sees opportunity");
    else if(gContrarian > 0.6 && a.fg > 75.0)
-      d.note += " | Crowd is euphoric: time to be careful";
+      d.note2 = L("بازار در طمع شدید است؛ وقت احتیاط است", "Crowd is euphoric: time to be careful");
   }
 
 //+------------------------------------------------------------------+
@@ -494,21 +586,28 @@ double CalcLots(const double stopDist, const double riskMoney, double &riskTaken
    return lots;
   }
 
+void SetEvent(const string text, const string value)
+  {
+   gEventText  = text;
+   gEventValue = value;
+   Print("EmoTrader: ", text, "  ", value);
+  }
+
 // returns "" when a new trade is allowed, otherwise the reason it is not
 string BlockReason(const SAnalysis &a)
   {
    if(InpMode != EMO_AUTO_TRADE)
-      return "analyze-only mode";
+      return L("حالت فقط تحلیل", "analyze-only mode");
    if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) || !MQLInfoInteger(MQL_TRADE_ALLOWED))
-      return "Algo Trading is disabled in the terminal";
+      return L("الگو تریدینگ در متاتریدر خاموش است", "Algo Trading is disabled in the terminal");
    if(gTradesToday >= InpMaxTradesPerDay)
-      return "daily trade limit reached";
+      return L("سقف معاملات امروز پر شده", "daily trade limit reached");
    double equity = AccountInfoDouble(ACCOUNT_EQUITY);
    if(gDayStartEquity > 0.0 && equity < gDayStartEquity * (1.0 - InpDailyLossPct / 100.0))
-      return "daily loss limit reached";
+      return L("به سقف ضرر روزانه رسیدیم", "daily loss limit reached");
    double spread = SymbolInfoDouble(_Symbol, SYMBOL_ASK) - SymbolInfoDouble(_Symbol, SYMBOL_BID);
    if(spread > InpMaxSpreadATR * a.atr)
-      return StringFormat("spread too wide (%.2f ATR)", spread / a.atr);
+      return L("اسپرد خیلی زیاد است", "spread too wide");
    return "";
   }
 
@@ -518,7 +617,7 @@ void OpenTrade(const int dir, const SAnalysis &a, const SDecision &d)
    if(blocked != "")
      {
       if(InpMode == EMO_AUTO_TRADE)
-         gLastEvent = "Not opened: " + blocked;
+         SetEvent(L("معامله باز نشد: ", "Not opened: ") + blocked, "");
       return;
      }
 
@@ -532,15 +631,14 @@ void OpenTrade(const int dir, const SAnalysis &a, const SDecision &d)
    double lots = CalcLots(stopDist, riskMoney, riskTaken);
    if(lots <= 0.0)
      {
-      gLastEvent = "Not opened: account too small for minimum lot at this stop";
-      Print("EmoTrader: ", gLastEvent);
+      SetEvent(L("معامله باز نشد: سرمایه برای حداقل لات کافی نیست", "Not opened: account too small for the minimum lot"), "");
       return;
      }
 
    double price = (dir > 0) ? SymbolInfoDouble(_Symbol, SYMBOL_ASK) : SymbolInfoDouble(_Symbol, SYMBOL_BID);
    double sl = NormalizeDouble(dir > 0 ? price - stopDist : price + stopDist, _Digits);
    double tp = NormalizeDouble(dir > 0 ? price + tpDist : price - tpDist, _Digits);
-   string comment = "Emo " + Mood();
+   string comment = "Emo " + MoodEn();
 
    bool ok = (dir > 0) ? trade.Buy(lots, _Symbol, 0.0, sl, tp, comment)
                        : trade.Sell(lots, _Symbol, 0.0, sl, tp, comment);
@@ -548,14 +646,12 @@ void OpenTrade(const int dir, const SAnalysis &a, const SDecision &d)
      {
       gTradesToday++;
       gEntryRisk = riskTaken;
-      gLastEvent = StringFormat("%s %.2f lot @ %s  SL %s  TP %s  risk %.2f %s  mood %s",
-                                dir > 0 ? "BOUGHT" : "SOLD", lots, DoubleToString(price, _Digits),
-                                DoubleToString(sl, _Digits), DoubleToString(tp, _Digits),
-                                riskTaken, AccountInfoString(ACCOUNT_CURRENCY), Mood());
+      SetEvent(dir > 0 ? L("خرید باز شد", "BUY opened") : L("فروش باز شد", "SELL opened"),
+               StringFormat("%.2f lot @ %s  SL %s  TP %s", lots, DoubleToString(price, _Digits),
+                            DoubleToString(sl, _Digits), DoubleToString(tp, _Digits)));
      }
    else
-      gLastEvent = "Order failed: " + trade.ResultRetcodeDescription();
-   Print("EmoTrader: ", gLastEvent);
+      SetEvent(L("خطا در ارسال سفارش", "Order failed"), trade.ResultRetcodeDescription());
   }
 
 void Notify(const string text)
@@ -631,17 +727,17 @@ void OnNewBar()
    if(gDecision.action == ACT_CLOSE && hasPos && InpMode == EMO_AUTO_TRADE)
      {
       if(trade.PositionClose(ticket))
-         gLastEvent = (gDecision.panic ? "PANIC CLOSE: " : "CLOSED: ") + gDecision.note;
+         SetEvent(gDecision.panic ? L("بستن از روی وحشت", "PANIC CLOSE") : L("پوزیشن بسته شد", "Position closed"), "");
       else
-         gLastEvent = "Close failed: " + trade.ResultRetcodeDescription();
-      Print("EmoTrader: ", gLastEvent);
+         SetEvent(L("خطا در بستن پوزیشن", "Close failed"), trade.ResultRetcodeDescription());
      }
 
    int signal = (gDecision.action == ACT_BUY || gDecision.action == ACT_SELL) ? gDecision.action : (int)ACT_HOLD;
    if(signal != ACT_HOLD && signal != gLastSignal)
-      Notify(StringFormat("EmoTrader %s %s: %s @ %s | score %+.2f | F&G %.0f | mood %s",
-                          _Symbol, EnumToString(InpTimeframe), ActionName(signal),
-                          DoubleToString(a.price, _Digits), a.score, a.fg, Mood()));
+      Notify(StringFormat("EmoTrader %s %s: %s @ %s | %s %+.2f | %s %.0f | %s",
+                          _Symbol, StringSubstr(EnumToString(InpTimeframe), 7), ActionName(signal),
+                          DoubleToString(a.price, _Digits), L("امتیاز", "score"), a.score,
+                          L("ترس و طمع بازار", "F&G"), a.fg, Mood()));
    gLastSignal = signal;
 
    if(signal != ACT_HOLD && !hasPos)
@@ -649,56 +745,166 @@ void OnNewBar()
   }
 
 //+------------------------------------------------------------------+
-//| on-chart panel                                                   |
+//| on-chart panel: a framed box, one line per row                   |
+//| Persian: title on the right, words next to it, numbers on the     |
+//| left. Words and numbers live in separate labels so right-to-left  |
+//| text never gets mixed with numbers.                              |
 //+------------------------------------------------------------------+
+void PanelLabel(const string name, const int x, const int y, const string text, const color clr,
+                const ENUM_ANCHOR_POINT anchor, const string font, const int size)
+  {
+   if(ObjectFind(0, name) < 0)
+     {
+      ObjectCreate(0, name, OBJ_LABEL, 0, 0, 0);
+      ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+      ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
+      ObjectSetInteger(0, name, OBJPROP_BACK, false);
+     }
+   ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
+   ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
+   ObjectSetInteger(0, name, OBJPROP_ANCHOR, anchor);
+   ObjectSetString(0, name, OBJPROP_TEXT, text == "" ? " " : text);
+   ObjectSetString(0, name, OBJPROP_FONT, font);
+   ObjectSetInteger(0, name, OBJPROP_FONTSIZE, size);
+   ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
+  }
+
+void PanelBox(const int height)
+  {
+   string name = PNL_PREFIX + "BG";
+   if(ObjectFind(0, name) < 0)
+     {
+      ObjectCreate(0, name, OBJ_RECTANGLE_LABEL, 0, 0, 0);
+      ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+      ObjectSetInteger(0, name, OBJPROP_XDISTANCE, PNL_X);
+      ObjectSetInteger(0, name, OBJPROP_YDISTANCE, PNL_Y);
+      ObjectSetInteger(0, name, OBJPROP_XSIZE, PNL_W);
+      ObjectSetInteger(0, name, OBJPROP_BGCOLOR, CLR_BG);
+      ObjectSetInteger(0, name, OBJPROP_BORDER_TYPE, BORDER_FLAT);
+      ObjectSetInteger(0, name, OBJPROP_COLOR, CLR_BORDER);
+      ObjectSetInteger(0, name, OBJPROP_WIDTH, 2);
+      ObjectSetInteger(0, name, OBJPROP_BACK, false);
+      ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
+     }
+   ObjectSetInteger(0, name, OBJPROP_YSIZE, height);
+  }
+
+// one row: title, words (Persian-safe), value (numbers only)
+void Row(const string title, const string words = "", const string value = "",
+         const color wordsClr = CLR_TEXT, const color valueClr = CLR_TEXT, const color titleClr = CLR_TITLE)
+  {
+   int y = PNL_Y + 8 + gRow * PNL_ROW_H;
+   string id = IntegerToString(gRow);
+   if(IsFa())
+     {
+      PanelLabel(PNL_PREFIX + "T" + id, PNL_X + PNL_W - 12,  y, title, titleClr, ANCHOR_RIGHT_UPPER, "Tahoma", 9);
+      PanelLabel(PNL_PREFIX + "W" + id, PNL_X + PNL_W - 170, y, words, wordsClr, ANCHOR_RIGHT_UPPER, "Tahoma", 9);
+      PanelLabel(PNL_PREFIX + "V" + id, PNL_X + 12,          y, value, valueClr, ANCHOR_LEFT_UPPER,  "Consolas", 9);
+     }
+   else
+     {
+      PanelLabel(PNL_PREFIX + "T" + id, PNL_X + 12,          y, title, titleClr, ANCHOR_LEFT_UPPER,  "Tahoma", 9);
+      PanelLabel(PNL_PREFIX + "W" + id, PNL_X + 150,         y, words, wordsClr, ANCHOR_LEFT_UPPER,  "Tahoma", 9);
+      PanelLabel(PNL_PREFIX + "V" + id, PNL_X + PNL_W - 12,  y, value, valueClr, ANCHOR_RIGHT_UPPER, "Consolas", 9);
+     }
+   gRow++;
+  }
+
+void Section(const string title)
+  {
+   Row(title, "", "", CLR_TEXT, CLR_TEXT, CLR_SECTION);
+  }
+
 void UpdatePanel()
   {
    if(MQLInfoInteger(MQL_TESTER) && !MQLInfoInteger(MQL_VISUAL_MODE))
       return;
+   gRow = 0;
    string tf = StringSubstr(EnumToString(InpTimeframe), 7);
-   string s = StringFormat("EmoTrader  |  %s %s  |  %s  |  Personality: %s\n",
-                           _Symbol, tf, InpMode == EMO_AUTO_TRADE ? "AUTO TRADE" : "ANALYZE ONLY", gPersonalityName);
+   bool autoMode = (InpMode == EMO_AUTO_TRADE);
+
+   Row(autoMode ? L("معامله خودکار", "AUTO TRADE") : L("فقط تحلیل", "ANALYZE ONLY"),
+       PersonalityName(), "EmoTrader  " + _Symbol + "  " + tf,
+       CLR_TEXT, CLR_BORDER, autoMode ? CLR_WARN : CLR_GOOD);
+
    if(!gReady)
-     {
-      Comment(s + "Loading history and building the mood...");
-      return;
-     }
-   double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-   double spread = SymbolInfoDouble(_Symbol, SYMBOL_ASK) - bid;
-   s += StringFormat("Price %s   Spread %.2f ATR   ATR %s\n", DoubleToString(bid, _Digits),
-                     gLast.atr > 0 ? spread / gLast.atr : 0.0, DoubleToString(gLast.atr, _Digits));
-
-   s += "\n--- MARKET (last closed bar " + TimeToString(gLast.time, TIME_MINUTES) + ") ---\n";
-   s += StringFormat("Trend %s (%+.2f)   Momentum %+.2f   RSI %.0f\n",
-                     gLast.trend >= 0 ? "UP" : "DOWN", gLast.trend, gLast.momentum, gLast.rsi);
-   s += StringFormat("Volatility x%.2f of normal   %.1f ATR below recent high\n", gLast.volRatio, gLast.ddAtr);
-   s += StringFormat("Signal score %+.2f   (sell -1 .. +1 buy)\n", gLast.score);
-   s += StringFormat("Market Fear & Greed %.0f/100 %s %s\n", gLast.fg, Bar(gLast.fg / 100.0), FgLabel(gLast.fg));
-
-   s += "\n--- BOT MIND ---\n";
-   s += StringFormat("Fear  %3.0f%% %s\n", gFear * 100.0, Bar(gFear));
-   s += StringFormat("Greed %3.0f%% %s\n", gGreed * 100.0, Bar(gGreed));
-   s += "Mood: " + Mood() + StringFormat("   (wins in a row %d, losses in a row %d)\n", gWinStreak, gLossStreak);
-
-   s += "\n--- DECISION ---\n";
-   s += ActionName(gDecision.action) + ": " + gDecision.note + "\n";
-   s += StringFormat("Entry threshold %.2f   Size x%.2f   SL %.1f ATR   TP %.1f ATR\n",
-                     gDecision.threshold, gDecision.sizeMult, gDecision.stopAtr, gDecision.tpAtr);
-
-   ulong ticket = 0;
-   int dir = 0;
-   double openPrice = 0.0, volume = 0.0, profit = 0.0;
-   if(GetPosition(ticket, dir, openPrice, volume, profit))
-      s += StringFormat("Position: %s %.2f lot @ %s   P/L %.2f %s\n", dir > 0 ? "LONG" : "SHORT", volume,
-                        DoubleToString(openPrice, _Digits), profit, AccountInfoString(ACCOUNT_CURRENCY));
+      Row(L("صبر کنید", "Please wait"), L("در حال خواندن تاریخچه و ساختن حال ربات", "Loading history and building the mood"));
    else
-      s += "Position: none\n";
+     {
+      double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+      double spread = SymbolInfoDouble(_Symbol, SYMBOL_ASK) - bid;
 
-   double dayPl = (gDayStartEquity > 0.0) ? AccountInfoDouble(ACCOUNT_EQUITY) / gDayStartEquity - 1.0 : 0.0;
-   s += StringFormat("Today: %d/%d trades   P/L %+.2f%%\n", gTradesToday, InpMaxTradesPerDay, dayPl * 100.0);
-   if(gLastEvent != "")
-      s += "Last event: " + gLastEvent + "\n";
-   Comment(s);
+      Section(L("بازار", "MARKET"));
+      Row(L("قیمت", "Price"), "", DoubleToString(bid, _Digits));
+      Row(L("اسپرد", "Spread"), "", StringFormat("%.2f ATR", gLast.atr > 0 ? spread / gLast.atr : 0.0));
+      Row(L("روند", "Trend"), gLast.trend >= 0 ? L("صعودی", "up") : L("نزولی", "down"),
+          StringFormat("%+.2f", gLast.trend), gLast.trend >= 0 ? CLR_GOOD : CLR_BAD);
+      Row(L("مومنتوم", "Momentum"), gLast.momentum >= 0 ? L("مثبت", "positive") : L("منفی", "negative"),
+          StringFormat("%+.2f", gLast.momentum), gLast.momentum >= 0 ? CLR_GOOD : CLR_BAD);
+      string rsiWord = (gLast.rsi >= 70) ? L("اشباع خرید", "overbought")
+                       : ((gLast.rsi <= 30) ? L("اشباع فروش", "oversold") : L("عادی", "normal"));
+      Row("RSI", rsiWord, StringFormat("%.0f", gLast.rsi));
+      string volWord = (gLast.volRatio > 1.4) ? L("ملتهب", "heated")
+                       : ((gLast.volRatio < 0.75) ? L("آرام", "quiet") : L("عادی", "normal"));
+      Row(L("نوسان", "Volatility vs normal"), volWord, StringFormat("x%.2f", gLast.volRatio));
+      Row(L("فاصله از سقف", "Below recent high"), "", StringFormat("%.1f ATR", gLast.ddAtr));
+      string scoreWord = (gLast.score > 0.1) ? L("تمایل به خرید", "leaning buy")
+                         : ((gLast.score < -0.1) ? L("تمایل به فروش", "leaning sell") : L("خنثی", "neutral"));
+      Row(L("امتیاز تحلیل", "Signal score"), scoreWord, StringFormat("%+.2f", gLast.score),
+          gLast.score > 0.1 ? CLR_GOOD : (gLast.score < -0.1 ? CLR_BAD : CLR_TEXT));
+      Row(L("ترس و طمع بازار", "Market fear & greed"), FgLabel(gLast.fg),
+          StringFormat("%3.0f ", gLast.fg) + Bar(gLast.fg / 100.0), gLast.fg < 40 ? CLR_BAD : (gLast.fg > 60 ? CLR_GOOD : CLR_TEXT));
+
+      Section(L("ذهن ربات", "BOT MIND"));
+      Row(L("ترس", "Fear"), "", StringFormat("%3.0f%% ", gFear * 100.0) + Bar(gFear), CLR_TEXT, CLR_BAD);
+      Row(L("طمع", "Greed"), "", StringFormat("%3.0f%% ", gGreed * 100.0) + Bar(gGreed), CLR_TEXT, CLR_GOOD);
+      Row(L("حال ربات", "Mood"), Mood(), "", MoodColor());
+      Row(L("برد / باخت پیاپی", "Wins / losses in a row"), "", StringFormat("%d / %d", gWinStreak, gLossStreak));
+
+      Section(L("تصمیم", "DECISION"));
+      Row(L("تصمیم", "Action"), ActionName(gDecision.action), "", ActionColor(gDecision.action));
+      Row(L("دلیل", "Reason"), gDecision.note);
+      if(gDecision.note2 != "")
+         Row("", gDecision.note2, "", CLR_WARN);
+      Row(L("آستانه ورود", "Entry threshold"), "", StringFormat("%.2f", gDecision.threshold));
+      Row(L("ضریب حجم", "Size multiplier"), "", StringFormat("x%.2f", gDecision.sizeMult));
+      Row(L("حد ضرر / حد سود", "Stop / target"), "", StringFormat("%.1f / %.1f ATR", gDecision.stopAtr, gDecision.tpAtr));
+
+      Section(L("حساب", "ACCOUNT"));
+      ulong ticket = 0;
+      int dir = 0;
+      double openPrice = 0.0, volume = 0.0, profit = 0.0;
+      if(GetPosition(ticket, dir, openPrice, volume, profit))
+         Row(L("پوزیشن", "Position"), dir > 0 ? L("خرید", "long") : L("فروش", "short"),
+             StringFormat("%.2f lot @ %s  P/L %+.2f", volume, DoubleToString(openPrice, _Digits), profit),
+             dir > 0 ? CLR_GOOD : CLR_BAD, profit >= 0 ? CLR_GOOD : CLR_BAD);
+      else
+         Row(L("پوزیشن", "Position"), L("ندارد", "none"));
+      double dayPl = (gDayStartEquity > 0.0) ? AccountInfoDouble(ACCOUNT_EQUITY) / gDayStartEquity - 1.0 : 0.0;
+      Row(L("معاملات و سود امروز", "Today trades / P&L"), "",
+          StringFormat("%d/%d   %+.2f%%", gTradesToday, InpMaxTradesPerDay, dayPl * 100.0),
+          CLR_TEXT, dayPl >= 0 ? CLR_GOOD : CLR_BAD);
+      if(gEventText != "")
+        {
+         Row(L("آخرین رویداد", "Last event"), gEventText, "", CLR_WARN);
+         if(gEventValue != "")
+            Row("", "", gEventValue);
+        }
+     }
+
+   // blank rows left over from a longer previous frame
+   for(int i = gRow; i < gPanelRows; i++)
+     {
+      string id = IntegerToString(i);
+      ObjectSetString(0, PNL_PREFIX + "T" + id, OBJPROP_TEXT, " ");
+      ObjectSetString(0, PNL_PREFIX + "W" + id, OBJPROP_TEXT, " ");
+      ObjectSetString(0, PNL_PREFIX + "V" + id, OBJPROP_TEXT, " ");
+     }
+   gPanelRows = MathMax(gPanelRows, gRow);
+   PanelBox(gRow * PNL_ROW_H + 14);
+   ChartRedraw();
   }
 
 //+------------------------------------------------------------------+
@@ -707,6 +913,9 @@ void UpdatePanel()
 int OnInit()
   {
    ApplyPersonality();
+   gReady = false;     // globals survive a re-init when inputs change
+   gLastBar = 0;
+   gPanelRows = 0;
 
    hEmaFast = iMA(_Symbol, InpTimeframe, 20, 0, MODE_EMA, PRICE_CLOSE);
    hEmaSlow = iMA(_Symbol, InpTimeframe, 50, 0, MODE_EMA, PRICE_CLOSE);
@@ -733,17 +942,19 @@ int OnInit()
 
    gEquityPeak = AccountInfoDouble(ACCOUNT_EQUITY);
    gDecision.action = ACT_HOLD;
-   gDecision.note = "waiting for the first closed bar";
+   gDecision.note = L("منتظر بسته شدن اولین کندل", "Waiting for the first closed bar");
+   gDecision.note2 = "";
    CheckNewDay();
-   Print("EmoTrader started on ", _Symbol, " ", EnumToString(InpTimeframe), ", personality ", gPersonalityName,
-         ", mode ", InpMode == EMO_AUTO_TRADE ? "AUTO TRADE" : "ANALYZE ONLY");
+   Comment("");
+   Print("EmoTrader started on ", _Symbol, " ", EnumToString(InpTimeframe));
    UpdatePanel();
    return INIT_SUCCEEDED;
   }
 
 void OnDeinit(const int reason)
   {
-   Comment("");
+   ObjectsDeleteAll(0, PNL_PREFIX);
+   ChartRedraw();
    IndicatorRelease(hEmaFast); IndicatorRelease(hEmaSlow); IndicatorRelease(hSma);
    IndicatorRelease(hRsi);     IndicatorRelease(hMacd);    IndicatorRelease(hBands);
    IndicatorRelease(hAtr);
@@ -787,14 +998,12 @@ void OnTradeTransaction(const MqlTradeTransaction &trans, const MqlTradeRequest 
    gEntryRisk = 0.0;
 
    long reason = HistoryDealGetInteger(trans.deal, DEAL_REASON);
-   string why = "closed";
+   string why = L("معامله بسته شد", "Trade closed");
    if(reason == DEAL_REASON_SL)
-      why = "stop loss";
+      why = L("حد ضرر خورد", "Stop loss hit");
    else if(reason == DEAL_REASON_TP)
-      why = "take profit";
-   gLastEvent = StringFormat("Trade closed by %s: %.2f %s (%+.2fR). Mood now %s",
-                             why, profit, AccountInfoString(ACCOUNT_CURRENCY), r, Mood());
-   Print("EmoTrader: ", gLastEvent);
+      why = L("حد سود خورد", "Take profit hit");
+   SetEvent(why, StringFormat("%+.2f %s  (%+.2fR)", profit, AccountInfoString(ACCOUNT_CURRENCY), r));
    UpdatePanel();
   }
 //+------------------------------------------------------------------+
