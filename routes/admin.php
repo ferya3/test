@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\Resources\CatalogController;
 use App\Http\Controllers\Admin\Resources\CategoryController;
 use App\Http\Controllers\Admin\Resources\CertificateController;
 use App\Http\Controllers\Admin\Resources\ColorController;
+use App\Http\Controllers\Admin\Resources\CompanyController;
 use App\Http\Controllers\Admin\Resources\DecorController;
 use App\Http\Controllers\Admin\Resources\LeadController;
 use App\Http\Controllers\Admin\Resources\MaterialController;
@@ -87,6 +88,7 @@ Route::middleware(['auth', EnsureCanAccessAdmin::class, RequireTwoFactor::class]
      * check that could be forgotten.
      */
     $crud = [
+        'companies' => CompanyController::class,
         'products' => ProductController::class,
         'categories' => CategoryController::class,
         'colors' => ColorController::class,

@@ -7,6 +7,7 @@ use App\Http\Controllers\Public\CatalogController;
 use App\Http\Controllers\Public\CategoryController;
 use App\Http\Controllers\Public\CertificateController;
 use App\Http\Controllers\Public\ColorDecorController;
+use App\Http\Controllers\Public\CompanyController;
 use App\Http\Controllers\Public\CompareController;
 use App\Http\Controllers\Public\ContactController;
 use App\Http\Controllers\Public\HomeController;
@@ -36,6 +37,12 @@ use Illuminate\Support\Facades\Route;
 
 $pages = function (): void {
     Route::get('/', HomeController::class)->name('home');
+
+    // The holding's subsidiaries. Mounted whatever features.holding says,
+    // like the English pages: the flag decides whether the site advertises
+    // them, not whether a direct link works.
+    Route::get('/companies', [CompanyController::class, 'index'])->name('companies.index');
+    Route::get('/companies/{company:slug}', [CompanyController::class, 'show'])->name('companies.show');
 
     // Catalogue
     /*

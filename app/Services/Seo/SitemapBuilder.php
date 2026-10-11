@@ -6,6 +6,7 @@ namespace App\Services\Seo;
 
 use App\Models\Article;
 use App\Models\Category;
+use App\Models\Company;
 use App\Models\Page;
 use App\Models\Product;
 use App\Models\Project;
@@ -49,7 +50,10 @@ class SitemapBuilder
 
     public function render(): string
     {
-        return $this->cache->remember(fn (): string => $this->build()->render());
+        return $this->cache->remember(
+            fn (): string => $this->build()->render(),
+            variant: config('features.holding') ? 'holding' : '',
+        );
     }
 
     private function build(): Sitemap
@@ -66,6 +70,7 @@ class SitemapBuilder
         $this->addRoute($sitemap, 'representatives', priority: 0.5);
         $this->addRoute($sitemap, 'contact', priority: 0.5);
 
+        $this->addCompanies($sitemap);
         $this->addEditorialPages($sitemap);
         $this->addProducts($sitemap);
         $this->addCategories($sitemap);
@@ -73,6 +78,32 @@ class SitemapBuilder
         $this->addArticles($sitemap);
 
         return $sitemap;
+    }
+
+    /**
+     * Only while the holding is switched on: the pages answer either way, but
+     * a sitemap is the site advertising them, which is what the flag withholds.
+     * The flag is part of the cache key (see render()), so switching it
+     * takes effect on the next request.
+     */
+    private function addCompanies(Sitemap $sitemap): void
+    {
+        if (! config('features.holding')) {
+            return;
+        }
+
+        $this->addRoute($sitemap, 'companies.index', priority: 0.8);
+
+        Company::query()->active()
+            ->select(['slug', 'name', 'tagline', 'sector', 'summary', 'body', 'location', 'capacity', 'updated_at'])
+            ->each(fn (Company $company) => $this->addRoute(
+                $sitemap,
+                'companies.show',
+                ['company' => $company->slug],
+                priority: 0.8,
+                lastModified: $company->updated_at,
+                locales: $company->translatedLocales(),
+            ));
     }
 
     private function addEditorialPages(Sitemap $sitemap): void

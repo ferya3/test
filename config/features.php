@@ -39,4 +39,14 @@ return [
     */
     'language_switcher' => (bool) env('FEATURE_LANGUAGE_SWITCHER', false),
 
+    /*
+    | The holding layer: the "companies" link in the header and footer, the
+    | subsidiaries band on the homepage, and their entries in the sitemap.
+    |
+    | Off until the subsidiaries have been entered in the admin. Switched on
+    | over an empty companies table, the header would lead to a page listing
+    | nothing. The /companies routes answer either way.
+    */
+    'holding' => (bool) env('FEATURE_HOLDING', false),
+
 ];

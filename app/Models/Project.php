@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Casts\TranslatedJson;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\GeneratesSlug;
 use App\Models\Concerns\HasSeoMetadata;
 use App\Models\Concerns\HasTranslations;
@@ -22,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 #[ObservedBy(InvalidatesSitemapCache::class)]
 class Project extends Model
 {
+    use BelongsToCompany;
     use GeneratesSlug;
 
     /** @use HasFactory<ProjectFactory> */
@@ -37,6 +39,7 @@ class Project extends Model
     protected array $translatable = ['title', 'client', 'location', 'summary', 'body'];
 
     protected $fillable = [
+        'company_id',
         'slug',
         'title',
         'client',

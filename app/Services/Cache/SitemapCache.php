@@ -34,9 +34,16 @@ class SitemapCache
 
     /**
      * @param  Closure(): string  $callback
+     * @param  string  $variant  Anything outside the database that changes the
+     *                           document, such as a feature flag, so flipping it
+     *                           takes effect without waiting out the TTL.
      */
-    public function remember(Closure $callback): string
+    public function remember(Closure $callback, string $variant = ''): string
     {
-        return Cache::remember(sprintf('sitemap:v%d:xml', $this->version()), self::TTL, $callback);
+        $key = $variant === ''
+            ? sprintf('sitemap:v%d:xml', $this->version())
+            : sprintf('sitemap:v%d:%s:xml', $this->version(), $variant);
+
+        return Cache::remember($key, self::TTL, $callback);
     }
 }

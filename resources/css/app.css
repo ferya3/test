@@ -500,6 +500,20 @@
     }
 
     /*
+       A subsidiary's accent, set per element as --company-accent from the
+       admin and falling back to the group accent. Decorative surfaces only:
+       a rule, a marker, a border. Never text — an editor can pick any colour,
+       and none of these carry meaning that depends on reading against it.
+    */
+    .company-rule {
+        background-color: var(--company-accent, var(--accent));
+    }
+
+    .company-border {
+        border-color: var(--company-accent, var(--accent));
+    }
+
+    /*
        Horizontal drift for the layers of x-content.wave.
 
        The translation is one tile — 1440 user units — and each path is drawn

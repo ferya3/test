@@ -58,6 +58,9 @@ final class Permissions
     public static function matrix(): array
     {
         return [
+            // Holding
+            'companies' => self::CRUD,
+
             // Catalogue
             'products' => self::CRUD,
             'categories' => self::CRUD,
@@ -128,6 +131,9 @@ final class Permissions
             RoleName::Admin->value => self::except(['roles', 'users']),
 
             RoleName::Editor->value => self::for([
+                // An editor keeps the subsidiaries' profiles current, but
+                // which companies exist is the group's decision, not theirs.
+                'companies' => [self::VIEW_ANY, self::VIEW, self::UPDATE],
                 'articles' => self::CRUD,
                 'article-categories' => self::CRUD,
                 'pages' => self::CRUD,

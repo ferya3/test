@@ -22,6 +22,43 @@
         <x-content.intro :intro="$intro" />
     @endunless
 
+    {{-- Group companies ------------------------------------------------ --}}
+    {{--
+        A horizontal track. On a wide screen with motion allowed, the section
+        pins and vertical scrolling drives the track sideways (resources/js/
+        motion/horizontal.js). Everywhere else — phones, reduced motion, no
+        JavaScript — it is an ordinary swipeable row with snap points, so
+        nothing depends on the effect.
+    --}}
+    @if ($companies->isNotEmpty())
+        {{-- Default tone: the product groups band right after it is subtle,
+             and two tinted sections in a row read as one grey block. --}}
+        <x-layout.section data-motion-pin>
+            <div class="mb-8 flex flex-wrap items-end justify-between gap-4 md:mb-10">
+                <x-layout.section-header
+                    :overline="__('pages.companies.overline')"
+                    :heading="__('pages.home.companies_heading')"
+                    :lead="__('pages.home.companies_lead')"
+                    data-motion="reveal"
+                />
+
+                <x-ui.button :href="lroute('companies.index')" variant="outline">
+                    {{ __('cta.view_all') }}
+                </x-ui.button>
+            </div>
+
+            <div data-motion="horizontal" class="-mx-gutter snap-x snap-mandatory overflow-x-auto px-gutter pb-4">
+                <ul class="flex w-max gap-5">
+                    @foreach ($companies as $company)
+                        <li class="flex w-[min(80vw,22rem)] shrink-0 snap-start">
+                            <x-company.card :company="$company" sizes="(min-width: 640px) 22rem, 80vw" />
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+        </x-layout.section>
+    @endif
+
     {{-- Product groups ------------------------------------------------- --}}
     @if ($categories->isNotEmpty())
         <x-layout.section tone="subtle">
@@ -30,6 +67,7 @@
                 :heading="__('pages.home.categories_heading')"
                 :lead="__('pages.home.categories_lead')"
                 class="mb-8 md:mb-10"
+                data-motion="reveal"
             />
 
             {{--
@@ -38,7 +76,7 @@
                 its own row. The image is taller on mobile, where it is the
                 whole card, and wider on desktop, where it sits beside text.
             --}}
-            <ul class="grid gap-5 md:grid-cols-2 md:gap-6">
+            <ul class="grid gap-5 md:grid-cols-2 md:gap-6" data-motion="stagger">
                 @foreach ($categories as $category)
                     <li class="flex">
                         <x-ui.card
@@ -82,6 +120,7 @@
                 <x-layout.section-header
                     :overline="__('nav.products')"
                     :heading="__('pages.home.featured_heading')"
+                    data-motion="reveal"
                 />
 
                 <x-ui.button :href="lroute('categories.index')" variant="outline">
@@ -101,6 +140,7 @@
                     :overline="__('nav.projects')"
                     :heading="__('pages.home.projects_heading')"
                     :lead="__('pages.home.projects_lead')"
+                    data-motion="reveal"
                 />
 
                 <x-ui.button :href="lroute('projects.index')" variant="outline">
@@ -108,7 +148,7 @@
                 </x-ui.button>
             </div>
 
-            <ul class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <ul class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3" data-motion="stagger">
                 @foreach ($featuredProjects as $project)
                     <li class="flex">
                         <x-ui.card
@@ -156,6 +196,7 @@
                 :heading="__('pages.home.certificates_heading')"
                 :level="2"
                 class="mb-8"
+                data-motion="reveal"
             />
 
             <ul class="flex flex-wrap gap-3">
@@ -184,6 +225,7 @@
                 <x-layout.section-header
                     :overline="__('nav.articles')"
                     :heading="__('pages.home.articles_heading')"
+                    data-motion="reveal"
                 />
 
                 <x-ui.button :href="lroute('articles.index')" variant="outline">
@@ -191,7 +233,7 @@
                 </x-ui.button>
             </div>
 
-            <ul class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <ul class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3" data-motion="stagger">
                 @foreach ($latestArticles as $article)
                     <li class="flex">
                         <x-ui.card

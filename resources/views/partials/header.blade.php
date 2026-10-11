@@ -1,7 +1,7 @@
 @php
     /** @var \App\Services\Localization\LocaleManager $locales */
     $locales = app(\App\Services\Localization\LocaleManager::class);
-    $primary = config('navigation.primary', []);
+    $primary = nav_links(config('navigation.primary', []));
     $currentPath = '/'.ltrim(str_replace($locales->prefix(), '', request()->path()), '/');
 @endphp
 

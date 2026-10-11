@@ -16,8 +16,10 @@ Live reference: **`/design-system`** (registered outside production only).
    contrast against an image. Nothing decorative.
 5. **Generous vertical rhythm.** Sections breathe via `py-section`
    (`clamp(4rem, 2rem + 8vw, 8rem)`).
-6. **Motion is transform and opacity only**, ≤300ms, and globally disabled under
-   `prefers-reduced-motion`.
+6. **Motion is transform and opacity only**, and globally disabled under
+   `prefers-reduced-motion`. Interface feedback (hover, focus, open/close)
+   stays ≤300ms; content arriving on scroll has its own, slower tier — see
+   §6 *Motion system*.
 7. **Logical properties only.** `ps/pe`, `ms/me`, `start/end`, `text-start`.
    Never `pl/pr/left/right`. One stylesheet serves both directions.
 
@@ -193,6 +195,51 @@ resources/views/
 │   └── media/picture                the only way to render an image
 └── partials/header.blade.php, footer.blade.php
 ```
+
+### Motion system
+
+Scroll-driven motion is a separate layer in `resources/js/motion/`. Templates
+ask for an effect by name and never touch GSAP:
+
+| Attribute | Effect | Notes |
+| --- | --- | --- |
+| `data-motion="reveal"` | rises 28px and fades in, once | 0.8s, `power3.out` |
+| `data-motion="stagger"` | the same, for each direct child in turn | 0.08s apart |
+| `data-motion="counter"` | a figure counts up from zero | on `x-ui.measure`; keeps `1,500` grouping |
+| `data-motion="parallax"` | the image drifts at a quarter of scroll speed | every hero photograph |
+| `data-motion="horizontal"` | a row of cards travels sideways while its section is pinned | ≥1024px only; needs `data-motion-pin` on the section |
+
+Rules the layer keeps, so a template cannot break them:
+
+- **The HTML is the finished page.** Nothing is hidden by CSS waiting for
+  JavaScript. No JS, reduced motion or a failed chunk all leave the complete,
+  static page.
+- **GSAP loads only on demand** — a dynamic import, fetched when the page has a
+  `[data-motion]` element and the visitor allows motion. It adds ~45 KB gzip
+  to those pages and nothing to the others.
+- **What is already on screen is never re-hidden.** An element in the viewport
+  when the layer starts is left alone, so the first screen never flashes empty.
+- **The hero image is never faded.** It is the LCP element; parallax moves it
+  but never sets its opacity.
+- **Cleanup is structural.** Every tween lives inside `gsap.matchMedia()`, which
+  reverts it — inline styles and pins included — when reduced motion is turned
+  on mid-visit or the window crosses the desktop breakpoint.
+- **Keyboard-safe pinning.** Tabbing to a card that the horizontal track has
+  moved out of view scrolls the page to where that card is visible.
+- **Direction-aware.** The horizontal track reads `direction` and travels the
+  other way on a right-to-left page.
+
+Smooth-scroll libraries (Lenis and the like) are deliberately not used. They
+replace native scrolling, which changes how keyboard, screen-reader and
+trackpad users move through the page, for an effect nobody asked to see.
+
+### Subsidiary accents
+
+Each subsidiary has an accent colour, set in the admin and exposed as
+`--company-accent` on its page and its cards. It is used by `.company-rule`
+and `.company-border` only — rules, markers, borders — **never for text**, so
+an editor can pick any colour without a contrast check. Everything else on a
+company page uses the group palette.
 
 ### Accessible form wiring
 

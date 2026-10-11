@@ -15,6 +15,8 @@ return [
     'request_representation' => 'درخواست نمایندگی',
     'request_quote' => 'استعلام قیمت',
     'view_details' => 'مشاهده جزئیات',
+    'view_company' => 'معرفی شرکت',
+    'visit_website' => 'وب‌سایت شرکت',
     'view_all' => 'مشاهده همه',
     'download_datasheet' => 'دانلود دیتاشیت',
     'find_representative' => 'یافتن نمایندگی',

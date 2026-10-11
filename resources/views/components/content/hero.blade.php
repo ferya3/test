@@ -69,6 +69,7 @@
             fill
             sizes="100vw"
             class="absolute inset-0 -z-10 size-full"
+            data-motion="parallax"
         />
         <div aria-hidden="true" class="scrim absolute inset-0 -z-10"></div>
     @endif

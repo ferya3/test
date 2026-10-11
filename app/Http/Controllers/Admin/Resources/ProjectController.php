@@ -32,6 +32,7 @@ class ProjectController extends CrudController
     {
         return [
             Field::translated('title', __('admin.field.title'), required: true)->listed(),
+            $this->companyField(),
             Field::translated('client', __('admin.field.client')),
             Field::translated('location', __('admin.field.location')),
             Field::translated('summary', __('admin.field.summary')),

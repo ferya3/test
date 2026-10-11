@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 return [
     'home' => 'Home',
+    'companies' => 'Group companies',
     'products' => 'Products',
     'cabinet_panel' => 'HPL Cabinet Panel',
     'compact' => 'HPL Compact',

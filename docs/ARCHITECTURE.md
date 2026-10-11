@@ -1,7 +1,9 @@
 # معماری / Architecture
 
-Premium industrial corporate website for a factory manufacturing kitchen cabinet
-panels and decorative panels. Persian-first (RTL), English as second language.
+Premium industrial corporate website for an industrial holding and its
+subsidiary factories — it began as the site of one factory manufacturing kitchen
+cabinet panels, which is still the catalogue it carries. Persian-first (RTL),
+English as second language.
 
 ## 1. Stack
 
@@ -11,6 +13,7 @@ panels and decorative panels. Persian-first (RTL), English as second language.
 | Templating | Blade + reusable components |
 | CSS | Tailwind CSS 4 (CSS-first `@theme` tokens) |
 | JS | Alpine.js 3 (progressive enhancement only) |
+| Motion | GSAP 3 + ScrollTrigger, loaded on demand (`resources/js/motion`) |
 | Bundler | Vite 8 |
 | Database | MySQL 8 (SQLite in-memory for tests) |
 | Cache / Queue | Redis (`phpredis`) |
@@ -203,7 +206,36 @@ Composite indexes chosen for the actual query shapes:
 - **representatives** — `province` / `city` (both indexed for the locator),
   contact details, `latitude` / `longitude`.
 
-### 4.6 Cross-cutting
+### 4.6 Holding
+
+**companies** — one row per subsidiary: `slug` (unique), translatable `name`,
+`tagline`, `sector`, `summary`, `body`, `location`, `capacity`; numeric
+`founded_year`, `employees`, `site_area_sqm` (plain columns so the group page
+can total them); `accent_hex`; `logo_media_id`, `cover_media_id`;
+`website_url`, `email`, `phone`; `is_active`, `position`.
+
+`products`, `projects`, `certificates`, `catalogs` and `articles` carry a
+nullable `company_id` (FK, null on delete). **Null means the holding owns the
+row**, not that it is unassigned: group news, a certificate the whole group
+holds. Deleting a company hands its content back to the holding rather than
+taking public pages down with it.
+
+Categories and the product attribute tables are deliberately *not* scoped.
+They describe what a panel is, and are shared until a second subsidiary with a
+different kind of product needs its own — at which point the attribute model,
+not just a foreign key, is the thing to revisit.
+
+One design system, one admin, one sitemap: five subsidiaries are five rows,
+not five sites in one codebase.
+
+The public face is behind `features.holding` (`FEATURE_HOLDING`, off by
+default): it adds the header and footer links, the homepage band and the
+sitemap entries. `/companies` and `/companies/{slug}` answer either way. The
+`companies.*` permissions are created by a migration as well as the seeder,
+because `deploy.sh` migrates but never seeds and spatie throws on a permission
+that does not exist.
+
+### 4.7 Cross-cutting
 
 - **seo_metadata** — polymorphic (`seoable_type`, `seoable_id`, unique together).
   `title`, `description`, `keywords`, `canonical_url`, `og_*`, `og_media_id`,
@@ -230,6 +262,8 @@ Composite indexes chosen for the actual query shapes:
 | 13 | Articles | `/articles`, `/articles/{slug}` | `articles` |
 | 14 | Contact | `/contact` | form → `contact_requests` |
 | 15 | Representatives | `/representatives` | `representatives` + locator |
+| 16 | Group companies | `/companies` | `companies`, group totals |
+| 17 | Company | `/companies/{slug}` | `companies` + that company's products, projects, certificates, articles |
 
 Utility routes: `/search`, `/compare`, `/sitemap.xml`, `/robots.txt`.
 
@@ -256,6 +290,10 @@ resources/views/
 `<x-media.picture>` is the single image entry point: it always emits `width`,
 `height`, `loading`, `decoding`, `sizes` and an AVIF→WebP→original `<picture>`
 chain, which is what keeps CLS and LCP in budget.
+
+Scroll-driven motion is declared in markup (`data-motion="reveal"`, `stagger`,
+`counter`, `parallax`, `horizontal`) and implemented once in
+`resources/js/motion/`. See `docs/DESIGN-SYSTEM.md` §6.
 
 ## 7. Design system
 

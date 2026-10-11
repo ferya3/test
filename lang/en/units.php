@@ -11,5 +11,6 @@ return [
     'kg_per_m3' => 'kg/m³',
     'gloss_unit' => 'GU',
     'minute' => 'min',
+    'people' => 'people',
     'year' => 'year',
 ];

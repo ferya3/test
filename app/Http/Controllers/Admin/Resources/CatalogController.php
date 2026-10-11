@@ -30,6 +30,7 @@ class CatalogController extends CrudController
     {
         return [
             Field::translated('title', __('admin.field.title'), required: true)->listed(),
+            $this->companyField(),
             Field::translated('description', __('admin.field.description'), long: true),
             Field::media('cover_media_id', __('admin.field.cover')),
             Field::media('file_media_id', __('admin.field.file'), __('admin.hint.pdf_only')),

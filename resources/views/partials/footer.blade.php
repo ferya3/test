@@ -1,7 +1,7 @@
 @php
     /** @var \App\Services\Localization\LocaleManager $locales */
     $locales = app(\App\Services\Localization\LocaleManager::class);
-    $groups = config('navigation.footer', []);
+    $groups = array_map(nav_links(...), config('navigation.footer', []));
 @endphp
 
 <footer class="border-t border-border bg-surface-subtle">

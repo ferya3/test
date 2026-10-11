@@ -10,6 +10,8 @@ return [
     'request_representation' => 'Apply for representation',
     'request_quote' => 'Request a quote',
     'view_details' => 'View details',
+    'view_company' => 'About the company',
+    'visit_website' => 'Company website',
     'view_all' => 'View all',
     'download_datasheet' => 'Download datasheet',
     'find_representative' => 'Find a representative',

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Seo;
 
 use App\Models\Article;
+use App\Models\Company;
 use App\Models\Media;
 use App\Models\Product;
 use App\Services\SettingsRepository;
@@ -26,9 +27,15 @@ class SchemaGenerator
      * Emitted on every page: identifies the business behind the site,
      * independent of whatever the page itself is about.
      *
+     * Given the holding's subsidiaries, the node also lists them as
+     * `subOrganization`, each by the `@id` its own page declares — so the
+     * group and its factories resolve to one connected entity rather than six
+     * unrelated ones.
+     *
+     * @param  iterable<Company>  $subsidiaries
      * @return array<string, mixed>
      */
-    public function organization(): array
+    public function organization(iterable $subsidiaries = []): array
     {
         $sameAs = array_values(array_filter([
             $this->settings->get('social_instagram'),
@@ -52,7 +59,42 @@ class SchemaGenerator
                 'addressCountry' => 'IR',
             ]),
             'sameAs' => $sameAs === [] ? null : $sameAs,
+            'subOrganization' => $this->subsidiaryReferences($subsidiaries),
         ], static fn (mixed $value): bool => $value !== null && $value !== []);
+    }
+
+    /**
+     * One subsidiary, as the main entity of its own page.
+     *
+     * @return array<string, mixed>
+     */
+    public function subsidiary(Company $company, string $canonical): array
+    {
+        $sameAs = array_values(array_filter([$company->website_url]));
+
+        return array_filter([
+            '@type' => 'Organization',
+            '@id' => $canonical.'#organization',
+            'name' => $company->name,
+            'description' => $company->summary,
+            'url' => $canonical,
+            'logo' => $company->logo?->absoluteUrl(),
+            'image' => $company->cover?->absoluteUrl(),
+            'foundingDate' => $company->founded_year !== null ? (string) $company->founded_year : null,
+            'numberOfEmployees' => $company->employees !== null ? [
+                '@type' => 'QuantitativeValue',
+                'value' => $company->employees,
+            ] : null,
+            'email' => $company->email,
+            'telephone' => $company->phone,
+            'address' => $company->location !== null ? [
+                '@type' => 'PostalAddress',
+                'addressLocality' => $company->location,
+                'addressCountry' => 'IR',
+            ] : null,
+            'sameAs' => $sameAs === [] ? null : $sameAs,
+            'parentOrganization' => ['@id' => url('/').'#organization'],
+        ], static fn (mixed $value): bool => $value !== null && $value !== '');
     }
 
     /**
@@ -156,6 +198,28 @@ class SchemaGenerator
             ] : ['@id' => url('/').'#organization'],
             'publisher' => ['@id' => url('/').'#organization'],
         ], static fn (mixed $value): bool => $value !== null);
+    }
+
+    /**
+     * @param  iterable<Company>  $subsidiaries
+     * @return list<array<string, string>>
+     */
+    private function subsidiaryReferences(iterable $subsidiaries): array
+    {
+        $references = [];
+
+        foreach ($subsidiaries as $company) {
+            $url = lroute('companies.show', ['company' => $company->slug]);
+
+            $references[] = [
+                '@type' => 'Organization',
+                '@id' => $url.'#organization',
+                'name' => (string) $company->name,
+                'url' => $url,
+            ];
+        }
+
+        return $references;
     }
 
     /**

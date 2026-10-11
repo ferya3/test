@@ -4,6 +4,7 @@ import focus from '@alpinejs/focus';
 
 import theme from './stores/theme';
 import compare from './stores/compare';
+import { initMotion } from './motion';
 
 /*
  * Alpine is used for progressive enhancement only. Every component below
@@ -20,3 +21,6 @@ Alpine.store('compare', compare);
 window.Alpine = Alpine;
 
 Alpine.start();
+
+// After Alpine, so anything it renders is in the DOM before effects are bound.
+initMotion();

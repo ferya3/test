@@ -33,6 +33,7 @@ class ArticleController extends CrudController
     {
         return [
             Field::translated('title', __('admin.field.title'), required: true)->listed(),
+            $this->companyField(),
             Field::select('article_category_id', __('admin.field.category'), $this->categoryOptions())->listed(),
             Field::translated('excerpt', __('admin.field.excerpt')),
             Field::translated('body', __('admin.field.body'), required: true, long: true),

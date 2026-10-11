@@ -5,7 +5,9 @@ declare(strict_types=1);
 use App\Http\Controllers\Admin\CrudController;
 use App\Http\Middleware\RequireTwoFactor;
 use App\Models\CatalogRequest;
+use App\Models\Company;
 use App\Models\ContactRequest;
+use App\Models\Product;
 use App\Models\User;
 use Database\Seeders\ArticleSeeder;
 use Database\Seeders\AttributeSeeder;
@@ -44,6 +46,12 @@ beforeEach(function (): void {
 
     ContactRequest::factory()->count(3)->create();
     CatalogRequest::factory()->count(2)->create();
+
+    // Companies are entered in the admin, never seeded outside local, so the
+    // rows come from the factory — and one product is filed under one, so the
+    // subsidiary column renders a name and not only the empty state.
+    $company = Company::factory()->create();
+    Product::query()->first()?->update(['company_id' => $company->id]);
 
     $this->actingAs(User::factory()->superAdmin()->create());
     session([RequireTwoFactor::SESSION_KEY => time()]);
@@ -94,8 +102,8 @@ function modelOf(string $controller): string
 it('discovers every CRUD resource', function (): void {
     // Guards the discovery itself: if the router shape changes and this returns
     // nothing, the tests below would all pass vacuously.
-    expect(crudResources())->toHaveCount(15)
-        ->toHaveKeys(['products', 'articles', 'pages', 'projects', 'categories']);
+    expect(crudResources())->toHaveCount(16)
+        ->toHaveKeys(['companies', 'products', 'articles', 'pages', 'projects', 'categories']);
 });
 
 it('renders each resource index with rows in it', function (): void {

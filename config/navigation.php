@@ -26,6 +26,8 @@ return [
     */
     'primary' => [
         ['label' => 'nav.home', 'path' => '/'],
+        // Shown only while features.holding is on — see the header partial.
+        ['label' => 'nav.companies', 'path' => '/companies', 'feature' => 'holding'],
         // The catalogue is these two panels and nothing else, so they are the
         // menu rather than something reached through a products index that
         // would only ever list two cards.
@@ -52,6 +54,7 @@ return [
             ['label' => 'nav.quality_control', 'path' => '/quality-control'],
         ],
         'company' => [
+            ['label' => 'nav.companies', 'path' => '/companies', 'feature' => 'holding'],
             ['label' => 'nav.projects', 'path' => '/projects'],
             ['label' => 'nav.certificates', 'path' => '/certificates'],
             ['label' => 'nav.articles', 'path' => '/articles'],

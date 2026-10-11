@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Casts\TranslatedJson;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\GeneratesSlug;
 use App\Models\Concerns\HasSeoMetadata;
 use App\Models\Concerns\HasTranslations;
@@ -26,6 +27,7 @@ use Illuminate\Support\Carbon;
 #[ObservedBy(InvalidatesSitemapCache::class)]
 class Article extends Model
 {
+    use BelongsToCompany;
     use GeneratesSlug;
 
     /** @use HasFactory<ArticleFactory> */
@@ -41,6 +43,7 @@ class Article extends Model
     protected array $translatable = ['title', 'excerpt', 'body'];
 
     protected $fillable = [
+        'company_id',
         'article_category_id',
         'slug',
         'title',

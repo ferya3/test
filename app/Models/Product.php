@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Casts\TranslatedJson;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\GeneratesSlug;
 use App\Models\Concerns\HasSeoMetadata;
 use App\Models\Concerns\HasTranslations;
@@ -35,6 +36,7 @@ use Illuminate\Support\Carbon;
 #[ObservedBy([ProductObserver::class, InvalidatesCatalogCache::class, InvalidatesSitemapCache::class])]
 class Product extends Model
 {
+    use BelongsToCompany;
     use Concerns\NormalisesPosition;
     use GeneratesSlug;
 
@@ -51,6 +53,7 @@ class Product extends Model
     protected array $translatable = ['name', 'short_description', 'description'];
 
     protected $fillable = [
+        'company_id',
         'slug',
         'code',
         'category_id',

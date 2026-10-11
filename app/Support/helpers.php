@@ -40,3 +40,20 @@ if (! function_exists('lroute_is')) {
         );
     }
 }
+
+if (! function_exists('nav_links')) {
+    /**
+     * Navigation entries from config/navigation.php, minus any whose
+     * `feature` flag in config/features.php is off.
+     *
+     * @param  list<array{label: string, path: string, feature?: string}>  $links
+     * @return list<array{label: string, path: string, feature?: string}>
+     */
+    function nav_links(array $links): array
+    {
+        return array_values(array_filter(
+            $links,
+            static fn (array $link): bool => ! isset($link['feature']) || (bool) config("features.{$link['feature']}"),
+        ));
+    }
+}

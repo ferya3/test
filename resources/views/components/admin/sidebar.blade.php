@@ -4,6 +4,9 @@
      * refused at. The permission check is the same one the controller runs.
      */
     $groups = [
+        __('admin.group.holding') => [
+            ['label' => __('admin.resources.companies'), 'route' => 'admin.companies.index', 'model' => App\Models\Company::class],
+        ],
         __('admin.group.catalog') => [
             ['label' => __('admin.resources.products'), 'route' => 'admin.products.index', 'model' => App\Models\Product::class],
             ['label' => __('admin.resources.categories'), 'route' => 'admin.categories.index', 'model' => App\Models\Category::class],

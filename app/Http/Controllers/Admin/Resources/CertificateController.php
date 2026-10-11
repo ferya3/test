@@ -30,6 +30,7 @@ class CertificateController extends CrudController
     {
         return [
             Field::translated('title', __('admin.field.title'), required: true)->listed(),
+            $this->companyField(),
             Field::translated('issuer', __('admin.field.issuer'))->listed(),
             Field::translated('description', __('admin.field.description'), long: true),
             Field::text('certificate_number', __('admin.field.certificate_number'))->listed(),

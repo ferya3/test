@@ -9,6 +9,7 @@ use App\Models\Category;
 use App\Models\Certificate;
 use App\Models\Media;
 use App\Queries\ArticleQuery;
+use App\Queries\CompanyQuery;
 use App\Queries\ProductQuery;
 use App\Queries\ProjectQuery;
 use App\Services\Seo\SchemaGenerator;
@@ -23,6 +24,7 @@ class HomeController extends Controller
         ProductQuery $products,
         ProjectQuery $projects,
         ArticleQuery $articles,
+        CompanyQuery $companies,
         SeoManager $seo,
         SchemaGenerator $schema,
         SettingsRepository $settings,
@@ -35,7 +37,12 @@ class HomeController extends Controller
             ->ordered()
             ->get();
 
+        // Not queried at all while the holding is switched off, rather than
+        // queried and then hidden by the template.
+        $subsidiaries = config('features.holding') ? $companies->listing() : collect();
+
         return view('pages.home', [
+            'companies' => $subsidiaries,
             'featuredProducts' => $products->featured(6),
             'categories' => $categories,
             // The homepage is a route rather than a Page record, so its hero
@@ -69,7 +76,7 @@ class HomeController extends Controller
                 routeName: 'home',
                 title: $settings->translated('seo_default_title') ?? config('app.name'),
                 description: $settings->translated('seo_default_description') ?? '',
-                structuredData: $schema->graph([$schema->organization(), $schema->website()]),
+                structuredData: $schema->graph([$schema->organization($subsidiaries), $schema->website()]),
                 suffixTitle: false,
             ),
         ]);

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Company;
 use App\Support\Admin\Field;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -12,6 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 /**
  * Generic CRUD for the CMS-style admin resources.
@@ -245,6 +247,28 @@ abstract class CrudController extends Controller
 
             $record->{$field->relation}()->sync(array_map('intval', (array) $validated[$field->name]));
         }
+    }
+
+    /**
+     * The subsidiary a record belongs to, shared by every resource a company
+     * can own. Left empty, the record belongs to the holding itself — which is
+     * what every row created before the holding existed already means.
+     *
+     * Inactive companies stay selectable: hiding a company from the public
+     * site must not silently reassign its products on their next save.
+     */
+    protected function companyField(): Field
+    {
+        $options = Company::query()
+            ->ordered()
+            ->get()
+            ->mapWithKeys(fn (Company $company): array => [(string) $company->getKey() => (string) $company->name])
+            ->all();
+
+        return Field::select('company_id', __('admin.field.subsidiary'), $options)
+            ->rules(['nullable', 'integer', Rule::exists('companies', 'id')])
+            ->hint(__('admin.hint.subsidiary'))
+            ->listed();
     }
 
     protected function applySearch(Builder $query, string $term): Builder

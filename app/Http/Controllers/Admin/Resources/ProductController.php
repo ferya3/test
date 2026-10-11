@@ -41,6 +41,7 @@ class ProductController extends CrudController
         return [
             Field::text('code', __('admin.field.code'))->listed()->required(),
             Field::translated('name', __('admin.field.name'), required: true)->listed(),
+            $this->companyField(),
             Field::select('category_id', __('admin.field.category'), $this->options(Category::class))
                 ->rules(['required', 'integer', Rule::exists('categories', 'id')])
                 ->listed()

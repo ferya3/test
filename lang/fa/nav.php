@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 return [
     'home' => 'صفحه اصلی',
+    'companies' => 'شرکت‌های گروه',
     'products' => 'محصولات',
     'cabinet_panel' => 'صفحه کابینت اچ‌پی‌ال',
     'compact' => 'کامپکت اچ‌پی‌ال',
