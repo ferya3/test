@@ -11,7 +11,7 @@ export function Projects({ projects }: { projects: Project[] }) {
   if (projects.length === 0) return null;
 
   return (
-    <section className="bg-ink-50 py-20 sm:py-28">
+    <section className="bg-ink-50 py-14 sm:py-20 lg:py-28">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <Reveal className="flex flex-wrap items-end justify-between gap-4">
           <SectionHeading
@@ -27,7 +27,7 @@ export function Projects({ projects }: { projects: Project[] }) {
           </Button>
         </Reveal>
 
-        <Reveal delay={0.1} className="mt-10 lg:mt-14">
+        <Reveal delay={0.1} className="mt-7 sm:mt-10 lg:mt-14">
           <ProjectGallery projects={projects} layout="bento" />
         </Reveal>
 

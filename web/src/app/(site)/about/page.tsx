@@ -33,9 +33,9 @@ export default function AboutPage() {
     <>
       <section className="relative overflow-hidden bg-ink-950 text-paper">
         <div aria-hidden className="absolute -top-1/2 end-0 size-[40rem] rounded-full bg-gold-500/15 blur-[120px]" />
-        <div className="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8">
+        <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-24 lg:px-8">
           <p className="mb-3 text-sm font-bold text-gold-300">دربارهٔ ما</p>
-          <h1 className="max-w-3xl text-display font-black text-balance">
+          <h1 className="max-w-3xl text-h1 font-black text-balance sm:text-display">
             {s.company_name}، <span className="gold-text">{s.company_tagline}</span>
           </h1>
         </div>
@@ -46,18 +46,18 @@ export default function AboutPage() {
         heading={s.intro_heading}
         body={s.intro_body}
         stats={[
-          ...(years ? [{ value: years, suffix: '+', label: 'سال تجربه در تولید ورق اچ‌پی‌ال' }] : []),
+          ...(years ? [{ value: years, suffix: '+', label: 'سال تجربه' }] : []),
           { value: countProducts(), label: 'طرح و رنگ' },
           { value: getCategories().length, label: 'گروه کالا' },
         ]}
       />
 
-      <section className="bg-ink-50 py-20 sm:py-28">
+      <section className="bg-ink-50 py-14 sm:py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Reveal>
             <SectionHeading overline="چرا ما" title="آنچه به آن متعهدیم" />
           </Reveal>
-          <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <ul className="mt-7 grid gap-3 sm:mt-10 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {VALUES.map(({ icon: Icon, title, body }, i) => (
               <li key={title}>
                 <Reveal delay={i * 0.08} className="h-full rounded-2xl border border-ink-100 bg-white p-6 shadow-[var(--shadow-soft)]">
@@ -74,7 +74,7 @@ export default function AboutPage() {
       </section>
 
       <Process steps={getProcessSteps()} />
-      <div className="pt-20 sm:pt-28">
+      <div className="pt-14 sm:pt-20 lg:pt-28">
         <Cta phone={s.contact_phone} />
       </div>
     </>

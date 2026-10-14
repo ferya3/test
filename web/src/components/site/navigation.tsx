@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Menu, X, Phone } from 'lucide-react';
+import { ChevronLeft, Menu, X, Phone } from 'lucide-react';
 import { useEffect } from 'react';
 import { useMenu } from '@/store/menu';
 import { lenis } from '@/components/providers/smooth-scroll';
@@ -101,23 +101,32 @@ export function MobileMenu({ phone }: { phone: string }) {
           transition={{ duration: 0.25 }}
           className="fixed inset-x-0 top-16 bottom-0 z-40 bg-paper/97 backdrop-blur-xl lg:hidden"
         >
-          <nav className="flex h-full flex-col px-6 pt-8 pb-10">
+          <nav className="flex h-full flex-col overflow-y-auto px-4 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
             <ul className="flex flex-col gap-1">
-              {NAV.map((item, i) => (
-                <motion.li
-                  key={item.href}
-                  initial={{ opacity: 0, x: 24 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.05 + i * 0.05, ease: [0.16, 1, 0.3, 1], duration: 0.5 }}
-                >
-                  <Link
-                    href={item.href}
-                    className="block rounded-xl px-4 py-4 text-2xl font-bold text-ink-900 transition-colors hover:bg-ink-50"
+              {NAV.map((item, i) => {
+                const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
+
+                return (
+                  <motion.li
+                    key={item.href}
+                    initial={{ opacity: 0, x: 24 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.05 + i * 0.05, ease: [0.16, 1, 0.3, 1], duration: 0.5 }}
                   >
-                    {item.label}
-                  </Link>
-                </motion.li>
-              ))}
+                    <Link
+                      href={item.href}
+                      aria-current={active ? 'page' : undefined}
+                      className={cn(
+                        'flex items-center justify-between rounded-xl px-4 py-3.5 text-xl font-bold transition-colors',
+                        active ? 'bg-ink-950 text-paper' : 'text-ink-900 active:bg-ink-100',
+                      )}
+                    >
+                      {item.label}
+                      <ChevronLeft className={cn('size-5', active ? 'text-gold-300' : 'text-ink-300')} />
+                    </Link>
+                  </motion.li>
+                );
+              })}
             </ul>
 
             <a

@@ -17,7 +17,7 @@ export default function HomePage() {
 
   const stats = [
     ...(Number.isFinite(founded) && founded < persianYear()
-      ? [{ value: persianYear() - founded, label: 'سال تجربه در تولید ورق اچ‌پی‌ال', suffix: '+' }]
+      ? [{ value: persianYear() - founded, label: 'سال تجربه', suffix: '+' }]
       : []),
     { value: countProducts(), label: 'طرح و رنگ' },
     { value: categories.length, label: 'گروه کالا' },

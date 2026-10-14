@@ -17,8 +17,8 @@ export function Footer() {
         className="pointer-events-none absolute -top-40 start-1/4 size-[32rem] rounded-full bg-gold-500/10 blur-3xl"
       />
 
-      <div className="relative mx-auto grid max-w-7xl gap-12 px-4 py-16 sm:px-6 md:grid-cols-2 lg:grid-cols-4 lg:px-8">
-        <div className="flex flex-col gap-4 lg:col-span-1">
+      <div className="relative mx-auto grid max-w-7xl grid-cols-2 gap-x-6 gap-y-8 px-4 py-12 sm:gap-10 sm:px-6 sm:py-16 lg:grid-cols-4 lg:px-8">
+        <div className="col-span-2 flex flex-col gap-4 lg:col-span-1">
           <Brand name={settings.company_name} light />
           <p className="max-w-xs text-sm leading-7">{settings.company_tagline}</p>
         </div>
@@ -26,22 +26,23 @@ export function Footer() {
         <FooterList title="محصولات" items={categories.map((c) => ({ href: `/categories/${c.slug}`, label: c.name }))} />
         <FooterList title="دسترسی سریع" items={NAV.map((n) => ({ href: n.href, label: n.label }))} />
 
-        <div>
-          <h2 className="mb-4 text-sm font-bold text-paper">تماس</h2>
-          <ul className="flex flex-col gap-3 text-sm">
-            <li className="flex items-start gap-2.5">
-              <Phone className="mt-1 size-4 shrink-0 text-gold-400" />
-              <a href={`tel:${settings.contact_phone.replace(/[^\d+]/g, '')}`} className="ltr-isolate hover:text-paper">
-                {settings.contact_phone}
+        <div className="col-span-2 lg:col-span-1">
+          <h2 className="mb-2 text-sm font-bold text-paper sm:mb-4">تماس</h2>
+          <ul className="flex flex-col text-sm">
+            {/* Whole rows are the tap targets, at least 44px tall. */}
+            <li>
+              <a href={`tel:${settings.contact_phone.replace(/[^\d+]/g, '')}`} className="flex min-h-11 items-center gap-2.5 hover:text-paper">
+                <Phone className="size-4 shrink-0 text-gold-400" />
+                <span className="ltr-isolate">{settings.contact_phone}</span>
               </a>
             </li>
-            <li className="flex items-start gap-2.5">
-              <Mail className="mt-1 size-4 shrink-0 text-gold-400" />
-              <a href={`mailto:${settings.contact_email}`} className="ltr-isolate hover:text-paper">
-                {settings.contact_email}
+            <li>
+              <a href={`mailto:${settings.contact_email}`} className="flex min-h-11 items-center gap-2.5 hover:text-paper">
+                <Mail className="size-4 shrink-0 text-gold-400" />
+                <span className="ltr-isolate">{settings.contact_email}</span>
               </a>
             </li>
-            <li className="flex items-start gap-2.5">
+            <li className="flex items-start gap-2.5 py-2.5">
               <MapPin className="mt-1 size-4 shrink-0 text-gold-400" />
               <span>{settings.contact_address}</span>
             </li>
@@ -61,12 +62,12 @@ export function Footer() {
 function FooterList({ title, items }: { title: string; items: { href: string; label: string }[] }) {
   return (
     <div>
-      <h2 className="mb-4 text-sm font-bold text-paper">{title}</h2>
-      <ul className="flex flex-col gap-1 text-sm">
+      <h2 className="mb-2 text-sm font-bold text-paper sm:mb-4">{title}</h2>
+      <ul className="flex flex-col text-sm">
         {items.map((item) => (
           <li key={item.href}>
             {/* Padded to a real tap target, not a bare line of text. */}
-            <Link href={item.href} className="inline-block py-1.5 transition-colors hover:text-gold-300">
+            <Link href={item.href} className="flex min-h-11 items-center transition-colors hover:text-gold-300">
               {item.label}
             </Link>
           </li>

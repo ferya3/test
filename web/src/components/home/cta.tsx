@@ -5,8 +5,8 @@ import { Reveal } from '@/components/motion/reveal';
 
 export function Cta({ phone }: { phone: string }) {
   return (
-    <section className="px-4 pb-20 sm:px-6 sm:pb-28 lg:px-8">
-      <Reveal className="relative mx-auto max-w-7xl overflow-hidden rounded-2xl bg-ink-950 px-6 py-14 text-center text-paper sm:px-12 sm:py-20">
+    <section className="px-4 pb-14 sm:px-6 sm:pb-20 lg:px-8 lg:pb-28">
+      <Reveal className="relative mx-auto max-w-7xl overflow-hidden rounded-2xl bg-ink-950 px-5 py-10 text-center text-paper sm:px-12 sm:py-20">
         <div aria-hidden className="absolute -top-1/2 left-1/2 size-[40rem] -translate-x-1/2 rounded-full bg-gold-500/20 blur-[110px]" />
         <div className="relative">
           <h2 className="text-h1 font-black text-balance">

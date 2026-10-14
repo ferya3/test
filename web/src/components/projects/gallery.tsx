@@ -43,10 +43,10 @@ export function ProjectGallery({ projects, layout = 'grid' }: { projects: Projec
     <>
       <ul
         className={cn(
-          'grid gap-3 sm:gap-5',
           layout === 'bento'
-            ? 'grid-cols-2 lg:auto-rows-[15rem] lg:grid-cols-3'
-            : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+            ? // A swipeable row on phones; from `sm` a grid, the first project large.
+              '-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-5 sm:overflow-visible sm:px-0 lg:auto-rows-[15rem] lg:grid-cols-3'
+            : 'grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3',
         )}
       >
         {projects.map((project, i) => {
@@ -56,10 +56,9 @@ export function ProjectGallery({ projects, layout = 'grid' }: { projects: Projec
             <li
               key={project.id}
               className={cn(
-                big ? 'col-span-2 lg:row-span-2' : layout === 'bento' ? 'col-span-1' : '',
-                layout === 'bento' && !big && 'aspect-square lg:aspect-auto',
-                big && 'aspect-[4/3] lg:aspect-auto',
                 layout === 'grid' && 'aspect-[4/3]',
+                layout === 'bento' && 'aspect-[4/3] w-[80vw] max-w-sm shrink-0 snap-start sm:w-auto sm:max-w-none lg:aspect-auto',
+                big && 'sm:col-span-2 lg:row-span-2',
               )}
             >
               <button
@@ -81,7 +80,7 @@ export function ProjectGallery({ projects, layout = 'grid' }: { projects: Projec
                 )}
 
                 <span className="absolute inset-x-0 bottom-0 p-3 sm:p-5">
-                  <span className={cn('block font-bold text-paper', big ? 'text-lg sm:text-h3' : 'text-sm sm:text-base')}>
+                  <span className={cn('block font-bold text-paper', big ? 'text-lg sm:text-h3' : 'text-base')}>
                     {project.title}
                   </span>
                   {meta(project) && <span className="mt-0.5 block text-xs text-ink-200">{meta(project)}</span>}

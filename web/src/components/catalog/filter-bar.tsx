@@ -94,7 +94,7 @@ export function FilterBar({ groups, total }: { groups: FilterGroup[]; total: num
               key={`${chip.param}-${chip.value}`}
               type="button"
               onClick={() => toggle(chip.param, chip.value)}
-              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-ink-950 ps-3 pe-2 text-xs text-paper transition-colors hover:bg-ink-800"
+              className="inline-flex h-9 items-center gap-1.5 rounded-full bg-ink-950 ps-3 pe-2 text-xs text-paper transition-colors hover:bg-ink-800"
               aria-label={`حذف فیلتر ${chip.label}`}
             >
               {chip.label}
@@ -104,7 +104,7 @@ export function FilterBar({ groups, total }: { groups: FilterGroup[]; total: num
           <button
             type="button"
             onClick={() => navigate({})}
-            className="h-8 px-2 text-xs font-bold text-gold-700 underline-offset-4 hover:underline"
+            className="h-10 px-2 text-xs font-bold text-gold-700 underline-offset-4 hover:underline"
           >
             حذف همه
           </button>

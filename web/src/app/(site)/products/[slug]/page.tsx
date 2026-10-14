@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Droplets, Flame, ShieldCheck, Sparkles } from 'lucide-react';
+import { ChevronRight, Droplets, Flame, ShieldCheck, Sparkles } from 'lucide-react';
 import { Swatch } from '@/components/catalog/swatch';
 import { ProductCard } from '@/components/catalog/product-card';
 import { LeadForm } from '@/components/catalog/lead-form';
+import { QuoteBar } from '@/components/catalog/quote-bar';
 import { Tilt } from '@/components/motion/tilt';
 import { Reveal } from '@/components/motion/reveal';
 import { Badge } from '@/components/ui/card';
@@ -66,8 +67,16 @@ export default async function ProductPage({ params }: Props) {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(schema) }} />
 
-      <section className="mx-auto max-w-7xl px-4 pt-8 pb-16 sm:px-6 sm:pt-12 lg:px-8 lg:pb-24">
-        <nav aria-label="مسیر" className="mb-6 text-sm text-ink-500">
+      <section className="mx-auto max-w-7xl px-4 pt-4 pb-12 sm:px-6 sm:pt-12 sm:pb-16 lg:px-8 lg:pb-24">
+        {/* On a phone the trail is just the way back to the group. */}
+        <Link
+          href={`/categories/${product.category_slug}`}
+          className="mb-3 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-ink-600 sm:hidden"
+        >
+          <ChevronRight className="size-4" />
+          {product.category_name}
+        </Link>
+        <nav aria-label="مسیر" className="mb-6 hidden text-sm text-ink-500 sm:block">
           <Link href="/" className="hover:text-ink-950">
             خانه
           </Link>
@@ -79,7 +88,7 @@ export default async function ProductPage({ params }: Props) {
           <span className="text-ink-800">{product.name}</span>
         </nav>
 
-        <div className="grid gap-8 lg:grid-cols-2 lg:gap-14">
+        <div className="grid gap-5 sm:gap-8 lg:grid-cols-2 lg:gap-14">
           <div className="self-start lg:sticky lg:top-28">
             <Tilt max={5} className="rounded-2xl">
               <div className="aspect-square overflow-hidden rounded-2xl shadow-[var(--shadow-lift)]">
@@ -101,10 +110,10 @@ export default async function ProductPage({ params }: Props) {
               <Badge>{FAMILIES[product.family]}</Badge>
               <Badge>{SURFACES[product.surface]}</Badge>
             </div>
-            <h1 className="mt-4 text-h1 font-black text-balance text-ink-950">{product.name}</h1>
-            <p className="mt-4 text-lead text-ink-600">{product.description || product.short}</p>
+            <h1 className="mt-3 text-h2 font-black text-balance text-ink-950 sm:mt-4 sm:text-h1">{product.name}</h1>
+            <p className="mt-3 text-ink-600 sm:mt-4 sm:text-lead">{product.description || product.short}</p>
 
-            <dl className="mt-8 divide-y divide-ink-100 rounded-xl border border-ink-100 bg-white">
+            <dl className="mt-6 divide-y divide-ink-100 rounded-xl border border-ink-100 bg-white">
               {specs.map(([term, value]) => (
                 <div key={term} className="flex items-center justify-between gap-4 px-5 py-3.5 text-sm">
                   <dt className="text-ink-500">{term}</dt>
@@ -124,7 +133,7 @@ export default async function ProductPage({ params }: Props) {
               ))}
             </ul>
 
-            <div id="quote" className="mt-10 scroll-mt-28 rounded-2xl bg-ink-950 p-5 sm:p-8">
+            <div id="quote" className="mt-8 scroll-mt-20 sm:mt-10 sm:scroll-mt-28 rounded-2xl bg-ink-950 p-5 sm:p-8">
               <h2 className="text-h3 font-bold text-paper">استعلام قیمت این محصول</h2>
               <p className="mt-1 mb-6 text-sm text-ink-300">شماره‌تان را بگذارید؛ همکاران فروش تماس می‌گیرند.</p>
               <LeadForm kind="quote" product={product.slug} dark />
@@ -134,7 +143,7 @@ export default async function ProductPage({ params }: Props) {
       </section>
 
       {related.length > 0 && (
-        <section className="bg-ink-50 py-16 sm:py-20">
+        <section className="bg-ink-50 py-12 sm:py-20">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <Reveal>
               <h2 className="text-h2 font-black text-ink-950">محصولات مشابه</h2>
@@ -149,6 +158,8 @@ export default async function ProductPage({ params }: Props) {
           </div>
         </section>
       )}
+
+      <QuoteBar phone={settings.contact_phone} />
     </>
   );
 }

@@ -2,23 +2,65 @@
 
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowLeft, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Swatch } from '@/components/catalog/swatch';
 import type { ScenePanel } from './hero-scene';
 
-// WebGL exists only in the browser; the server renders the static fallback.
+// WebGL exists only in the browser, and only from tablet width up (below).
 const HeroScene = dynamic(() => import('./hero-scene'), {
   ssr: false,
-  loading: () => <SceneFallback />,
+  loading: () => <SwatchFan panels={[]} />,
 });
 
-function SceneFallback() {
+/**
+ * The same sample sheets as the 3D scene, as a fan of flat cards drifting
+ * gently in CSS. This is what phones get: three.js is ~750 KB of JavaScript
+ * to download and parse, which on a mid-range phone on a mobile network
+ * costs seconds before the page settles. It is also the server-rendered
+ * picture everyone sees before the 3D scene loads on larger screens.
+ */
+function SwatchFan({ panels }: { panels: ScenePanel[] }) {
   return (
-    <div className="grid size-full place-items-center">
-      <div className="size-40 animate-pulse rounded-full bg-gold-400/10 blur-2xl" />
+    <div aria-hidden className="relative mx-auto h-full max-w-sm">
+      {panels.map((panel, i) => {
+        const offset = i - (panels.length - 1) / 2;
+        // Anchored with a physical `left`: `start` flips to the right in RTL
+        // and the centring below would land a card's width off.
+        return (
+          <div
+            key={i}
+            className="absolute left-1/2 top-1/2 h-[80%] w-[27%] animate-[drift_6s_ease-in-out_infinite]"
+            style={{
+              transform: `translate(calc(${offset * 60}% - 50%), -50%) rotate(${offset * 6}deg)`,
+              transformOrigin: '50% 100%',
+              animationDelay: `${i * -1.4}s`,
+              zIndex: 10 - Math.round(Math.abs(offset)),
+            }}
+          >
+            <div className="size-full overflow-hidden rounded-lg shadow-[0_24px_40px_-14px_rgb(0_0_0/0.75)] ring-1 ring-gold-400/40">
+              <Swatch color={panel.color} family={panel.family} seed={i + 3} alt="" />
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
+}
+
+/** True once mounted on a screen wide enough for the 3D scene. */
+function useWideScreen() {
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia('(min-width: 768px)');
+    const update = () => setWide(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+  return wide;
 }
 
 const ease = [0.16, 1, 0.3, 1] as const;
@@ -37,6 +79,7 @@ export function Hero({
   panels: ScenePanel[];
 }) {
   const reduce = useReducedMotion();
+  const wide = useWideScreen();
   const words = title.split(' ');
   const from = (delay: number) =>
     reduce
@@ -52,11 +95,11 @@ export function Hero({
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,transparent_40%,rgb(15_13_11)_100%)]" />
       </div>
 
-      <div className="mx-auto grid max-w-7xl items-center gap-4 px-4 pt-12 pb-10 sm:px-6 lg:min-h-[calc(100dvh-5rem)] lg:grid-cols-2 lg:gap-8 lg:px-8 lg:py-16">
+      <div className="mx-auto grid max-w-7xl items-center gap-2 px-4 pt-8 pb-6 sm:gap-4 sm:px-6 sm:pt-12 sm:pb-10 lg:min-h-[calc(100dvh-5rem)] lg:grid-cols-2 lg:gap-8 lg:px-8 lg:py-16">
         <div className="relative z-10 max-w-xl">
           <motion.p
             {...from(0)}
-            className="mb-5 inline-flex items-center gap-2 rounded-full border border-gold-400/30 bg-gold-400/10 px-3.5 py-1 text-sm text-gold-300"
+            className="mb-4 inline-flex items-center gap-2 rounded-full border border-gold-400/30 bg-gold-400/10 px-3.5 py-1 text-xs text-gold-300 sm:mb-5 sm:text-sm"
           >
             <span className="size-1.5 rounded-full bg-gold-400" />
             {overline}
@@ -81,21 +124,22 @@ export function Hero({
             ))}
           </h1>
 
-          <motion.p {...from(0.45)} className="mt-6 max-w-lg text-lead text-ink-300">
+          <motion.p {...from(0.45)} className="mt-4 max-w-lg text-lead text-ink-300 sm:mt-6">
             {lead}
           </motion.p>
 
-          <motion.div {...from(0.6)} className="mt-9 flex flex-col gap-3 sm:flex-row">
-            <Button asChild size="lg">
+          <motion.div {...from(0.6)} className="mt-7 flex gap-3 sm:mt-9">
+            <Button asChild size="lg" className="flex-1 sm:flex-none">
               <Link href="/categories/hpl-cabinet-panel">
                 مشاهدهٔ محصولات
                 <ArrowLeft />
               </Link>
             </Button>
-            <Button asChild size="lg" variant="ghostLight">
-              <a href={`tel:${phone.replace(/[^\d+]/g, '')}`}>
+            {/* On a phone the call button is just the icon, beside the main action. */}
+            <Button asChild size="lg" variant="ghostLight" className="w-13 px-0 sm:w-auto sm:px-8">
+              <a href={`tel:${phone.replace(/[^\d+]/g, '')}`} aria-label={`تماس: ${phone}`}>
                 <Phone />
-                <span className="ltr-isolate">{phone}</span>
+                <span className="ltr-isolate hidden sm:inline">{phone}</span>
               </a>
             </Button>
           </motion.div>
@@ -105,9 +149,9 @@ export function Hero({
           initial={reduce ? false : { opacity: 0, scale: 0.94 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1.4, delay: 0.2, ease }}
-          className="relative -mx-4 h-[22rem] sm:h-[28rem] lg:mx-0 lg:h-[36rem]"
+          className="relative h-56 sm:h-[28rem] lg:h-[36rem]"
         >
-          <HeroScene panels={panels} />
+          {wide ? <HeroScene panels={panels} /> : <SwatchFan panels={panels} />}
         </motion.div>
       </div>
     </section>

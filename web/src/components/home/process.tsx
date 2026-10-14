@@ -73,7 +73,7 @@ export function Process({ steps }: { steps: ProcessCard[] }) {
   );
 
   return (
-    <section ref={section} className="relative overflow-hidden bg-ink-950 py-20 text-paper lg:flex lg:h-dvh lg:flex-col lg:justify-center lg:pt-20 lg:pb-0">
+    <section ref={section} className="relative overflow-hidden bg-ink-950 py-14 text-paper sm:py-20 lg:flex lg:h-dvh lg:flex-col lg:justify-center lg:pt-20 lg:pb-0">
       <div aria-hidden className="absolute bottom-0 start-1/3 size-[36rem] translate-y-1/2 rounded-full bg-gold-500/10 blur-[120px]" />
 
       <div className="relative mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -83,7 +83,7 @@ export function Process({ steps }: { steps: ProcessCard[] }) {
 
       <ol
         ref={track}
-        className="relative mt-10 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-4 [scrollbar-width:none] sm:px-6 lg:mt-14 lg:snap-none lg:gap-6 lg:overflow-visible lg:px-[max(2rem,calc((100%-80rem)/2+2rem))]"
+        className="relative mt-7 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-4 [scrollbar-width:none] sm:mt-10 sm:px-6 lg:mt-14 lg:snap-none lg:gap-6 lg:overflow-visible lg:px-[max(2rem,calc((100%-80rem)/2+2rem))]"
       >
         {steps.map((step, i) => {
           const Icon = ICONS[i % ICONS.length]!;

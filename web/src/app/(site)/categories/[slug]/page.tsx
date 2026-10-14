@@ -47,8 +47,8 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   return (
     <>
       <section className="relative overflow-hidden bg-ink-50 bg-[radial-gradient(ellipse_60%_80%_at_0%_0%,rgb(230_196_126/0.35),transparent_70%)]">
-        <div className="relative mx-auto max-w-7xl px-4 pt-10 pb-8 sm:px-6 sm:pt-14 lg:px-8 lg:pt-16">
-          <nav aria-label="مسیر" className="mb-6 text-sm text-ink-500">
+        <div className="relative mx-auto max-w-7xl px-4 pt-5 pb-6 sm:px-6 sm:pt-14 sm:pb-8 lg:px-8 lg:pt-16">
+          <nav aria-label="مسیر" className="mb-6 hidden text-sm text-ink-500 sm:block">
             <Link href="/" className="hover:text-ink-950">
               خانه
             </Link>
@@ -57,14 +57,14 @@ export default async function CategoryPage({ params, searchParams }: Props) {
           </nav>
 
           {/* Switch between the two groups without going back to the homepage. */}
-          <div className="mb-6 inline-flex rounded-xl bg-white p-1 shadow-[var(--shadow-soft)]">
+          <div className="mb-5 flex w-full rounded-xl bg-white p-1 shadow-[var(--shadow-soft)] sm:mb-6 sm:inline-flex sm:w-auto">
             {categories.map((c) => (
               <Link
                 key={c.id}
                 href={`/categories/${c.slug}`}
                 aria-current={c.id === category.id ? 'page' : undefined}
                 className={cn(
-                  'rounded-lg px-4 py-2 text-sm font-bold transition-colors',
+                  'flex-1 rounded-lg px-3 py-2.5 text-center text-sm font-bold whitespace-nowrap transition-colors sm:flex-none sm:px-4 sm:py-2',
                   c.id === category.id ? 'bg-ink-950 text-paper' : 'text-ink-600 hover:text-ink-950',
                 )}
               >
@@ -74,11 +74,14 @@ export default async function CategoryPage({ params, searchParams }: Props) {
           </div>
 
           <h1 className="text-h1 font-black text-balance text-ink-950">{category.name}</h1>
-          <p className="mt-4 max-w-3xl text-lead text-ink-600">{category.description}</p>
+          {/* The one-line summary on a phone, so the products start on the first
+              screen; the full description from `sm` up. */}
+          <p className="mt-3 text-ink-600 sm:hidden">{category.short}</p>
+          <p className="mt-4 hidden max-w-3xl text-lead text-ink-600 sm:block">{category.description}</p>
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 pb-20 sm:px-6 lg:px-8">
+      <section className="mx-auto max-w-7xl px-4 pb-14 sm:px-6 sm:pb-20 lg:px-8">
         <FilterBar groups={groups} total={products.length} />
 
         {products.length > 0 ? (
