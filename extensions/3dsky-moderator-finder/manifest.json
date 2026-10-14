@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "3dsky Moderator Finder",
+  "version": "0.1.0",
+  "description": "Shows which moderator your 3dsky upload was assigned to, by watching what the site sends to your own browser.",
+  "minimum_chrome_version": "111",
+  "permissions": ["storage"],
+  "host_permissions": ["*://*.3dsky.org/*"],
+  "background": { "service_worker": "background.js" },
+  "action": {
+    "default_title": "3dsky Moderator Finder",
+    "default_icon": { "16": "icons/icon16.png", "48": "icons/icon48.png" }
+  },
+  "icons": { "16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "content_scripts": [
+    {
+      "matches": ["*://*.3dsky.org/*"],
+      "js": ["hook.js"],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": true
+    },
+    {
+      "matches": ["*://*.3dsky.org/*"],
+      "js": ["detect.js", "content.js"],
+      "run_at": "document_start"
+    }
+  ]
+}
