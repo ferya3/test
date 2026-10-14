@@ -44,6 +44,9 @@ const srv = http.createServer((req, res) => {
   if (u === '/api/upload') { res.setHeader('content-type', 'application/json'); return res.end('{"id":5,"status":"queued"}'); }
   if (u.startsWith('/api/model/')) { res.setHeader('content-type', 'application/json'); res.setHeader('x-assigned-moderator', 'hdr-Boris'); return res.end('{"model":{"id":5,"moderator":{"id":7,"nickname":"Ivan"},"moderation_status":"pending"}}'); }
   if (u === '/api/user/finance') { res.setHeader('content-type', 'application/json'); return res.end('{"balance":123,"moderator":"SECRET-FIN"}'); }
+  if (u === '/form') { res.setHeader('content-type', 'text/html'); return res.end('<!doctype html><meta charset=utf-8><body><form id=f method=post action="/submit"><input name=title value=Sofa><input type=hidden name=moderator_pick value=3><select name=who style="display:none"><option value=1>Anna<option value=2>Boris</select><input type=password name=pw value=hunter2><button>go</button></form>'); }
+  if (req.method === 'POST' && u === '/submit') { res.writeHead(303, { location: '/done' }); return res.end(); }
+  if (u === '/done') { res.setHeader('content-type', 'text/html'); return res.end('<!doctype html><meta charset=utf-8><body><p>Thanks. Your model is checked by Moderator: Katya</p>'); }
   if (u === '/events') { res.writeHead(200, { 'content-type': 'text/event-stream' }); res.write('data: {"moderatorName":"SseKate"}\n\n'); return; }
   res.statusCode = 404; res.end();
 });
@@ -118,6 +121,31 @@ console.log('PILL AFTER CLEAR:', pill);
 // the page's own behaviour must be untouched
 const ok = await R(async () => { const r = await fetch('/api/upload', { method: 'POST', body: 'x' }); return r.status + ':' + (await r.text()); });
 console.log('PAGE FETCH STILL WORKS:', ok);
+
+// ---- multi-page flow WITHOUT ever opening the panel (regression: log used to be lost on full page loads) ----
+await R(() => document.getElementById('__3dsky_modfinder_host').shadowRoot.querySelector('[data-act=clear]').click());
+await page.goto(base);                       // fresh page load
+await page.click('#go');                     // XHR on page 1
+await page.waitForTimeout(1500);
+await page.goto(base + '/form');             // full navigation (old page's memory is gone)
+await page.waitForTimeout(800);
+await R(() => document.getElementById('__3dsky_modfinder_host').shadowRoot.getElementById('pill').click());
+await page.waitForTimeout(700);
+await R(() => document.getElementById('__3dsky_modfinder_host').shadowRoot.querySelector('[data-act=snapshot]').click());
+await R(() => document.getElementById('__3dsky_modfinder_host').shadowRoot.getElementById('pill').click()); // close again
+await page.click('#f button');               // classic form POST + 303 redirect
+await page.waitForURL('**/done');
+await page.waitForTimeout(1500);
+await R(() => document.getElementById('__3dsky_modfinder_host').shadowRoot.getElementById('pill').click());
+await page.waitForTimeout(700);
+const [dl2] = await Promise.all([page.waitForEvent('download'), R(() => document.getElementById('__3dsky_modfinder_host').shadowRoot.querySelector('[data-act=export]').click())]);
+const raw2 = fs.readFileSync(await dl2.path(), 'utf8'); const e2 = JSON.parse(raw2);
+console.log('LOG SURVIVED FULL NAVIGATION:', e2.entries.some((e) => e.url.includes('/api/model/5/status')));
+const fe = e2.entries.find((e) => e.kind === 'form');
+console.log('FORM SUBMIT CAPTURED:', !!fe && /moderator_pick/.test(fe.reqBody) && !/hunter2/.test(raw2));
+const sn = e2.snapshots[0];
+console.log('SNAPSHOT HAS HIDDEN CONTROLS:', !!sn && sn.controls.some((c) => c.name === 'moderator_pick' && c.hidden === true && c.value === '3') && sn.controls.some((c) => c.options && c.options.includes('2=Boris')) && !sn.controls.some((c) => c.name === 'pw'));
+console.log('MODERATOR ON REDIRECT TARGET PAGE FOUND:', e2.findings.some((f) => f.strength === 3 && /Katya/.test(f.text)));
 console.log('PAGE ERRORS:', errors.length ? errors : 'none');
 await ctx.close(); srv.close();
 

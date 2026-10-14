@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "3dsky Moderator Finder",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Shows which moderator your 3dsky upload was assigned to, by watching what the site sends to your own browser.",
   "minimum_chrome_version": "111",
   "permissions": ["storage"],

@@ -20,6 +20,7 @@
     expanded: new Set(),
     audit: null,
     auditBusy: false,
+    snapshots: [],
   };
 
   // ------------------------------------------------------------------ helpers
@@ -42,23 +43,29 @@
 
   // ------------------------------------------------------------------ persistence
   let saveTimer = null;
+  const persistNow = () => {
+    clearTimeout(saveTimer);
+    try {
+      chrome.storage.local.set({
+        mf: {
+          aliases: S.aliases,
+          prefs: S.prefs,
+          snapshots: S.snapshots.slice(-6),
+          findings: [...S.findings.values()].slice(-300),
+          entries: S.entries.slice(-150).map((e) => ({
+            ...e, resBody: e.resBody ? e.resBody.slice(0, e.matched ? 20000 : 6000) : null, reqBody: e.reqBody ? String(e.reqBody).slice(0, 4000) : null,
+          })),
+        },
+      });
+    } catch (_) { /* extension reloaded */ }
+  };
   const save = () => {
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-      try {
-        chrome.storage.local.set({
-          mf: {
-            aliases: S.aliases,
-            prefs: S.prefs,
-            findings: [...S.findings.values()].slice(-300),
-            entries: S.entries.slice(-150).map((e) => ({
-              ...e, resBody: e.resBody ? e.resBody.slice(0, e.matched ? 20000 : 6000) : null, reqBody: e.reqBody ? String(e.reqBody).slice(0, 4000) : null,
-            })),
-          },
-        });
-      } catch (_) { /* extension reloaded */ }
-    }, 1000);
+    saveTimer = setTimeout(persistNow, 1000);
   };
+  // A form submit / link click can unload the page well within the debounce window: flush on the way out.
+  window.addEventListener('pagehide', persistNow);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') persistNow(); });
   const hydrate = () => {
     try {
       chrome.storage.local.get('mf', ({ mf }) => {
@@ -67,6 +74,7 @@
         if (mf.prefs && mf.prefs.v === 2) Object.assign(S.prefs, mf.prefs); // older saved prefs had capture off
         for (const f of mf.findings || []) if (!S.findings.has(f.key)) S.findings.set(f.key, f);
         S.entries = [...(mf.entries || []), ...S.entries].slice(-MAX_ENTRIES);
+        S.snapshots = [...(mf.snapshots || []), ...S.snapshots].slice(-6);
         syncHook();
         update();
       });
@@ -101,7 +109,8 @@
     for (const { f, dir } of found) {
       addFinding(f, { source: `${entry.kind.toUpperCase()} ${entry.method || ''} · ${dir}`, where: entry.kind === 'state' ? entry.url : shortUrl(entry.url) });
     }
-    if (found.length || S.open) { save(); update(); }
+    save();
+    if (found.length || S.open) update();
   }
 
   window.addEventListener('message', (ev) => {
@@ -391,6 +400,7 @@
         <label><input type="checkbox" data-pref="showWeak" ${S.prefs.showWeak ? 'checked' : ''}> سرنخ‌های ضعیف</label>
         <label title="همه‌ی پاسخ‌ها ذخیره شوند (برای عیب‌یابی؛ مصرف حافظه بیشتر)"><input type="checkbox" data-pref="captureAll" ${S.prefs.captureAll ? 'checked' : ''}> ثبت کامل بدنه‌ها</label>
         <span style="flex:1"></span>
+        <button data-act="snapshot" title="متن صفحه و همه‌ی فیلدهای فرم را ذخیره می‌کند">اسنپ‌شات صفحه (${S.snapshots.length})</button>
         <button data-act="rescan">اسکن مجدد</button>
         <button data-act="export">خروجی JSON</button>
         <button data-act="clear">پاک کردن</button>
@@ -414,8 +424,9 @@
       const v = prompt(`اسم مستعار برای «${key}» (خالی = حذف):`, S.aliases[key] || '');
       if (v !== null) { if (v.trim()) S.aliases[key] = v.trim(); else delete S.aliases[key]; save(); }
     } else if (act === 'rescan') { syncHook(true); scanNode(document.documentElement); }
+    else if (act === 'snapshot') takeSnapshot();
     else if (act === 'clear') {
-      S.findings.clear(); S.entries = []; S.audit = null; S.expanded.clear(); lastAnnounced = '';
+      S.findings.clear(); S.snapshots = []; S.entries = []; S.audit = null; S.expanded.clear(); lastAnnounced = '';
       send({ type: 'badge', text: '' }); save();
     } else if (act === 'export') exportJSON();
     else if (act === 'audit') runAudit();
@@ -432,11 +443,47 @@
     save(); update();
   }
 
+  const SENSITIVE_URL = /auth|login|finance|payment|billing|cart|notifier|token|password|session|oauth|card|wallet|balance/i;
+
+  /** Everything a human would see on this page plus every form control (the removed moderator picker may only exist as a hidden control). */
+  function takeSnapshot() {
+    const controls = [...document.querySelectorAll('input:not([type=password]):not([type=file]),select,textarea')].slice(0, 300).map((el) => ({
+      tag: el.tagName.toLowerCase(), type: el.type || undefined, name: el.name || undefined, id: el.id || undefined,
+      value: String(el.value || '').slice(0, 100), hidden: el.offsetParent === null,
+      options: el.tagName === 'SELECT' ? [...el.options].slice(0, 40).map((o) => `${o.value}=${o.text.trim()}`) : undefined,
+    }));
+    const marks = [...document.querySelectorAll('[class*="moder" i],[id*="moder" i],[data-moder],[class*="review" i],[class*="check" i]')].slice(0, 60)
+      .map((el) => `${el.tagName.toLowerCase()}.${String(el.className).slice(0, 80)} :: ${(el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 120)}`);
+    S.snapshots.push({ t: Date.now(), url: location.href, title: document.title, text: (document.body ? document.body.innerText : '').slice(0, 8000), controls, marks });
+    S.snapshots = S.snapshots.slice(-6);
+    persistNow();
+  }
+
+  document.addEventListener('submit', (ev) => {
+    try {
+      const form = ev.target;
+      if (!form || form.tagName !== 'FORM') return;
+      const url = form.action || location.href;
+      const o = {};
+      if (!SENSITIVE_URL.test(url)) {
+        // password fields (and anything that looks like a secret) are never recorded
+        const secret = new Set([...form.elements].filter((el) => el.type === 'password' || /pass|pwd|secret|token|card|cvv|cvc|iban/i.test(el.name || '')).map((el) => el.name));
+        for (const [k, v] of new FormData(form).entries()) {
+          if (secret.has(k)) continue;
+          const val = typeof v === 'string' ? v.slice(0, 500) : `[File ${v.name} ${v.size}B]`;
+          if (k in o) o[k] = [].concat(o[k], val); else o[k] = val;
+        }
+      }
+      ingest({ id: 0, t: Date.now(), kind: 'form', method: (form.method || 'GET').toUpperCase(), url, status: 0, size: 0, reqBody: SENSITIVE_URL.test(url) ? null : JSON.stringify(o), redacted: SENSITIVE_URL.test(url) || undefined });
+      persistNow();
+    } catch (_) { /* never break the page */ }
+  }, true);
+
   function exportJSON() {
     const data = {
       tool: '3dsky-moderator-finder', version: chrome.runtime.getManifest().version, exportedAt: new Date().toISOString(),
       page: location.href, userAgent: navigator.userAgent, aliases: S.aliases,
-      findings: [...S.findings.values()], entries: S.entries, codeAudit: S.audit,
+      findings: [...S.findings.values()], entries: S.entries, snapshots: S.snapshots, codeAudit: S.audit,
     };
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
     const a = document.createElement('a');
@@ -472,7 +519,10 @@
   // ------------------------------------------------------------------ boot
   hydrate();
   syncHook();
-  const boot = () => { ensureUI(); startDomWatch(); update(); };
+  const boot = () => {
+    ensureUI(); startDomWatch(); update();
+    ingest({ id: 0, t: Date.now(), kind: 'page', method: 'LOAD', url: location.href, status: 200, size: 0 });
+  };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
   else boot();
 })();
