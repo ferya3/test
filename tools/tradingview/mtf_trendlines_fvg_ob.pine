@@ -327,10 +327,12 @@ alertcondition(newBearOB,   "Bearish OB formed",   "Bearish Order Block formed")
 
 f_cnt(int[] arr, int a, int b) =>
     int n = 0
-    for idx = 0 to array.size(arr) - 1
-        int v = array.get(arr, idx)
-        if v == a or v == b
-            n += 1
+    int sz = array.size(arr)
+    if sz > 0
+        for idx = 0 to sz - 1
+            int v = array.get(arr, idx)
+            if v == a or v == b
+                n += 1
     n
 
 panelPosition = panelPos == "Top left" ? position.top_left : panelPos == "Bottom left" ? position.bottom_left : panelPos == "Bottom right" ? position.bottom_right : position.top_right
