@@ -38,6 +38,11 @@ const config: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
 
+  // The repository root has its own lockfile (the Laravel app); without this
+  // Next guesses the root from lockfiles and picks the wrong one. npm scripts
+  // always run from web/, so the working directory is the app.
+  outputFileTracingRoot: process.cwd(),
+
   // sharp is a native module and must not be bundled. Next lists it as
   // external by default, but naming it here makes the requirement explicit
   // rather than an accident of the framework's defaults.
