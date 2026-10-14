@@ -4,10 +4,16 @@ import { Brand } from './header';
 import { NAV } from '@/lib/nav';
 import { getCategories, getSettings } from '@/lib/queries';
 import { faDigits, persianYear } from '@/lib/catalog';
+import { getDictionary } from '@/i18n/dictionaries';
+import { localePath, type Locale } from '@/i18n/config';
 
-export function Footer() {
-  const settings = getSettings();
-  const categories = getCategories();
+export function Footer({ locale }: { locale: Locale }) {
+  const settings = getSettings(locale);
+  const categories = getCategories(locale);
+  const t = getDictionary(locale);
+  const href = (p: string) => localePath(locale, p);
+  // The Solar Hijri year on the Persian site, the Gregorian on the English.
+  const year = locale === 'fa' ? faDigits(persianYear()) : String(new Date().getFullYear());
 
   return (
     <footer className="relative overflow-hidden bg-ink-950 text-ink-300">
@@ -19,15 +25,15 @@ export function Footer() {
 
       <div className="relative mx-auto grid max-w-7xl grid-cols-2 gap-x-6 gap-y-8 px-4 py-12 sm:gap-10 sm:px-6 sm:py-16 lg:grid-cols-4 lg:px-8">
         <div className="col-span-2 flex flex-col gap-4 lg:col-span-1">
-          <Brand name={settings.company_name} light />
+          <Brand name={settings.company_name} locale={locale} light />
           <p className="max-w-xs text-sm leading-7">{settings.company_tagline}</p>
         </div>
 
-        <FooterList title="محصولات" items={categories.map((c) => ({ href: `/categories/${c.slug}`, label: c.name }))} />
-        <FooterList title="دسترسی سریع" items={NAV.map((n) => ({ href: n.href, label: n.label }))} />
+        <FooterList title={t.footer.products} items={categories.map((c) => ({ href: href(`/categories/${c.slug}`), label: c.name }))} />
+        <FooterList title={t.footer.quickLinks} items={NAV.map((n) => ({ href: href(n.href), label: t.nav[n.key] }))} />
 
         <div className="col-span-2 lg:col-span-1">
-          <h2 className="mb-2 text-sm font-bold text-paper sm:mb-4">تماس</h2>
+          <h2 className="mb-2 text-sm font-bold text-paper sm:mb-4">{t.footer.contact}</h2>
           <ul className="flex flex-col text-sm">
             {/* Whole rows are the tap targets, at least 44px tall. */}
             <li>
@@ -52,7 +58,7 @@ export function Footer() {
 
       <div className="relative border-t border-white/10">
         <p className="mx-auto max-w-7xl px-4 py-6 text-xs sm:px-6 lg:px-8">
-          © {faDigits(persianYear())} {settings.company_name}. همهٔ حقوق محفوظ است.
+          © {year} {settings.company_name}. {t.footer.rights}
         </p>
       </div>
     </footer>

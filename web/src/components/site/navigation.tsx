@@ -1,17 +1,30 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronLeft, Menu, X, Phone } from 'lucide-react';
+import { ChevronLeft, Globe, Menu, X, Phone } from 'lucide-react';
 import { useEffect } from 'react';
 import { useMenu } from '@/store/menu';
 import { lenis } from '@/components/providers/smooth-scroll';
+import { useLocale } from '@/i18n/client';
+import { switchLocalePath } from '@/i18n/config';
 import { NAV } from '@/lib/nav';
 import { cn } from '@/lib/utils';
 
+/** Whether `href` (a path without language prefix) is the page being viewed. */
+function useIsActive() {
+  const pathname = usePathname();
+  const { path } = useLocale();
+  return (href: string) => {
+    const target = path(href);
+    return href === '/' ? pathname === target : pathname.startsWith(target);
+  };
+}
+
 export function MenuButton() {
   const { open, toggle } = useMenu();
+  const { t } = useLocale();
 
   return (
     <button
@@ -19,7 +32,7 @@ export function MenuButton() {
       onClick={toggle}
       aria-expanded={open}
       aria-controls="mobile-menu"
-      aria-label={open ? 'بستن منو' : 'باز کردن منو'}
+      aria-label={open ? t.header.closeMenu : t.header.openMenu}
       className="grid size-11 place-items-center rounded-lg text-ink-900 transition-colors hover:bg-ink-50 lg:hidden"
     >
       {open ? <X className="size-6" /> : <Menu className="size-6" />}
@@ -27,26 +40,57 @@ export function MenuButton() {
   );
 }
 
-export function DesktopNav() {
+/**
+ * The same page in the other language, keeping the query string, so a
+ * filtered product list stays filtered.
+ */
+export function LanguageSwitch({ className }: { className?: string }) {
+  const { locale, t } = useLocale();
   const pathname = usePathname();
+  const search = useSearchParams().toString();
+  const other = locale === 'fa' ? 'en' : 'fa';
+
+  // A plain link, not next/link: switching language must load a fresh
+  // document. The root layout, which sets <html lang dir>, is not re-rendered
+  // on client-side navigation, so the page would keep the old direction.
+  return (
+    <a
+      href={`${switchLocalePath(pathname, other)}${search ? `?${search}` : ''}`}
+      hrefLang={other}
+      lang={other}
+      aria-label={t.header.otherLanguageLabel}
+      className={cn(
+        'inline-flex h-10 items-center gap-1.5 rounded-lg border border-ink-200 px-3 text-sm font-bold text-ink-800 transition-colors hover:border-ink-900',
+        className,
+      )}
+    >
+      <Globe className="size-4" />
+      {t.header.otherLanguageShort}
+    </a>
+  );
+}
+
+export function DesktopNav() {
+  const { t, path } = useLocale();
+  const isActive = useIsActive();
 
   return (
-    <nav aria-label="منوی اصلی" className="hidden lg:block">
+    <nav aria-label={t.header.mainNav} className="hidden lg:block">
       <ul className="flex items-center gap-1">
         {NAV.map((item) => {
-          const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
+          const active = isActive(item.href);
 
           return (
             <li key={item.href}>
               <Link
-                href={item.href}
+                href={path(item.href)}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'relative rounded-lg px-3.5 py-2 text-sm font-medium transition-colors',
+                  'relative rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors xl:px-3.5',
                   active ? 'text-ink-950' : 'text-ink-600 hover:text-ink-950',
                 )}
               >
-                {item.label}
+                {t.nav[item.key]}
                 {active && (
                   <motion.span
                     layoutId="nav-underline"
@@ -66,6 +110,8 @@ export function DesktopNav() {
 export function MobileMenu({ phone }: { phone: string }) {
   const { open, setOpen } = useMenu();
   const pathname = usePathname();
+  const { t, path } = useLocale();
+  const isActive = useIsActive();
 
   // Navigating closes the drawer — a link that leaves it open over the new
   // page looks like the tap did nothing.
@@ -94,7 +140,7 @@ export function MobileMenu({ phone }: { phone: string }) {
           id="mobile-menu"
           role="dialog"
           aria-modal="true"
-          aria-label="منو"
+          aria-label={t.header.menu}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -104,7 +150,7 @@ export function MobileMenu({ phone }: { phone: string }) {
           <nav className="flex h-full flex-col overflow-y-auto px-4 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
             <ul className="flex flex-col gap-1">
               {NAV.map((item, i) => {
-                const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
+                const active = isActive(item.href);
 
                 return (
                   <motion.li
@@ -114,28 +160,31 @@ export function MobileMenu({ phone }: { phone: string }) {
                     transition={{ delay: 0.05 + i * 0.05, ease: [0.16, 1, 0.3, 1], duration: 0.5 }}
                   >
                     <Link
-                      href={item.href}
+                      href={path(item.href)}
                       aria-current={active ? 'page' : undefined}
                       className={cn(
                         'flex items-center justify-between rounded-xl px-4 py-3.5 text-xl font-bold transition-colors',
                         active ? 'bg-ink-950 text-paper' : 'text-ink-900 active:bg-ink-100',
                       )}
                     >
-                      {item.label}
-                      <ChevronLeft className={cn('size-5', active ? 'text-gold-300' : 'text-ink-300')} />
+                      {t.nav[item.key]}
+                      <ChevronLeft className={cn('dir-icon size-5', active ? 'text-gold-300' : 'text-ink-300')} />
                     </Link>
                   </motion.li>
                 );
               })}
             </ul>
 
-            <a
-              href={`tel:${phone.replace(/[^\d+]/g, '')}`}
-              className="mt-auto flex items-center justify-center gap-2 rounded-xl bg-gold-400 py-4 text-base font-bold text-ink-950"
-            >
-              <Phone className="size-5" />
-              <span className="ltr-isolate">{phone}</span>
-            </a>
+            <div className="mt-auto flex gap-2 pt-6">
+              <a
+                href={`tel:${phone.replace(/[^\d+]/g, '')}`}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gold-400 py-4 text-base font-bold text-ink-950"
+              >
+                <Phone className="size-5" />
+                <span className="ltr-isolate">{phone}</span>
+              </a>
+              <LanguageSwitch className="h-auto rounded-xl px-5 text-base" />
+            </div>
           </nav>
         </motion.div>
       )}

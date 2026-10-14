@@ -7,25 +7,29 @@ import { Reveal } from '@/components/motion/reveal';
 import { SectionHeading } from '@/components/site/section-heading';
 import { countProducts, getProcessSteps, getCategories, getSettings } from '@/lib/queries';
 import { persianYear } from '@/lib/catalog';
+import { alternates } from '@/lib/seo';
+import { getDictionary } from '@/i18n/dictionaries';
+import type { Locale } from '@/i18n/config';
 
-export function generateMetadata(): Metadata {
-  const s = getSettings();
+type Props = { params: Promise<{ lang: Locale }> };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { lang } = await params;
+  const s = getSettings(lang);
   return {
-    title: 'دربارهٔ ما',
+    title: getDictionary(lang).about.metaTitle,
     description: `${s.company_name} — ${s.company_tagline}`,
-    alternates: { canonical: '/about' },
+    alternates: alternates(lang, '/about'),
   };
 }
 
-const VALUES = [
-  { icon: Factory, title: 'تولید یکپارچه', body: 'از آغشته‌سازی کاغذ تا برش نهایی، همهٔ مراحل زیر یک سقف و با یک استاندارد.' },
-  { icon: FlaskConical, title: 'آزمایشگاه داخلی', body: 'ثبات رنگ، مقاومت سایشی و ضخامت هر بچ پیش از ارسال اندازه‌گیری می‌شود.' },
-  { icon: Truck, title: 'انبار دائمی', body: 'موجودی همیشگی طرح‌های پرمصرف، برای تحویل سریع سفارش‌های کارگاهی.' },
-  { icon: Award, title: 'پشتیبانی فنی', body: 'مشاوره در انتخاب ضخامت، سطح و روش نصب برای هر پروژه.' },
-];
+// In the order of the dictionary's `about.values`.
+const VALUE_ICONS = [Factory, FlaskConical, Truck, Award];
 
-export default function AboutPage() {
-  const s = getSettings();
+export default async function AboutPage({ params }: Props) {
+  const { lang } = await params;
+  const t = getDictionary(lang);
+  const s = getSettings(lang);
   const founded = parseInt(s.founded_year, 10);
   const years = Number.isFinite(founded) && founded < persianYear() ? persianYear() - founded : 0;
 
@@ -34,9 +38,9 @@ export default function AboutPage() {
       <section className="relative overflow-hidden bg-ink-950 text-paper">
         <div aria-hidden className="absolute -top-1/2 end-0 size-[40rem] rounded-full bg-gold-500/15 blur-[120px]" />
         <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-24 lg:px-8">
-          <p className="mb-3 text-sm font-bold text-gold-300">دربارهٔ ما</p>
+          <p className="mb-3 text-sm font-bold text-gold-300">{t.about.overline}</p>
           <h1 className="max-w-3xl text-h1 font-black text-balance sm:text-display">
-            {s.company_name}، <span className="gold-text">{s.company_tagline}</span>
+            {s.company_name}{lang === 'fa' ? '،' : ','} <span className="gold-text">{s.company_tagline}</span>
           </h1>
         </div>
       </section>
@@ -46,19 +50,21 @@ export default function AboutPage() {
         heading={s.intro_heading}
         body={s.intro_body}
         stats={[
-          ...(years ? [{ value: years, suffix: '+', label: 'سال تجربه' }] : []),
-          { value: countProducts(), label: 'طرح و رنگ' },
-          { value: getCategories().length, label: 'گروه کالا' },
+          ...(years ? [{ value: years, suffix: '+', label: t.stats.years }] : []),
+          { value: countProducts(), label: t.stats.designs },
+          { value: getCategories().length, label: t.stats.groups },
         ]}
       />
 
       <section className="bg-ink-50 py-14 sm:py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Reveal>
-            <SectionHeading overline="چرا ما" title="آنچه به آن متعهدیم" />
+            <SectionHeading overline={t.about.whyOverline} title={t.about.whyTitle} />
           </Reveal>
           <ul className="mt-7 grid gap-3 sm:mt-10 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {VALUES.map(({ icon: Icon, title, body }, i) => (
+            {t.about.values.map(({ title, body }, i) => {
+              const Icon = VALUE_ICONS[i] ?? Award;
+              return (
               <li key={title}>
                 <Reveal delay={i * 0.08} className="h-full rounded-2xl border border-ink-100 bg-white p-6 shadow-[var(--shadow-soft)]">
                   <span className="grid size-12 place-items-center rounded-xl bg-gold-50 text-gold-700">
@@ -68,14 +74,15 @@ export default function AboutPage() {
                   <p className="mt-2 leading-8 text-ink-600">{body}</p>
                 </Reveal>
               </li>
-            ))}
+              );
+            })}
           </ul>
         </div>
       </section>
 
-      <Process steps={getProcessSteps()} />
+      <Process steps={getProcessSteps(lang)} />
       <div className="pt-14 sm:pt-20 lg:pt-28">
-        <Cta phone={s.contact_phone} />
+        <Cta phone={s.contact_phone} locale={lang} />
       </div>
     </>
   );

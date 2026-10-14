@@ -8,6 +8,7 @@ import { ArrowLeft, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Swatch } from '@/components/catalog/swatch';
 import type { ScenePanel } from './hero-scene';
+import { useLocale } from '@/i18n/client';
 
 // WebGL exists only in the browser, and only from tablet width up (below).
 const HeroScene = dynamic(() => import('./hero-scene'), {
@@ -80,6 +81,7 @@ export function Hero({
 }) {
   const reduce = useReducedMotion();
   const wide = useWideScreen();
+  const { t, path } = useLocale();
   const words = title.split(' ');
   const from = (delay: number) =>
     reduce
@@ -130,14 +132,14 @@ export function Hero({
 
           <motion.div {...from(0.6)} className="mt-7 flex gap-3 sm:mt-9">
             <Button asChild size="lg" className="flex-1 sm:flex-none">
-              <Link href="/categories/hpl-cabinet-panel">
-                مشاهدهٔ محصولات
-                <ArrowLeft />
+              <Link href={path('/categories/hpl-cabinet-panel')}>
+                {t.hero.viewProducts}
+                <ArrowLeft className="dir-icon" />
               </Link>
             </Button>
             {/* On a phone the call button is just the icon, beside the main action. */}
             <Button asChild size="lg" variant="ghostLight" className="w-13 px-0 sm:w-auto sm:px-8">
-              <a href={`tel:${phone.replace(/[^\d+]/g, '')}`} aria-label={`تماس: ${phone}`}>
+              <a href={`tel:${phone.replace(/[^\d+]/g, '')}`} aria-label={`${t.hero.call}: ${phone}`}>
                 <Phone />
                 <span className="ltr-isolate hidden sm:inline">{phone}</span>
               </a>

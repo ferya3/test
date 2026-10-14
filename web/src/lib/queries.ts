@@ -4,9 +4,15 @@
  * Every query here is a prepared statement with bound parameters — no string
  * concatenation of anything a visitor supplied, which is the whole of the SQL
  * injection defence and the only one that holds.
+ *
+ * Reads that feed the site take a language. Text columns have an English twin
+ * (`name_en`, …); for English the twin is used, falling back to the Persian
+ * when it has not been filled in yet, so a page is never blank.
  */
 import { db } from './db.ts';
-import { FAMILIES, SURFACES, THICKNESSES, type Family, type Surface, type Thickness } from './catalog.ts';
+import { THICKNESSES, familyLabels, num, surfaceLabels, type Family, type Surface, type Thickness } from './catalog.ts';
+
+export type Lang = 'fa' | 'en';
 
 export type Category = {
   id: number;
@@ -14,6 +20,9 @@ export type Category = {
   name: string;
   short: string;
   description: string;
+  name_en: string;
+  short_en: string;
+  description_en: string;
   position: number;
   is_active: number;
 };
@@ -26,6 +35,9 @@ export type Product = {
   name: string;
   short: string;
   description: string;
+  name_en: string;
+  short_en: string;
+  description_en: string;
   family: Family;
   surface: Surface;
   thicknesses: string;
@@ -47,16 +59,34 @@ export type Filters = {
 
 export const NO_FILTERS: Filters = { families: [], surfaces: [], thicknesses: [] };
 
-export function getCategories(): Category[] {
-  return db
-    .prepare('SELECT * FROM categories WHERE is_active = 1 ORDER BY position, id')
-    .all() as Category[];
+/*
+ * Rows come back from node:sqlite with a null prototype, which React will not
+ * pass from a server component to a client one; every row is copied into an
+ * ordinary object on the way out, and its text put in the right language.
+ */
+function localize<T>(row: unknown, lang: Lang, fields: string[]): T {
+  const out: Record<string, unknown> = { ...(row as object) };
+  if (lang === 'en') {
+    for (const f of fields) {
+      const en = out[`${f}_en`];
+      if (typeof en === 'string' && en.trim() !== '') out[f] = en;
+    }
+  }
+  return out as T;
 }
 
-export function getCategory(slug: string): Category | undefined {
-  return db
-    .prepare('SELECT * FROM categories WHERE slug = ? AND is_active = 1')
-    .get(slug) as Category | undefined;
+const many = <T,>(rows: unknown[], lang: Lang, fields: string[]) => rows.map((r) => localize<T>(r, lang, fields));
+const one = <T,>(row: unknown, lang: Lang, fields: string[]) => (row ? localize<T>(row, lang, fields) : undefined);
+
+const CATEGORY_TEXT = ['name', 'short', 'description'];
+const PRODUCT_TEXT = ['name', 'short', 'description', 'category_name'];
+
+export function getCategories(lang: Lang = 'fa'): Category[] {
+  return many<Category>(db.prepare('SELECT * FROM categories WHERE is_active = 1 ORDER BY position, id').all(), lang, CATEGORY_TEXT);
+}
+
+export function getCategory(slug: string, lang: Lang = 'fa'): Category | undefined {
+  return one<Category>(db.prepare('SELECT * FROM categories WHERE slug = ? AND is_active = 1').get(slug), lang, CATEGORY_TEXT);
 }
 
 /**
@@ -89,12 +119,14 @@ function where(categoryId: number, filters: Filters, omit?: keyof Filters) {
   return { sql: clauses.join(' AND '), params };
 }
 
-export function getProducts(categoryId: number, filters: Filters): Product[] {
+export function getProducts(categoryId: number, filters: Filters, lang: Lang = 'fa'): Product[] {
   const { sql, params } = where(categoryId, filters);
 
-  return db
-    .prepare(`SELECT p.* FROM products p WHERE ${sql} ORDER BY p.position, p.id`)
-    .all(...params) as Product[];
+  return many<Product>(
+    db.prepare(`SELECT p.* FROM products p WHERE ${sql} ORDER BY p.position, p.id`).all(...params),
+    lang,
+    PRODUCT_TEXT,
+  );
 }
 
 export type Facets = {
@@ -140,47 +172,55 @@ export function getFacets(categoryId: number, filters: Filters): Facets {
   };
 }
 
-export function getFeaturedProducts(limit: number): ProductWithCategory[] {
-  return db
-    .prepare(
-      `SELECT p.*, c.slug AS category_slug, c.name AS category_name
-         FROM products p JOIN categories c ON c.id = p.category_id
-        WHERE p.is_active = 1 AND p.is_featured = 1 AND c.is_active = 1
-        ORDER BY p.position, p.id LIMIT ?`,
-    )
-    .all(limit) as ProductWithCategory[];
+const WITH_CATEGORY = `SELECT p.*, c.slug AS category_slug, c.name AS category_name, c.name_en AS category_name_en
+                         FROM products p JOIN categories c ON c.id = p.category_id`;
+
+export function getFeaturedProducts(limit: number, lang: Lang = 'fa'): ProductWithCategory[] {
+  return many<ProductWithCategory>(
+    db
+      .prepare(
+        `${WITH_CATEGORY}
+          WHERE p.is_active = 1 AND p.is_featured = 1 AND c.is_active = 1
+          ORDER BY p.position, p.id LIMIT ?`,
+      )
+      .all(limit),
+    lang,
+    PRODUCT_TEXT,
+  );
 }
 
-export function getProduct(slug: string): ProductWithCategory | undefined {
-  return db
-    .prepare(
-      `SELECT p.*, c.slug AS category_slug, c.name AS category_name
-         FROM products p JOIN categories c ON c.id = p.category_id
-        WHERE p.slug = ? AND p.is_active = 1 AND c.is_active = 1`,
-    )
-    .get(slug) as ProductWithCategory | undefined;
+export function getProduct(slug: string, lang: Lang = 'fa'): ProductWithCategory | undefined {
+  return one<ProductWithCategory>(
+    db.prepare(`${WITH_CATEGORY} WHERE p.slug = ? AND p.is_active = 1 AND c.is_active = 1`).get(slug),
+    lang,
+    PRODUCT_TEXT,
+  );
 }
 
-export function getRelated(product: Product, limit: number): Product[] {
-  return db
-    .prepare(
-      `SELECT * FROM products
-        WHERE category_id = ? AND id != ? AND is_active = 1
-        ORDER BY (family = ?) DESC, position LIMIT ?`,
-    )
-    .all(product.category_id, product.id, product.family, limit) as Product[];
+export function getRelated(product: Product, limit: number, lang: Lang = 'fa'): Product[] {
+  return many<Product>(
+    db
+      .prepare(
+        `SELECT * FROM products
+          WHERE category_id = ? AND id != ? AND is_active = 1
+          ORDER BY (family = ?) DESC, position LIMIT ?`,
+      )
+      .all(product.category_id, product.id, product.family, limit),
+    lang,
+    PRODUCT_TEXT,
+  );
 }
 
 export type CategoryWithStats = Category & { product_count: number; swatches: string[] };
 
 /** Categories for the home page cards: how many products, and a few colours to show. */
-export function getCategoriesWithStats(): CategoryWithStats[] {
+export function getCategoriesWithStats(lang: Lang = 'fa'): CategoryWithStats[] {
   const swatches = db.prepare(
     'SELECT color_hex FROM products WHERE category_id = ? AND is_active = 1 ORDER BY is_featured DESC, position LIMIT 5',
   );
   const count = db.prepare('SELECT COUNT(*) AS n FROM products WHERE category_id = ? AND is_active = 1');
 
-  return getCategories().map((c) => ({
+  return getCategories(lang).map((c) => ({
     ...c,
     product_count: (count.get(c.id) as { n: number }).n,
     swatches: (swatches.all(c.id) as { color_hex: string }[]).map((r) => r.color_hex),
@@ -195,17 +235,18 @@ export function countProducts(): number {
    Production steps and projects
    -------------------------------------------------------------------------- */
 
-export type ProcessStep = { id: number; position: number; title: string; body: string; image: string | null };
+export type ProcessStep = {
+  id: number;
+  position: number;
+  title: string;
+  body: string;
+  title_en: string;
+  body_en: string;
+  image: string | null;
+};
 
-/*
- * node:sqlite returns rows with a null prototype, which React refuses to pass
- * from a server component to a client one. Lists that go to the client are
- * copied into ordinary objects.
- */
-const plain = <T,>(rows: unknown[]) => rows.map((row) => ({ ...(row as object) })) as T[];
-
-export function getProcessSteps(): ProcessStep[] {
-  return plain<ProcessStep>(db.prepare('SELECT * FROM process_steps ORDER BY position, id').all());
+export function getProcessSteps(lang: Lang = 'fa'): ProcessStep[] {
+  return many<ProcessStep>(db.prepare('SELECT * FROM process_steps ORDER BY position, id').all(), lang, ['title', 'body']);
 }
 
 export type Project = {
@@ -224,16 +265,22 @@ export type Project = {
 };
 
 /** Active projects, optionally only one product group's, in editor order. */
-export function getProjects({ limit = 100, categorySlug }: { limit?: number; categorySlug?: string } = {}): Project[] {
-  return plain<Project>(
+export function getProjects({
+  limit = 100,
+  categorySlug,
+  lang = 'fa',
+}: { limit?: number; categorySlug?: string; lang?: Lang } = {}): Project[] {
+  return many<Project>(
     db
       .prepare(
-        `SELECT p.*, c.slug AS category_slug, c.name AS category_name
+        `SELECT p.*, c.slug AS category_slug, c.name AS category_name, c.name_en AS category_name_en
            FROM projects p LEFT JOIN categories c ON c.id = p.category_id
           WHERE p.is_active = 1 AND (? IS NULL OR c.slug = ?)
           ORDER BY p.position, p.id LIMIT ?`,
       )
       .all(categorySlug ?? null, categorySlug ?? null, limit),
+    lang,
+    ['title', 'location', 'description', 'category_name'],
   );
 }
 
@@ -261,21 +308,59 @@ export const SETTING_DEFAULTS = {
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
 export type Settings = Record<SettingKey, string>;
 
-export function getSettings(): Settings {
-  const rows = db.prepare('SELECT key, value FROM settings').all() as { key: string; value: string }[];
-  const stored = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+/**
+ * The settings that are text, and so have an English version, stored under
+ * `<key>_en`. Phone, email and founding year are the same in both languages.
+ */
+export const TRANSLATED_SETTINGS = [
+  'company_name',
+  'company_tagline',
+  'hero_overline',
+  'hero_title',
+  'hero_lead',
+  'intro_overline',
+  'intro_heading',
+  'intro_body',
+  'contact_address',
+] as const satisfies readonly SettingKey[];
 
-  return { ...SETTING_DEFAULTS, ...stored } as Settings;
+export type TranslatedSettingKey = (typeof TRANSLATED_SETTINGS)[number];
+
+export const SETTING_DEFAULTS_EN: Record<TranslatedSettingKey, string> = {
+  company_name: 'Artavil Gold',
+  company_tagline: 'Manufacturer of HPL cabinet panels and compact sheet',
+  hero_overline: 'HPL laminate manufacturer',
+  hero_title: 'Surfaces that stay beautiful for years',
+  hero_lead:
+    'High-pressure HPL cabinet panels and compact sheet: resistant to scratches, heat and moisture, in wood, stone and solid-colour designs.',
+  intro_overline: 'About the factory',
+  intro_heading: 'HPL sheet, from press to final cut',
+  intro_body:
+    'We make HPL: layers of kraft paper impregnated with resin, fused under high pressure and heat into one hard, solid surface. That one process is the basis of both our product lines.\n\nA fully automated line, an in-house quality lab and permanent stock let us deliver workshop orders and large projects with the same consistency of colour and thickness.',
+  contact_address: 'Km 25, Makhsous Road, Industrial Park, Tehran',
+};
+
+export function getSettings(lang: Lang = 'fa'): Settings {
+  const rows = db.prepare('SELECT key, value FROM settings').all() as { key: string; value: string }[];
+  const stored: Record<string, string> = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+  const settings = { ...SETTING_DEFAULTS, ...stored } as Settings;
+
+  if (lang === 'en') {
+    for (const key of TRANSLATED_SETTINGS) {
+      const en = stored[`${key}_en`];
+      settings[key] = en && en.trim() !== '' ? en : SETTING_DEFAULTS_EN[key];
+    }
+  }
+
+  return settings;
 }
 
-/** Labels for filter options, in the order they should be offered. */
-export const FILTER_GROUPS = [
-  { key: 'families', param: 'family', label: 'طرح', options: Object.entries(FAMILIES) },
-  { key: 'surfaces', param: 'surface', label: 'سطح', options: Object.entries(SURFACES) },
-  {
-    key: 'thicknesses',
-    param: 'thickness',
-    label: 'ضخامت',
-    options: THICKNESSES.map((t) => [t, `${t} میلی‌متر`] as [string, string]),
-  },
-] as const;
+/** The three filter dropdowns, in the order they are offered, labelled for `lang`. */
+export function filterGroups(lang: Lang) {
+  const mm = lang === 'en' ? 'mm' : 'میلی‌متر';
+  return [
+    { key: 'families', param: 'family', options: Object.entries(familyLabels(lang)) },
+    { key: 'surfaces', param: 'surface', options: Object.entries(surfaceLabels(lang)) },
+    { key: 'thicknesses', param: 'thickness', options: THICKNESSES.map((t) => [t, `${num(t, lang)} ${mm}`] as [string, string]) },
+  ] as const;
+}

@@ -164,6 +164,12 @@
     unicode-bidi: isolate;
   }
 
+  /* Arrows and chevrons drawn for right-to-left ("forward" points left) are
+     mirrored on the English, left-to-right pages. */
+  [dir='ltr'] .dir-icon {
+    transform: scaleX(-1);
+  }
+
   .text-balance {
     text-wrap: balance;
   }

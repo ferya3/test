@@ -27,11 +27,20 @@ export default async function CategoriesPage() {
                 <Input id={`position-${c.id}`} name="position" type="number" min={0} max={999} defaultValue={c.position} dir="ltr" />
               </Field>
             </div>
+            <Field name="name_en" id={`name_en-${c.id}`} label="نام گروه — انگلیسی">
+              <Input id={`name_en-${c.id}`} name="name_en" defaultValue={c.name_en} dir="ltr" maxLength={120} />
+            </Field>
             <Field name="short" id={`short-${c.id}`} label="توضیح کوتاه (روی کارت صفحهٔ اصلی)">
               <Textarea id={`short-${c.id}`} name="short" defaultValue={c.short} maxLength={300} className="min-h-20" />
             </Field>
+            <Field name="short_en" id={`short_en-${c.id}`} label="توضیح کوتاه — انگلیسی">
+              <Textarea id={`short_en-${c.id}`} name="short_en" defaultValue={c.short_en} dir="ltr" maxLength={300} className="min-h-20" />
+            </Field>
             <Field name="description" id={`description-${c.id}`} label="توضیح کامل (بالای صفحهٔ گروه)">
               <Textarea id={`description-${c.id}`} name="description" defaultValue={c.description} maxLength={3000} />
+            </Field>
+            <Field name="description_en" id={`description_en-${c.id}`} label="توضیح کامل — انگلیسی">
+              <Textarea id={`description_en-${c.id}`} name="description_en" defaultValue={c.description_en} dir="ltr" maxLength={3000} />
             </Field>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" name="is_active" defaultChecked={!!c.is_active} className="size-4 accent-gold-600" />

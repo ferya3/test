@@ -5,6 +5,8 @@ import { saveProduct } from '@/lib/actions/products';
 import { FAMILIES, SURFACES, THICKNESSES, faDigits } from '@/lib/catalog';
 import type { Category, Product } from '@/lib/queries';
 
+export const EN_HINT = 'برای نسخهٔ انگلیسی سایت. اگر خالی بماند، متن فارسی نمایش داده می‌شود.';
+
 export function ProductForm({ product, categories }: { product?: Product; categories: Category[] }) {
   const p = product;
   const thicknesses = p?.thicknesses.split(',') ?? [];
@@ -14,6 +16,10 @@ export function ProductForm({ product, categories }: { product?: Product; catego
       <div className="grid gap-5 sm:grid-cols-2">
         <Field name="name" label="نام محصول" className="sm:col-span-2">
           <Input id="name" name="name" defaultValue={p?.name} required maxLength={120} />
+        </Field>
+
+        <Field name="name_en" label="نام محصول — انگلیسی" hint={EN_HINT} className="sm:col-span-2">
+          <Input id="name_en" name="name_en" defaultValue={p?.name_en} dir="ltr" maxLength={120} placeholder="Natural Oak Embossed Cabinet Panel" />
         </Field>
 
         <Field name="code" label="کد محصول">
@@ -95,8 +101,16 @@ export function ProductForm({ product, categories }: { product?: Product; catego
           <Textarea id="short" name="short" defaultValue={p?.short} maxLength={300} className="min-h-20" />
         </Field>
 
+        <Field name="short_en" label="توضیح کوتاه — انگلیسی" className="sm:col-span-2">
+          <Textarea id="short_en" name="short_en" defaultValue={p?.short_en} dir="ltr" maxLength={300} className="min-h-20" />
+        </Field>
+
         <Field name="description" label="توضیحات کامل" className="sm:col-span-2">
           <Textarea id="description" name="description" defaultValue={p?.description} maxLength={5000} className="min-h-40" />
+        </Field>
+
+        <Field name="description_en" label="توضیحات کامل — انگلیسی" className="sm:col-span-2">
+          <Textarea id="description_en" name="description_en" defaultValue={p?.description_en} dir="ltr" maxLength={5000} className="min-h-40" />
         </Field>
       </div>
     </AdminForm>

@@ -34,6 +34,10 @@ export async function saveProduct(id: number | null, _prev: ActionState, form: F
     position: int(form, 'position', 0, 9999),
     is_featured: bool(form, 'is_featured') ? 1 : 0,
     is_active: bool(form, 'is_active') ? 1 : 0,
+    // English; left empty, the English site shows the Persian.
+    name_en: str(form, 'name_en', 120),
+    short_en: str(form, 'short_en', 300),
+    description_en: str(form, 'description_en', 5000),
   };
 
   const errors: Record<string, string> = {};
@@ -85,17 +89,22 @@ export async function saveProduct(id: number | null, _prev: ActionState, form: F
     data.is_featured,
     data.is_active,
     data.position,
+    data.name_en,
+    data.short_en,
+    data.description_en,
   ];
 
   if (id) {
     db.prepare(
       `UPDATE products SET slug=?, code=?, category_id=?, name=?, short=?, description=?, family=?, surface=?,
-         thicknesses=?, color_hex=?, image=?, is_featured=?, is_active=?, position=? WHERE id = ?`,
+         thicknesses=?, color_hex=?, image=?, is_featured=?, is_active=?, position=?,
+         name_en=?, short_en=?, description_en=? WHERE id = ?`,
     ).run(...values, id);
   } else {
     db.prepare(
       `INSERT INTO products (slug, code, category_id, name, short, description, family, surface,
-         thicknesses, color_hex, image, is_featured, is_active, position) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         thicknesses, color_hex, image, is_featured, is_active, position, name_en, short_en, description_en)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     ).run(...values);
   }
 

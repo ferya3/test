@@ -3,7 +3,7 @@ import { AdminForm, Field } from '@/components/admin/form';
 import { Input, Textarea } from '@/components/ui/input';
 import { requireAdmin } from '@/lib/session';
 import { saveSettings } from '@/lib/actions/content';
-import { getSettings, type SettingKey } from '@/lib/queries';
+import { getSettings, TRANSLATED_SETTINGS, type SettingKey, type TranslatedSettingKey } from '@/lib/queries';
 
 export const metadata = { title: 'محتوای سایت' };
 
@@ -47,6 +47,8 @@ const GROUPS: { title: string; items: Item[] }[] = [
 export default async function SettingsPage() {
   await requireAdmin();
   const settings = getSettings();
+  // What the English site shows now: the saved English, or its built-in default.
+  const english = getSettings('en');
 
   return (
     <>
@@ -55,15 +57,33 @@ export default async function SettingsPage() {
         {GROUPS.map((group) => (
           <fieldset key={group.title} className="grid gap-5 border-b border-ink-100 pb-6 last-of-type:border-0">
             <legend className="mb-4 text-h3 font-bold text-ink-950">{group.title}</legend>
-            {group.items.map((item) => (
-              <Field key={item.key} name={item.key} label={item.label} hint={item.hint}>
-                {item.long ? (
-                  <Textarea id={item.key} name={item.key} defaultValue={settings[item.key]} className="min-h-48" maxLength={6000} />
-                ) : (
-                  <Input id={item.key} name={item.key} defaultValue={settings[item.key]} dir={item.ltr ? 'ltr' : undefined} maxLength={300} />
-                )}
-              </Field>
-            ))}
+            {group.items.map((item) => {
+              const translated = (TRANSLATED_SETTINGS as readonly string[]).includes(item.key);
+              const enKey = `${item.key}_en`;
+
+              return (
+                <div key={item.key} className={translated ? 'grid gap-3 lg:grid-cols-2 lg:gap-5' : undefined}>
+                  <Field name={item.key} label={item.label} hint={item.hint}>
+                    {item.long ? (
+                      <Textarea id={item.key} name={item.key} defaultValue={settings[item.key]} className="min-h-48" maxLength={6000} />
+                    ) : (
+                      <Input id={item.key} name={item.key} defaultValue={settings[item.key]} dir={item.ltr ? 'ltr' : undefined} maxLength={300} />
+                    )}
+                  </Field>
+
+                  {/* The English version, beside it on wide screens. */}
+                  {translated && (
+                    <Field name={enKey} label={`${item.label} — انگلیسی`}>
+                      {item.long ? (
+                        <Textarea id={enKey} name={enKey} defaultValue={english[item.key as TranslatedSettingKey]} dir="ltr" className="min-h-48" maxLength={6000} />
+                      ) : (
+                        <Input id={enKey} name={enKey} defaultValue={english[item.key as TranslatedSettingKey]} dir="ltr" maxLength={300} />
+                      )}
+                    </Field>
+                  )}
+                </div>
+              );
+            })}
           </fieldset>
         ))}
       </AdminForm>

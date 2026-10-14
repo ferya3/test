@@ -11,6 +11,7 @@
 import { db, transaction } from '../src/lib/db.ts';
 import { generatePassword, hashPassword } from '../src/lib/crypto.ts';
 import { SETTING_DEFAULTS } from '../src/lib/queries.ts';
+import { CATEGORY_EN, productEnglish } from '../src/lib/english-content.ts';
 
 const categories = [
   {
@@ -84,14 +85,18 @@ const FEATURED = new Set([2, 8, 10, 15, 18, 21]);
 async function main(): Promise<void> {
   transaction(() => {
     const upsertCategory = db.prepare(`
-      INSERT INTO categories (slug, name, short, description, position)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO categories (slug, name, short, description, name_en, short_en, description_en, position)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(slug) DO UPDATE SET
         name = excluded.name, short = excluded.short,
-        description = excluded.description, position = excluded.position
+        description = excluded.description, position = excluded.position,
+        name_en = excluded.name_en, short_en = excluded.short_en, description_en = excluded.description_en
     `);
 
-    categories.forEach((c, i) => upsertCategory.run(c.slug, c.name, c.short, c.description, i));
+    categories.forEach((c, i) => {
+      const en = CATEGORY_EN[c.slug]!;
+      upsertCategory.run(c.slug, c.name, c.short, c.description, en.name, en.short, en.description, i);
+    });
 
     const categoryIds = Object.fromEntries(
       (db.prepare('SELECT id, slug FROM categories').all() as { id: number; slug: string }[]).map((r) => [
@@ -105,8 +110,8 @@ async function main(): Promise<void> {
     const insertProduct = db.prepare(`
       INSERT INTO products
         (slug, code, category_id, name, short, description, family, surface,
-         thicknesses, color_hex, is_featured, position)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         thicknesses, color_hex, is_featured, position, name_en, short_en, description_en)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(slug) DO NOTHING
     `);
 
@@ -115,9 +120,11 @@ async function main(): Promise<void> {
       const compact = category === 'hpl-compact';
       const kind = compact ? 'ورق کامپکت' : 'صفحه کابینت';
       const token = compact ? 'compact' : 'cabinet';
+      const slug = `${decor}-${surface}-${token}`;
+      const en = productEnglish(slug)!;
 
       insertProduct.run(
-        `${decor}-${surface}-${token}`,
+        slug,
         `AG-${1001 + index}`,
         categoryIds[category]!,
         `${kind} ${surfaceFa[surface]} ${decorFa}`,
@@ -133,6 +140,9 @@ async function main(): Promise<void> {
         hex,
         FEATURED.has(index) ? 1 : 0,
         index,
+        en.name,
+        en.short,
+        en.description,
       );
     });
 

@@ -1,7 +1,20 @@
 # Artavil Gold — website
 
 The Artavil Gold site (آرتاویل گلد): HPL cabinet panels and HPL compact sheet.
-Persian, right to left, built for phones first.
+Persian first (right to left) and English (left to right), built for phones first.
+
+## Languages
+
+- Persian lives at the root (`/products/…`), English under `/en` (`/en/products/…`).
+  `src/middleware.ts` rewrites Persian requests to the internal `[lang]` segment and
+  tells the root layout which `lang`/`dir` to put on `<html>`.
+- Fixed interface text is in `src/i18n/dictionaries.ts`; the English dictionary must
+  match the Persian one key for key (the type checker enforces it).
+- Editable content has an English twin in the database (`name_en`, `title_en`, …, and
+  `<key>_en` for site settings), edited in the admin next to the Persian. Left empty,
+  the English site shows the Persian text rather than nothing.
+- Arrows drawn for right-to-left carry the `dir-icon` class and are mirrored on English
+  pages.
 
 ## Stack
 
@@ -35,7 +48,7 @@ against WCAG AA; run it after changing a colour.
 
 ## Where things are
 
-- `src/app/(site)` — public pages: home, category (filters in the URL), product, about, contact
+- `src/app/(site)/[lang]` — public pages: home, category (filters in the URL), product, projects, about, contact
 - `src/app/admin` — login, two-step verification, and the panel (products, groups, site text, messages, security)
 - `src/lib/db.ts` — connection and schema migrations (`PRAGMA user_version`)
 - `src/lib/queries.ts` — catalogue reads, faceted filter counts, site settings and their defaults

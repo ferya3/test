@@ -44,3 +44,34 @@ export function faDigits(value: string | number): string {
 export function persianYear(date = new Date()): number {
   return parseInt(new Intl.DateTimeFormat('en-u-ca-persian', { year: 'numeric' }).format(date), 10);
 }
+
+/* --------------------------------------------------------------------------
+   English, and helpers that pick the right language
+   -------------------------------------------------------------------------- */
+
+export const FAMILIES_EN: Record<Family, string> = {
+  wood: 'Wood',
+  stone: 'Stone',
+  solid: 'Solid colour',
+  fabric: 'Fabric',
+};
+
+export const SURFACES_EN: Record<Surface, string> = {
+  'high-gloss': 'High-gloss',
+  'super-matte': 'Super-matte',
+  matte: 'Matte',
+  'semi-matte': 'Semi-matte',
+  embossed: 'Embossed',
+};
+
+type Lang = 'fa' | 'en';
+
+export const familyLabels = (lang: Lang): Record<Family, string> => (lang === 'en' ? FAMILIES_EN : FAMILIES);
+export const surfaceLabels = (lang: Lang): Record<Surface, string> => (lang === 'en' ? SURFACES_EN : SURFACES);
+
+/** A number for display: Persian digits on the Persian site, Western on the English one. */
+export const num = (value: string | number, lang: Lang) => (lang === 'fa' ? faDigits(value) : String(value));
+
+/** A list for display: «۱۶، ۱۸» in Persian, "16, 18" in English. */
+export const list = (values: (string | number)[], lang: Lang) =>
+  values.map((v) => num(v, lang)).join(lang === 'fa' ? '، ' : ', ');

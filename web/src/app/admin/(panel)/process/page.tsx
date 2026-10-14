@@ -29,6 +29,12 @@ export default async function ProcessPage() {
             <Field name="body" id={`body-${step.id}`} label="توضیح" hint="کوتاه بنویسید؛ روی عکس نمایش داده می‌شود.">
               <Textarea id={`body-${step.id}`} name="body" defaultValue={step.body} maxLength={400} className="min-h-24" />
             </Field>
+            <Field name="title_en" id={`title_en-${step.id}`} label="عنوان — انگلیسی">
+              <Input id={`title_en-${step.id}`} name="title_en" defaultValue={step.title_en} dir="ltr" maxLength={80} />
+            </Field>
+            <Field name="body_en" id={`body_en-${step.id}`} label="توضیح — انگلیسی">
+              <Textarea id={`body_en-${step.id}`} name="body_en" defaultValue={step.body_en} dir="ltr" maxLength={400} className="min-h-24" />
+            </Field>
             <Field name="image" id={`image-${step.id}`} label="عکس" hint="عکس عمودی بهتر است؛ متن روی پایین عکس می‌نشیند.">
               <ImageInput name="image" id={`image-${step.id}`} current={step.image} />
             </Field>

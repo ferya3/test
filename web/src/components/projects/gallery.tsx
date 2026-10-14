@@ -7,7 +7,8 @@ import { ArrowLeft, ChevronLeft, ChevronRight, MapPin, X } from 'lucide-react';
 import { ProjectArt } from '@/components/illustrations';
 import { lenis } from '@/components/providers/smooth-scroll';
 import { mediaUrl } from '@/lib/media';
-import { faDigits } from '@/lib/catalog';
+import { num } from '@/lib/catalog';
+import { useLocale } from '@/i18n/client';
 import type { Project } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
@@ -22,7 +23,7 @@ function Visual({ project, className }: { project: Project; className?: string }
   );
 }
 
-const meta = (p: Project) => [p.location, p.year && faDigits(p.year)].filter(Boolean).join(' · ');
+const meta = (p: Project, lang: 'fa' | 'en') => [p.location, p.year && num(p.year, lang)].filter(Boolean).join(' · ');
 
 /**
  * Completed projects as cards that open a lightbox.
@@ -33,6 +34,7 @@ const meta = (p: Project) => [p.location, p.year && faDigits(p.year)].filter(Boo
 export function ProjectGallery({ projects, layout = 'grid' }: { projects: Project[]; layout?: 'bento' | 'grid' }) {
   const [open, setOpen] = useState<number | null>(null);
   const opener = useRef<HTMLButtonElement | null>(null);
+  const { t, locale } = useLocale();
 
   const close = useCallback(() => {
     setOpen(null);
@@ -68,7 +70,7 @@ export function ProjectGallery({ projects, layout = 'grid' }: { projects: Projec
                   setOpen(i);
                 }}
                 className="group relative block size-full overflow-hidden rounded-2xl bg-ink-100 text-start shadow-[var(--shadow-soft)] transition-shadow duration-500 hover:shadow-[var(--shadow-lift)]"
-                aria-label={`${project.title} — نمایش جزئیات`}
+                aria-label={`${project.title} — ${t.projects.details}`}
               >
                 <Visual project={project} className="transition-transform duration-[1.2s] ease-[var(--ease-out-expo)] group-hover:scale-105" />
                 <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-ink-950/90 via-ink-950/25 via-45% to-transparent" />
@@ -83,7 +85,7 @@ export function ProjectGallery({ projects, layout = 'grid' }: { projects: Projec
                   <span className={cn('block font-bold text-paper', big ? 'text-lg sm:text-h3' : 'text-base')}>
                     {project.title}
                   </span>
-                  {meta(project) && <span className="mt-0.5 block text-xs text-ink-200">{meta(project)}</span>}
+                  {meta(project, locale) && <span className="mt-0.5 block text-xs text-ink-200">{meta(project, locale)}</span>}
                   {big && project.description && (
                     <span className="mt-2 hidden max-w-lg text-sm leading-7 text-ink-200 sm:block">{project.description}</span>
                   )}
@@ -111,10 +113,11 @@ function Lightbox({
   onClose: () => void;
 }) {
   const closeButton = useRef<HTMLButtonElement>(null);
+  const { t, locale, path } = useLocale();
   const project = index === null ? null : projects[index];
   const count = projects.length;
 
-  // In RTL "next" sits on the left: ArrowLeft moves forward.
+  // "Next" sits at the inline end: on the left in Persian, on the right in English.
   const step = useCallback((delta: number) => index !== null && onIndex((index + delta + count) % count), [index, count, onIndex]);
 
   useEffect(() => {
@@ -126,8 +129,10 @@ function Lightbox({
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
-      if (e.key === 'ArrowLeft') step(1);
-      if (e.key === 'ArrowRight') step(-1);
+      const forward = locale === 'fa' ? 'ArrowLeft' : 'ArrowRight';
+      const back = locale === 'fa' ? 'ArrowRight' : 'ArrowLeft';
+      if (e.key === forward) step(1);
+      if (e.key === back) step(-1);
     };
     window.addEventListener('keydown', onKey);
 
@@ -136,7 +141,7 @@ function Lightbox({
       document.body.style.overflow = '';
       window.removeEventListener('keydown', onKey);
     };
-  }, [index, onClose, step]);
+  }, [index, onClose, step, locale]);
 
   return (
     <AnimatePresence>
@@ -169,34 +174,34 @@ function Lightbox({
             <div className="flex flex-col p-5 sm:p-8">
               {project.category_name && <p className="text-sm font-bold text-gold-700">{project.category_name}</p>}
               <h2 className="mt-1 text-h3 font-black text-ink-950">{project.title}</h2>
-              {meta(project) && (
+              {meta(project, locale) && (
                 <p className="mt-2 flex items-center gap-1.5 text-sm text-ink-500">
                   <MapPin className="size-4" />
-                  {meta(project)}
+                  {meta(project, locale)}
                 </p>
               )}
               {project.description && <p className="mt-4 leading-8 whitespace-pre-line text-ink-700">{project.description}</p>}
 
               {project.category_slug && (
                 <Link
-                  href={`/categories/${project.category_slug}`}
+                  href={path(`/categories/${project.category_slug}`)}
                   className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-gold-700 hover:underline"
                 >
-                  محصولات {project.category_name}
-                  <ArrowLeft className="size-4" />
+                  {t.projects.productsOf} {project.category_name}
+                  <ArrowLeft className="dir-icon size-4" />
                 </Link>
               )}
 
               {count > 1 && (
                 <div className="mt-auto flex items-center justify-between gap-3 pt-8">
-                  <button type="button" onClick={() => step(-1)} className="grid size-11 place-items-center rounded-full border border-ink-200 text-ink-800 hover:bg-ink-50" aria-label="قبلی">
-                    <ChevronRight className="size-5" />
+                  <button type="button" onClick={() => step(-1)} className="grid size-11 place-items-center rounded-full border border-ink-200 text-ink-800 hover:bg-ink-50" aria-label={t.projects.previous}>
+                    <ChevronRight className="dir-icon size-5" />
                   </button>
                   <span className="text-sm text-ink-500 tabular-nums">
-                    {faDigits((index ?? 0) + 1)} از {faDigits(count)}
+                    {num((index ?? 0) + 1, locale)} {t.projects.of} {num(count, locale)}
                   </span>
-                  <button type="button" onClick={() => step(1)} className="grid size-11 place-items-center rounded-full border border-ink-200 text-ink-800 hover:bg-ink-50" aria-label="بعدی">
-                    <ChevronLeft className="size-5" />
+                  <button type="button" onClick={() => step(1)} className="grid size-11 place-items-center rounded-full border border-ink-200 text-ink-800 hover:bg-ink-50" aria-label={t.projects.next}>
+                    <ChevronLeft className="dir-icon size-5" />
                   </button>
                 </div>
               )}
@@ -207,7 +212,7 @@ function Lightbox({
               type="button"
               onClick={onClose}
               className="absolute end-3 top-3 grid size-10 place-items-center rounded-full bg-ink-950/70 text-paper backdrop-blur-sm hover:bg-ink-950"
-              aria-label="بستن"
+              aria-label={t.projects.close}
             >
               <X className="size-5" />
             </button>

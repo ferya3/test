@@ -7,10 +7,12 @@ import { submitLead, type LeadState } from '@/lib/actions/leads';
 import { Button } from '@/components/ui/button';
 import { FieldError, Input, Label, Textarea } from '@/components/ui/input';
 import { submitWithoutReset } from '@/lib/form';
+import { useLocale } from '@/i18n/client';
 
 export function LeadForm({ kind, product, dark = false }: { kind: 'contact' | 'quote'; product?: string; dark?: boolean }) {
   const [state, action, pending] = useActionState<LeadState, FormData>(submitLead, { ok: false });
   const v = state.values ?? {};
+  const { t, locale } = useLocale();
   const label = dark ? 'text-ink-200' : undefined;
 
   return (
@@ -29,18 +31,19 @@ export function LeadForm({ kind, product, dark = false }: { kind: 'contact' | 'q
       ) : (
         <motion.form key="form" action={action} onSubmit={submitWithoutReset(action)} className="relative grid gap-4 sm:grid-cols-2" noValidate exit={{ opacity: 0 }}>
           <input type="hidden" name="kind" value={kind} />
+          <input type="hidden" name="locale" value={locale} />
           {product && <input type="hidden" name="product" value={product} />}
           {/* Honeypot — hidden from people and from screen readers. */}
           <div aria-hidden className="absolute -start-[9999px] size-px overflow-hidden">
             <label>
-              وب‌سایت
+              {t.form.website}
               <input type="text" name="website" tabIndex={-1} autoComplete="off" />
             </label>
           </div>
 
           <div>
             <Label htmlFor={`${kind}-name`} className={label}>
-              نام و نام خانوادگی
+              {t.form.name}
             </Label>
             <Input id={`${kind}-name`} name="name" defaultValue={v.name} required maxLength={80} autoComplete="name" aria-invalid={!!state.errors?.name} />
             <FieldError message={state.errors?.name} />
@@ -48,7 +51,7 @@ export function LeadForm({ kind, product, dark = false }: { kind: 'contact' | 'q
 
           <div>
             <Label htmlFor={`${kind}-phone`} className={label}>
-              شمارهٔ تماس
+              {t.form.phone}
             </Label>
             <Input
               id={`${kind}-phone`}
@@ -68,7 +71,7 @@ export function LeadForm({ kind, product, dark = false }: { kind: 'contact' | 'q
 
           <div className="sm:col-span-2">
             <Label htmlFor={`${kind}-email`} className={label}>
-              ایمیل <span className="text-ink-400">(اختیاری)</span>
+              {t.form.email} <span className="text-ink-400">{t.form.optional}</span>
             </Label>
             <Input
               id={`${kind}-email`}
@@ -86,7 +89,7 @@ export function LeadForm({ kind, product, dark = false }: { kind: 'contact' | 'q
 
           <div className="sm:col-span-2">
             <Label htmlFor={`${kind}-message`} className={label}>
-              {kind === 'quote' ? 'متراژ، ضخامت یا توضیحات (اختیاری)' : 'پیام'}
+              {kind === 'quote' ? t.form.quoteMessage : t.form.message}
             </Label>
             <Textarea id={`${kind}-message`} name="message" defaultValue={v.message} maxLength={2000} aria-invalid={!!state.errors?.message} />
             <FieldError message={state.errors?.message} />
@@ -101,7 +104,7 @@ export function LeadForm({ kind, product, dark = false }: { kind: 'contact' | 'q
           <div className="sm:col-span-2">
             <Button type="submit" size="lg" disabled={pending} className="w-full sm:w-auto">
               {pending ? <Loader2 className="animate-spin" /> : <Send />}
-              {kind === 'quote' ? 'درخواست قیمت' : 'ارسال پیام'}
+              {kind === 'quote' ? t.form.sendQuote : t.form.sendMessage}
             </Button>
           </div>
         </motion.form>

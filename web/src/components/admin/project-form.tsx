@@ -3,6 +3,7 @@ import { ColorInput, ImageInput } from './inputs';
 import { Input, Select, Textarea } from '@/components/ui/input';
 import { saveProject } from '@/lib/actions/projects';
 import type { Category } from '@/lib/queries';
+import { EN_HINT } from './product-form';
 
 export type ProjectRow = {
   id: number;
@@ -15,6 +16,9 @@ export type ProjectRow = {
   image: string | null;
   position: number;
   is_active: number;
+  title_en: string;
+  location_en: string;
+  description_en: string;
 };
 
 export function ProjectForm({ project, categories }: { project?: ProjectRow; categories: Category[] }) {
@@ -27,8 +31,16 @@ export function ProjectForm({ project, categories }: { project?: ProjectRow; cat
           <Input id="title" name="title" defaultValue={p?.title} required maxLength={120} placeholder="آشپزخانهٔ مسکونی، ونک" />
         </Field>
 
+        <Field name="title_en" label="عنوان — انگلیسی" hint={EN_HINT} className="sm:col-span-2">
+          <Input id="title_en" name="title_en" defaultValue={p?.title_en} dir="ltr" maxLength={120} placeholder="Home kitchen, Vanak" />
+        </Field>
+
         <Field name="location" label="محل (اختیاری)">
           <Input id="location" name="location" defaultValue={p?.location} maxLength={120} placeholder="تهران" />
+        </Field>
+
+        <Field name="location_en" label="محل — انگلیسی">
+          <Input id="location_en" name="location_en" defaultValue={p?.location_en} dir="ltr" maxLength={120} placeholder="Tehran" />
         </Field>
 
         <Field name="year" label="سال اجرا (اختیاری)">
@@ -65,6 +77,10 @@ export function ProjectForm({ project, categories }: { project?: ProjectRow; cat
 
         <Field name="description" label="توضیحات" className="sm:col-span-2">
           <Textarea id="description" name="description" defaultValue={p?.description} maxLength={3000} />
+        </Field>
+
+        <Field name="description_en" label="توضیحات — انگلیسی" className="sm:col-span-2">
+          <Textarea id="description_en" name="description_en" defaultValue={p?.description_en} dir="ltr" maxLength={3000} />
         </Field>
       </div>
     </AdminForm>

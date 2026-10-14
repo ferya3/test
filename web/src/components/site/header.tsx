@@ -1,12 +1,15 @@
 import Link from 'next/link';
+import { Suspense } from 'react';
 import { Button } from '@/components/ui/button';
-import { DesktopNav, MenuButton, MobileMenu } from './navigation';
+import { DesktopNav, LanguageSwitch, MenuButton, MobileMenu } from './navigation';
 import { getSettings } from '@/lib/queries';
+import { getDictionary } from '@/i18n/dictionaries';
+import { localePath, type Locale } from '@/i18n/config';
 
 /** The brand mark: a gold monogram tile and the wordmark, both from settings. */
-export function Brand({ name, light = false }: { name: string; light?: boolean }) {
+export function Brand({ name, locale, light = false }: { name: string; locale: Locale; light?: boolean }) {
   return (
-    <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label={`${name} — خانه`}>
+    <Link href={localePath(locale, '/')} className="flex shrink-0 items-center gap-2.5" aria-label={`${name} — ${getDictionary(locale).home}`}>
       <span
         aria-hidden
         className="grid size-10 place-items-center rounded-lg bg-gradient-to-br from-gold-300 to-gold-500 text-lg font-black text-ink-950 shadow-[var(--shadow-gold)]"
@@ -20,26 +23,33 @@ export function Brand({ name, light = false }: { name: string; light?: boolean }
   );
 }
 
-export function Header() {
-  const settings = getSettings();
+export function Header({ locale }: { locale: Locale }) {
+  const settings = getSettings(locale);
+  const t = getDictionary(locale);
 
   return (
     <>
       <header className="sticky top-0 z-50 border-b border-ink-100/80 bg-paper/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-6 px-4 sm:px-6 lg:h-20 lg:px-8">
-          <Brand name={settings.company_name} />
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:h-20 lg:px-8">
+          <Brand name={settings.company_name} locale={locale} />
           <DesktopNav />
 
           <div className="flex items-center gap-2">
+            {/* useSearchParams needs a Suspense boundary to render on the server. */}
+            <Suspense fallback={null}>
+              <LanguageSwitch />
+            </Suspense>
             <Button asChild size="sm" className="hidden sm:inline-flex">
-              <Link href="/contact">درخواست مشاوره</Link>
+              <Link href={localePath(locale, '/contact')}>{t.header.consult}</Link>
             </Button>
             <MenuButton />
           </div>
         </div>
       </header>
 
-      <MobileMenu phone={settings.contact_phone} />
+      <Suspense fallback={null}>
+        <MobileMenu phone={settings.contact_phone} />
+      </Suspense>
     </>
   );
 }

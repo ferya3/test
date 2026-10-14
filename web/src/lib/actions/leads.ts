@@ -2,6 +2,8 @@
 
 import { db } from '@/lib/db';
 import { clientIp, isLimited, recordAttempt } from '@/lib/session';
+import { getDictionary } from '@/i18n/dictionaries';
+import { isLocale } from '@/i18n/config';
 
 export type LeadState = {
   ok: boolean;
@@ -33,15 +35,19 @@ const text = (form: FormData, key: string) => {
 export async function submitLead(_prev: LeadState, form: FormData): Promise<LeadState> {
   // A field real visitors never see. Bots that fill every input get a
   // success message and nothing is stored.
+  // The reply speaks the language of the page the form was on.
+  const lang = text(form, 'locale');
+  const t = getDictionary(isLocale(lang) ? lang : 'fa').leads;
+
   if (text(form, 'website') !== '') {
-    return { ok: true, message: 'پیام شما ثبت شد.' };
+    return { ok: true, message: t.sent };
   }
 
   const ip = await clientIp();
   const key = `lead:${ip}`;
 
   if (isLimited(key, 5, 60 * 60 * 1000)) {
-    return { ok: false, message: 'درخواست‌های زیادی از این دستگاه ثبت شده است. لطفاً کمی بعد دوباره تلاش کنید.' };
+    return { ok: false, message: t.tooMany };
   }
 
   const values = {
@@ -55,13 +61,13 @@ export async function submitLead(_prev: LeadState, form: FormData): Promise<Lead
 
   const errors: LeadState['errors'] = {};
 
-  if (values.name.length < 2 || values.name.length > 80) errors.name = 'نام را وارد کنید (۲ تا ۸۰ حرف).';
-  if (!/^\+?[\d\s-]{7,20}$/.test(values.phone)) errors.phone = 'شمارهٔ تماس معتبر نیست.';
+  if (values.name.length < 2 || values.name.length > 80) errors.name = t.name;
+  if (!/^\+?[\d\s-]{7,20}$/.test(values.phone)) errors.phone = t.phone;
   if (values.email && (values.email.length > 120 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email))) {
-    errors.email = 'نشانی ایمیل معتبر نیست.';
+    errors.email = t.email;
   }
-  if (values.message.length > 2000) errors.message = 'پیام حداکثر ۲۰۰۰ حرف است.';
-  if (kind === 'contact' && values.message.length < 5) errors.message = 'پیام خود را بنویسید.';
+  if (values.message.length > 2000) errors.message = t.messageTooLong;
+  if (kind === 'contact' && values.message.length < 5) errors.message = t.messageMissing;
 
   if (Object.keys(errors).length > 0) {
     return { ok: false, errors, values };
@@ -83,5 +89,5 @@ export async function submitLead(_prev: LeadState, form: FormData): Promise<Lead
   );
   recordAttempt(key);
 
-  return { ok: true, message: 'پیام شما ثبت شد. همکاران ما به‌زودی با شما تماس می‌گیرند.' };
+  return { ok: true, message: t.sent };
 }

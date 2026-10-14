@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { db, transaction } from '@/lib/db';
 import { requireAdmin } from '@/lib/session';
-import { SETTING_DEFAULTS, type SettingKey } from '@/lib/queries';
+import { SETTING_DEFAULTS, TRANSLATED_SETTINGS, type SettingKey } from '@/lib/queries';
 import { bool, int, str } from '@/lib/validate';
 import { deleteImage, replaceImage } from '@/lib/images';
 import type { ActionState } from './types';
@@ -14,10 +14,16 @@ export async function saveCategory(id: number, _prev: ActionState, form: FormDat
   const name = str(form, 'name', 120);
   if (name.length < 2) return { ok: false, errors: { name: 'نام گروه را وارد کنید.' } };
 
-  db.prepare('UPDATE categories SET name=?, short=?, description=?, position=?, is_active=? WHERE id=?').run(
+  db.prepare(
+    `UPDATE categories SET name=?, short=?, description=?, name_en=?, short_en=?, description_en=?,
+       position=?, is_active=? WHERE id=?`,
+  ).run(
     name,
     str(form, 'short', 300),
     str(form, 'description', 3000),
+    str(form, 'name_en', 120),
+    str(form, 'short_en', 300),
+    str(form, 'description_en', 3000),
     int(form, 'position', 0, 999),
     bool(form, 'is_active') ? 1 : 0,
     id,
@@ -43,6 +49,13 @@ export async function saveSettings(_prev: ActionState, form: FormData): Promise<
     if (key === 'founded_year' && value && !/^\d{4}$/.test(value)) errors[key] = 'سال چهاررقمی، مثل ۱۳۷۵.';
     if (key === 'contact_email' && value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) errors[key] = 'ایمیل معتبر نیست.';
     values.push([key, value]);
+  }
+
+  // English versions of the text settings, under `<key>_en`. Empty is allowed:
+  // the English site then shows its built-in default for that text.
+  for (const key of TRANSLATED_SETTINGS) {
+    const value = str(form, `${key}_en`, LONG.includes(key) ? 6000 : 300).replace(/\r\n?/g, '\n');
+    values.push([`${key}_en` as SettingKey, value]);
   }
 
   if (Object.keys(errors).length > 0) return { ok: false, message: 'لطفاً خطاها را برطرف کنید.', errors };
@@ -75,12 +88,21 @@ export async function saveProcessStep(id: number, _prev: ActionState, form: Form
 
   const title = str(form, 'title', 80);
   const body = str(form, 'body', 400);
+  const titleEn = str(form, 'title_en', 80);
+  const bodyEn = str(form, 'body_en', 400);
   if (title.length < 2) return { ok: false, errors: { title: 'عنوان را وارد کنید.' } };
 
   const image = await replaceImage(form, step.image);
   if (typeof image === 'object' && image) return image;
 
-  db.prepare('UPDATE process_steps SET title = ?, body = ?, image = ? WHERE id = ?').run(title, body, image, id);
+  db.prepare('UPDATE process_steps SET title = ?, body = ?, title_en = ?, body_en = ?, image = ? WHERE id = ?').run(
+    title,
+    body,
+    titleEn,
+    bodyEn,
+    image,
+    id,
+  );
   if (step.image && step.image !== image) await deleteImage(step.image);
 
   revalidatePath('/', 'layout');

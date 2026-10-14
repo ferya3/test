@@ -5,7 +5,8 @@ import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useGSAP } from '@gsap/react';
 import { Layers, Flame, Gauge, Ruler, ShieldCheck } from 'lucide-react';
-import { faDigits } from '@/lib/catalog';
+import { num } from '@/lib/catalog';
+import { useLocale } from '@/i18n/client';
 import { mediaUrl } from '@/lib/media';
 import { ProcessArt } from '@/components/illustrations';
 
@@ -28,6 +29,7 @@ export type ProcessCard = { position: number; title: string; body: string; image
 export function Process({ steps }: { steps: ProcessCard[] }) {
   const section = useRef<HTMLElement>(null);
   const track = useRef<HTMLOListElement>(null);
+  const { t, locale } = useLocale();
 
   useGSAP(
     () => {
@@ -35,19 +37,24 @@ export function Process({ steps }: { steps: ProcessCard[] }) {
 
       mm.add('(min-width: 1024px) and (prefers-reduced-motion: no-preference)', () => {
         const el = track.current!;
-        // In RTL the overflow lies to the left, so the strip travels right —
-        // far enough to bring the last card in with the same margin the first
+        const rtl = getComputedStyle(el).direction === 'rtl';
+        // The overflow lies on the inline-end side — to the left in Persian,
+        // to the right in English — so the strip travels the other way: far
+        // enough to bring the last card in with the same margin the first
         // had. Measured from the cards themselves: scrollWidth leaves out the
         // inline-end padding in RTL and would stop a card short.
         const distance = () => {
-          const last = el.lastElementChild as HTMLElement;
-          const margin = parseFloat(getComputedStyle(el).paddingLeft);
+          const last = (el.lastElementChild as HTMLElement).getBoundingClientRect();
+          const box = el.getBoundingClientRect();
+          const style = getComputedStyle(el);
 
-          return Math.max(0, el.getBoundingClientRect().left + margin - last.getBoundingClientRect().left);
+          return rtl
+            ? Math.max(0, box.left + parseFloat(style.paddingLeft) - last.left)
+            : Math.max(0, last.right - (box.right - parseFloat(style.paddingRight)));
         };
 
         gsap.to(el, {
-          x: () => distance(),
+          x: () => (rtl ? distance() : -distance()),
           ease: 'none',
           scrollTrigger: {
             trigger: section.current,
@@ -77,13 +84,13 @@ export function Process({ steps }: { steps: ProcessCard[] }) {
       <div aria-hidden className="absolute bottom-0 start-1/3 size-[36rem] translate-y-1/2 rounded-full bg-gold-500/10 blur-[120px]" />
 
       <div className="relative mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-        <p className="mb-3 text-sm font-bold tracking-wide text-gold-300">فرآیند تولید</p>
-        <h2 className="max-w-2xl text-h2 font-black text-balance">از کاغذ تا ورق، در پنج مرحله</h2>
+        <p className="mb-3 text-sm font-bold tracking-wide text-gold-300">{t.process.overline}</p>
+        <h2 className="max-w-2xl text-h2 font-black text-balance">{t.process.title}</h2>
       </div>
 
       <ol
         ref={track}
-        className="relative mt-7 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-4 [scrollbar-width:none] sm:mt-10 sm:px-6 lg:mt-14 lg:snap-none lg:gap-6 lg:overflow-visible lg:px-[max(2rem,calc((100%-80rem)/2+2rem))]"
+        className="relative mt-7 flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto px-4 pb-4 sm:scroll-px-6 [scrollbar-width:none] sm:mt-10 sm:px-6 lg:mt-14 lg:snap-none lg:gap-6 lg:overflow-visible lg:px-[max(2rem,calc((100%-80rem)/2+2rem))]"
       >
         {steps.map((step, i) => {
           const Icon = ICONS[i % ICONS.length]!;
@@ -112,7 +119,7 @@ export function Process({ steps }: { steps: ProcessCard[] }) {
                   <Icon className="size-5" />
                 </span>
                 <span className="rounded-full bg-ink-950/60 px-3 py-1 text-sm font-bold text-gold-300 backdrop-blur-sm">
-                  مرحلهٔ {faDigits(i + 1)}
+                  {t.process.step} {num(i + 1, locale)}
                 </span>
               </div>
 

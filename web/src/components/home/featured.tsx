@@ -2,15 +2,18 @@ import { Reveal } from '@/components/motion/reveal';
 import { SectionHeading } from '@/components/site/section-heading';
 import { ProductCard } from '@/components/catalog/product-card';
 import type { Product } from '@/lib/queries';
+import { getDictionary } from '@/i18n/dictionaries';
+import type { Locale } from '@/i18n/config';
 
-export function Featured({ products }: { products: Product[] }) {
+export function Featured({ products, locale }: { products: Product[]; locale: Locale }) {
   if (products.length === 0) return null;
+  const t = getDictionary(locale).featured;
 
   return (
     <section className="py-14 sm:py-20 lg:py-28">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <Reveal>
-          <SectionHeading overline="منتخب" title="طرح‌های پرطرفدار" lead="از هر دو گروه کالا؛ برای دیدن همه، گروه را باز کنید." />
+          <SectionHeading overline={t.overline} title={t.title} lead={t.lead} />
         </Reveal>
 
         {/* A swipeable row on phones — six tall cards stacked two by two would
@@ -19,7 +22,7 @@ export function Featured({ products }: { products: Product[] }) {
           <ul className="-mx-4 mt-7 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mt-10 md:mx-0 md:grid md:grid-cols-3 md:gap-5 md:overflow-visible md:px-0 lg:mt-14">
             {products.map((product) => (
               <li key={product.id} className="w-[44vw] max-w-[13rem] shrink-0 snap-start md:w-auto md:max-w-none">
-                <ProductCard product={product} />
+                <ProductCard product={product} locale={locale} />
               </li>
             ))}
           </ul>

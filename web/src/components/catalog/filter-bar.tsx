@@ -4,7 +4,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, ChevronDown, Loader2, X } from 'lucide-react';
-import { faDigits } from '@/lib/catalog';
+import { num } from '@/lib/catalog';
+import { useLocale } from '@/i18n/client';
 import { cn } from '@/lib/utils';
 
 export type FilterGroup = {
@@ -28,6 +29,7 @@ export function FilterBar({ groups, total }: { groups: FilterGroup[]; total: num
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState<string | null>(null);
   const bar = useRef<HTMLDivElement>(null);
+  const { t, locale } = useLocale();
 
   // Click outside or Escape closes the open panel.
   useEffect(() => {
@@ -83,7 +85,7 @@ export function FilterBar({ groups, total }: { groups: FilterGroup[]; total: num
 
         <p className="ms-auto flex items-center gap-2 text-sm text-ink-600" aria-live="polite">
           {pending && <Loader2 className="size-4 animate-spin text-gold-600" aria-hidden />}
-          <span className="font-bold text-ink-950">{faDigits(total)}</span> محصول
+          <span className="font-bold text-ink-950">{num(total, locale)}</span> {t.catalog.products}
         </p>
       </div>
 
@@ -95,7 +97,7 @@ export function FilterBar({ groups, total }: { groups: FilterGroup[]; total: num
               type="button"
               onClick={() => toggle(chip.param, chip.value)}
               className="inline-flex h-9 items-center gap-1.5 rounded-full bg-ink-950 ps-3 pe-2 text-xs text-paper transition-colors hover:bg-ink-800"
-              aria-label={`حذف فیلتر ${chip.label}`}
+              aria-label={`${t.catalog.removeFilter}: ${chip.label}`}
             >
               {chip.label}
               <X className="size-3.5" />
@@ -106,7 +108,7 @@ export function FilterBar({ groups, total }: { groups: FilterGroup[]; total: num
             onClick={() => navigate({})}
             className="h-10 px-2 text-xs font-bold text-gold-700 underline-offset-4 hover:underline"
           >
-            حذف همه
+            {t.catalog.clearAll}
           </button>
         </div>
       )}
@@ -127,6 +129,7 @@ function Dropdown({
 }) {
   const id = `filter-${group.param}`;
   const count = group.selected.length;
+  const { locale } = useLocale();
 
   return (
     // Positioned only from `sm` up: on a phone the panel anchors to the whole
@@ -148,7 +151,7 @@ function Dropdown({
           {group.label}
           {count > 0 && (
             <span className="grid size-5 place-items-center rounded-full bg-gold-400 text-[0.7rem] font-bold text-ink-950">
-              {faDigits(count)}
+              {num(count, locale)}
             </span>
           )}
         </span>
@@ -192,7 +195,7 @@ function Dropdown({
                         {checked && <Check className="size-3.5" strokeWidth={3} />}
                       </span>
                       <span className="flex-1">{option.label}</span>
-                      <span className="text-xs text-ink-500 tabular-nums">{faDigits(option.count)}</span>
+                      <span className="text-xs text-ink-500 tabular-nums">{num(option.count, locale)}</span>
                     </button>
                   </li>
                 );

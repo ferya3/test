@@ -28,6 +28,9 @@ export async function saveProject(id: number | null, _prev: ActionState, form: F
     color_hex: str(form, 'color_hex', 7).toLowerCase(),
     position: int(form, 'position', 0, 9999),
     is_active: bool(form, 'is_active') ? 1 : 0,
+    title_en: str(form, 'title_en', 120),
+    location_en: str(form, 'location_en', 120),
+    description_en: str(form, 'description_en', 3000).replace(/\r\n?/g, '\n'),
   };
 
   const errors: Record<string, string> = {};
@@ -49,17 +52,21 @@ export async function saveProject(id: number | null, _prev: ActionState, form: F
     image,
     data.position,
     data.is_active,
+    data.title_en,
+    data.location_en,
+    data.description_en,
   ];
 
   if (id) {
     db.prepare(
       `UPDATE projects SET title=?, location=?, year=?, description=?, category_id=?, color_hex=?, image=?,
-         position=?, is_active=? WHERE id = ?`,
+         position=?, is_active=?, title_en=?, location_en=?, description_en=? WHERE id = ?`,
     ).run(...values, id);
   } else {
     db.prepare(
-      `INSERT INTO projects (title, location, year, description, category_id, color_hex, image, position, is_active)
-       VALUES (?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO projects (title, location, year, description, category_id, color_hex, image, position, is_active,
+         title_en, location_en, description_en)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
     ).run(...values);
   }
 

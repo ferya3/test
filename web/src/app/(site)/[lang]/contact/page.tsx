@@ -4,20 +4,27 @@ import { LeadForm } from '@/components/catalog/lead-form';
 import { Reveal } from '@/components/motion/reveal';
 import { getSettings } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import { alternates } from '@/lib/seo';
+import { getDictionary } from '@/i18n/dictionaries';
+import type { Locale } from '@/i18n/config';
 
-export const metadata: Metadata = {
-  title: 'تماس با ما',
-  description: 'استعلام قیمت، نمونهٔ رنگ و مشاورهٔ فنی صفحه کابینت و کامپکت اچ‌پی‌ال.',
-  alternates: { canonical: '/contact' },
-};
+type Props = { params: Promise<{ lang: Locale }> };
 
-export default function ContactPage() {
-  const s = getSettings();
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { lang } = await params;
+  const t = getDictionary(lang).contact;
+  return { title: t.metaTitle, description: t.metaDescription, alternates: alternates(lang, '/contact') };
+}
+
+export default async function ContactPage({ params }: Props) {
+  const { lang } = await params;
+  const t = getDictionary(lang).contact;
+  const s = getSettings(lang);
   const items = [
-    { icon: Phone, label: 'تلفن', value: s.contact_phone, href: `tel:${s.contact_phone.replace(/[^\d+]/g, '')}`, ltr: true, half: true },
-    { icon: Mail, label: 'ایمیل', value: s.contact_email, href: `mailto:${s.contact_email}`, ltr: true, half: true },
-    { icon: MapPin, label: 'نشانی کارخانه', value: s.contact_address },
-    { icon: Clock, label: 'ساعت کاری', value: 'شنبه تا پنجشنبه، ۸ تا ۱۷' },
+    { icon: Phone, label: t.phone, value: s.contact_phone, href: `tel:${s.contact_phone.replace(/[^\d+]/g, '')}`, ltr: true, half: true },
+    { icon: Mail, label: t.email, value: s.contact_email, href: `mailto:${s.contact_email}`, ltr: true, half: true },
+    { icon: MapPin, label: t.address, value: s.contact_address },
+    { icon: Clock, label: t.hours, value: t.hoursValue },
   ];
 
   return (
@@ -25,10 +32,10 @@ export default function ContactPage() {
       <div aria-hidden className="absolute -top-40 start-0 size-[34rem] rounded-full bg-gold-300/20 blur-[110px]" />
       <div className="relative mx-auto grid max-w-7xl gap-8 px-4 py-6 sm:gap-10 sm:px-6 sm:py-16 lg:grid-cols-5 lg:gap-14 lg:px-8 lg:py-20">
         <Reveal className="lg:col-span-2">
-          <p className="mb-3 text-sm font-bold text-gold-700">تماس با ما</p>
-          <h1 className="text-h1 font-black text-balance text-ink-950">با ما در ارتباط باشید</h1>
+          <p className="mb-3 text-sm font-bold text-gold-700">{t.overline}</p>
+          <h1 className="text-h1 font-black text-balance text-ink-950">{t.title}</h1>
           <p className="mt-3 text-ink-600 sm:mt-4 sm:text-lead">
-            برای قیمت، نمونهٔ رنگ، سفارش پروژه یا مشاورهٔ فنی پیام بگذارید یا تماس بگیرید.
+            {t.lead}
           </p>
 
           <ul className="mt-6 grid grid-cols-2 gap-3 sm:mt-8 lg:grid-cols-1">
@@ -68,7 +75,7 @@ export default function ContactPage() {
         </Reveal>
 
         <Reveal delay={0.1} className="rounded-2xl border border-ink-100 bg-white p-5 shadow-[var(--shadow-lift)] sm:p-8 lg:col-span-3">
-          <h2 className="mb-6 text-h3 font-bold text-ink-950">فرم تماس</h2>
+          <h2 className="mb-6 text-h3 font-bold text-ink-950">{t.formTitle}</h2>
           <LeadForm kind="contact" />
         </Reveal>
       </div>

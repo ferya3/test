@@ -1,8 +1,9 @@
 import type { Metadata, Viewport } from 'next';
+import { headers } from 'next/headers';
 import '@fontsource-variable/vazirmatn';
 import './globals.css';
-import { getSettings } from '@/lib/queries';
 import { siteUrl } from '@/lib/seo';
+import { dirOf, isLocale } from '@/i18n/config';
 
 /*
  * Every page reads the catalogue and settings from SQLite on request. Those
@@ -11,18 +12,11 @@ import { siteUrl } from '@/lib/seo';
  */
 export const dynamic = 'force-dynamic';
 
-export function generateMetadata(): Metadata {
-  const settings = getSettings();
-
-  return {
-    metadataBase: new URL(siteUrl()),
-    title: { default: `${settings.company_name} | ${settings.company_tagline}`, template: `%s | ${settings.company_name}` },
-    description: settings.company_tagline,
-    applicationName: settings.company_name,
-    openGraph: { type: 'website', locale: 'fa_IR', siteName: settings.company_name },
-    formatDetection: { telephone: false },
-  };
-}
+// Titles and descriptions are set per language in app/(site)/[lang]/layout.tsx.
+export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl()),
+  formatDetection: { telephone: false },
+};
 
 export const viewport: Viewport = {
   themeColor: '#faf8f5',
@@ -30,9 +24,13 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Set by the middleware for public pages; the admin is always Persian.
+  const header = (await headers()).get('x-locale');
+  const locale = isLocale(header) ? header : 'fa';
+
   return (
-    <html lang="fa" dir="rtl">
+    <html lang={locale} dir={dirOf(locale)}>
       <body className="min-h-dvh">{children}</body>
     </html>
   );

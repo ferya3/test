@@ -12,6 +12,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
+import { CATEGORY_EN, PROJECT_EN, STEP_EN, productEnglish } from './english-content.ts';
 
 const DB_PATH = process.env.DATABASE_PATH ?? path.join(process.cwd(), 'data', 'app.db');
 
@@ -22,7 +23,9 @@ const DB_PATH = process.env.DATABASE_PATH ?? path.join(process.cwd(), 'data', 'a
  * Append only. Editing a migration that has already run on a server changes
  * nothing there, and leaves that server on a schema no other copy has.
  */
-const MIGRATIONS: string[] = [
+type Migration = string | ((db: DatabaseSync) => void);
+
+const MIGRATIONS: Migration[] = [
   /* 1 — initial schema */ `
     CREATE TABLE categories (
       id          INTEGER PRIMARY KEY,
@@ -180,6 +183,36 @@ const MIGRATIONS: string[] = [
        'کابین‌های کامپکت با رنگ روشن و یراق استیل؛ مقاوم در برابر ضربه و خط‌وخش.',
        (SELECT id FROM categories WHERE slug = 'hpl-compact'), '#d8cfc2', 6);
   `,
+
+  /* 4 — English: a second column for every piece of editable text */
+  (db) => {
+    const add = (table: string, columns: string[]) =>
+      columns.forEach((c) => db.exec(`ALTER TABLE ${table} ADD COLUMN ${c}_en TEXT NOT NULL DEFAULT ''`));
+
+    add('categories', ['name', 'short', 'description']);
+    add('products', ['name', 'short', 'description']);
+    add('process_steps', ['title', 'body']);
+    add('projects', ['title', 'location', 'description']);
+    // Site settings take their English as separate keys (`hero_title_en`).
+
+    // English for the content the site started with; anything an editor
+    // added gets its English in the admin. Empty English falls back to the
+    // Persian on the English site rather than showing nothing.
+    const category = db.prepare('UPDATE categories SET name_en = ?, short_en = ?, description_en = ? WHERE slug = ?');
+    for (const [slug, en] of Object.entries(CATEGORY_EN)) category.run(en.name, en.short, en.description, slug);
+
+    const product = db.prepare('UPDATE products SET name_en = ?, short_en = ?, description_en = ? WHERE id = ?');
+    for (const row of db.prepare('SELECT id, slug FROM products').all() as { id: number; slug: string }[]) {
+      const en = productEnglish(row.slug);
+      if (en) product.run(en.name, en.short, en.description, row.id);
+    }
+
+    const step = db.prepare('UPDATE process_steps SET title_en = ?, body_en = ? WHERE position = ?');
+    for (const [position, en] of Object.entries(STEP_EN)) step.run(en.title, en.body, Number(position));
+
+    const project = db.prepare('UPDATE projects SET title_en = ?, description_en = ? WHERE title = ?');
+    for (const [title, en] of Object.entries(PROJECT_EN)) project.run(en.title, en.description, title);
+  },
 ];
 
 function migrate(db: DatabaseSync): void {
@@ -189,7 +222,9 @@ function migrate(db: DatabaseSync): void {
   for (let version = current; version < MIGRATIONS.length; version++) {
     db.exec('BEGIN');
     try {
-      db.exec(MIGRATIONS[version]!);
+      const migration = MIGRATIONS[version]!;
+      if (typeof migration === 'string') db.exec(migration);
+      else migration(db);
       db.exec(`PRAGMA user_version = ${version + 1}`);
       db.exec('COMMIT');
     } catch (error) {
