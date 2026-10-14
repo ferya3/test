@@ -299,7 +299,7 @@ PHP_PKGS=()
 # Everything here is required: gd for image conversions, intl for locale-aware
 # formatting of Persian content, redis because cache, session and queue are all
 # configured onto it below.
-for ext in fpm cli common mysql mbstring xml curl zip intl gd bcmath opcache redis; do
+for ext in fpm cli common mysql mbstring xml curl zip intl gd bcmath redis; do
     if ! pkg="$(apt_pkg "php${PHP_VER}-${ext}" "php-${ext}")"; then
         warn "What apt knows about php${PHP_VER}-${ext}:"
         apt-cache policy "php${PHP_VER}-${ext}" "php-${ext}" || true
@@ -308,25 +308,64 @@ for ext in fpm cli common mysql mbstring xml curl zip intl gd bcmath opcache red
     PHP_PKGS+=("$pkg")
 done
 
-# igbinary is the one extension the application runs without, so it warns rather
-# than dies — but it is not incidental either. It is the faster serialiser for
-# everything going into Redis, and it is also the configuration in which a
-# cached object comes back as __PHP_Incomplete_Class. Stage 8 shipped exactly
-# that bug, and tests/Feature/Catalog/CachedPayloadTest.php guards it in CI with
-# igbinary loaded. Without it here, the server stops being the machine that CI
-# and docs/PERFORMANCE.md describe.
-if pkg="$(apt_pkg "php${PHP_VER}-igbinary" php-igbinary)"; then
-    PHP_PKGS+=("$pkg")
-    IGBINARY=yes
-else
-    IGBINARY=no
-fi
+# opcache and igbinary are asked for but not demanded by package name.
+#
+# Whether either is packaged separately is a decision that differs by source and
+# by release. Ubuntu 26.04 (resolute) carries PHP 8.5 and has no php8.5-opcache
+# at all, so an install that insisted on the *name* died on a release where the
+# extension is compiled in — reporting "Neither php8.5-opcache nor php-opcache
+# exists", which is true, and about packaging rather than about PHP.
+#
+# What the application needs is a loaded extension. That is checked against
+# `php -m` below; this list is only how we try to get there.
+for ext in opcache igbinary; do
+    if pkg="$(apt_pkg "php${PHP_VER}-${ext}" "php-${ext}")"; then
+        PHP_PKGS+=("$pkg")
+    fi
+done
 
 apt-get install -y -qq "${PHP_PKGS[@]}"
 
-if [[ "$IGBINARY" == "no" ]]; then
-    warn "igbinary is not packaged for PHP $PHP_VER — Redis will use PHP's serialiser"
+# The authoritative check: not which packages apt installed, but which
+# extensions the PHP that will run the site actually loaded.
+log "Verifying the extensions PHP $PHP_VER loaded"
+
+LOADED="$("$PHP_BIN" -m 2>/dev/null | tr '[:upper:]' '[:lower:]' || true)"
+MISSING=()
+
+# Only the extensions whose absence breaks something nameable, and under the
+# names `php -m` prints rather than the package suffixes: php8.5-mysql provides
+# pdo_mysql, php8.5-xml provides dom.
+#
+#   pdo_mysql  no database at all
+#   mbstring   Laravel's string helpers
+#   dom        the sitemap and the structured data
+#   gd         every image conversion in App\Services\Media
+#   intl       locale-aware formatting of Persian content
+#   redis      cache, session and queue are all configured onto it below
+#
+# bcmath, curl and zip are installed above but not demanded here. The
+# application calls no bc* function, declares no ext-* in composer.json, and
+# its whole suite passes without bcmath — so failing an install over it would
+# repeat the opcache mistake in a new place: refusing a server the application
+# runs on perfectly well.
+for module in pdo_mysql mbstring dom gd intl redis; do
+    grep -qx "$module" <<<"$LOADED" || MISSING+=("$module")
+done
+
+if [[ ${#MISSING[@]} -gt 0 ]]; then
+    warn "$PHP_BIN -m reports:"
+    "$PHP_BIN" -m || true
+    die "PHP $PHP_VER is missing: ${MISSING[*]}"
 fi
+
+# None of these stops the application, so they warn rather than die.
+for module in curl zip bcmath igbinary; do
+    grep -qx "$module" <<<"$LOADED" || warn "PHP extension not loaded: ${module}"
+done
+
+grep -q 'zend opcache' <<<"$LOADED" \
+    || warn "OPcache is not loaded — PHP will recompile every file on every request."
 
 log "Installing Nginx, MySQL and Redis"
 apt-get install -y -qq nginx mysql-server redis-server
