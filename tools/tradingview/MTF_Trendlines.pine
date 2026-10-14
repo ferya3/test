@@ -1,0 +1,110 @@
+//@version=5
+indicator("MTF Trendlines (1-5-10-15-30-1H-4H)", shorttitle="MTF Trendlines", overlay=true, max_lines_count=500, max_labels_count=500)
+
+// Indicator 1 of 2 - multi-timeframe trendlines.
+// Toggle the whole thing with the eye icon next to its name on the chart,
+// or single timeframes in Settings > Inputs.
+
+// ───────────────────────── Inputs: Trendlines ─────────────────────────
+grpTL = "Trendlines (multi-timeframe)"
+showTL      = input.bool(true, "Show trendlines", group=grpTL)
+tlPivot     = input.int(3, "Pivot length (on each timeframe)", minval=1, maxval=20, group=grpTL)
+onlyValid   = input.bool(true, "Only valid lines (lower highs / higher lows)", group=grpTL)
+showTLLabel = input.bool(true, "Show timeframe label", group=grpTL)
+tlWidth     = input.int(1, "Line width", minval=1, maxval=4, group=grpTL)
+tlStyleStr  = input.string("Solid", "Line style", options=["Solid", "Dashed", "Dotted"], group=grpTL)
+
+on1  = input.bool(true, "1m",  inline="t1", group=grpTL)
+c1   = input.color(#9E9E9E, "", inline="t1", group=grpTL)
+on5  = input.bool(true, "5m",  inline="t1", group=grpTL)
+c5   = input.color(#2196F3, "", inline="t1", group=grpTL)
+on10 = input.bool(true, "10m", inline="t2", group=grpTL)
+c10  = input.color(#00BCD4, "", inline="t2", group=grpTL)
+on15 = input.bool(true, "15m", inline="t2", group=grpTL)
+c15  = input.color(#4CAF50, "", inline="t2", group=grpTL)
+on30 = input.bool(true, "30m", inline="t3", group=grpTL)
+c30  = input.color(#FFC107, "", inline="t3", group=grpTL)
+on60 = input.bool(true, "1H",  inline="t3", group=grpTL)
+c60  = input.color(#FF9800, "", inline="t3", group=grpTL)
+on240 = input.bool(true, "4H", inline="t4", group=grpTL)
+c240  = input.color(#F44336, "", inline="t4", group=grpTL)
+
+// ═══════════════════════════ Trendlines ═══════════════════════════
+
+lineStyle = tlStyleStr == "Dashed" ? line.style_dashed : tlStyleStr == "Dotted" ? line.style_dotted : line.style_solid
+chartSec  = timeframe.in_seconds(timeframe.period)
+
+// A timeframe is only usable if it is >= the chart timeframe
+f_ok(string tf) =>
+    timeframe.in_seconds(tf) >= chartSec
+
+// Last two confirmed pivot highs / lows, evaluated on the requested timeframe
+f_piv(int len) =>
+    ph = ta.pivothigh(high, len, len)
+    pl = ta.pivotlow(low, len, len)
+    var float h1 = na
+    var int   h1t = na
+    var float h2 = na
+    var int   h2t = na
+    var float l1 = na
+    var int   l1t = na
+    var float l2 = na
+    var int   l2t = na
+    if not na(ph)
+        h2  := h1
+        h2t := h1t
+        h1  := ph
+        h1t := time[len]
+    if not na(pl)
+        l2  := l1
+        l2t := l1t
+        l1  := pl
+        l1t := time[len]
+    [h1t, h1, h2t, h2, l1t, l1, l2t, l2]
+
+[h1t_1,   h1_1,   h2t_1,   h2_1,   l1t_1,   l1_1,   l2t_1,   l2_1]   = request.security(syminfo.tickerid, "1",   f_piv(tlPivot))
+[h1t_5,   h1_5,   h2t_5,   h2_5,   l1t_5,   l1_5,   l2t_5,   l2_5]   = request.security(syminfo.tickerid, "5",   f_piv(tlPivot))
+[h1t_10,  h1_10,  h2t_10,  h2_10,  l1t_10,  l1_10,  l2t_10,  l2_10]  = request.security(syminfo.tickerid, "10",  f_piv(tlPivot))
+[h1t_15,  h1_15,  h2t_15,  h2_15,  l1t_15,  l1_15,  l2t_15,  l2_15]  = request.security(syminfo.tickerid, "15",  f_piv(tlPivot))
+[h1t_30,  h1_30,  h2t_30,  h2_30,  l1t_30,  l1_30,  l2t_30,  l2_30]  = request.security(syminfo.tickerid, "30",  f_piv(tlPivot))
+[h1t_60,  h1_60,  h2t_60,  h2_60,  l1t_60,  l1_60,  l2t_60,  l2_60]  = request.security(syminfo.tickerid, "60",  f_piv(tlPivot))
+[h1t_240, h1_240, h2t_240, h2_240, l1t_240, l1_240, l2t_240, l2_240] = request.security(syminfo.tickerid, "240", f_piv(tlPivot))
+
+var line[]  tlLines  = array.new<line>()
+var label[] tlLabels = array.new<label>()
+
+// Draw one trendline through the previous (old) and latest (new) pivot
+f_drawTL(bool enabled, string txt, color col, int tOld, float pOld, int tNew, float pNew, bool isResistance) =>
+    if enabled and not na(tOld) and not na(tNew) and tNew > tOld
+        bool valid = not onlyValid or (isResistance ? pNew < pOld : pNew > pOld)
+        if valid
+            line ln = line.new(tOld, pOld, tNew, pNew, xloc=xloc.bar_time, extend=extend.right, color=col, width=tlWidth, style=lineStyle)
+            array.push(tlLines, ln)
+            if showTLLabel
+                float slope = (pNew - pOld) / (tNew - tOld)
+                float py = pNew + slope * (time - tNew)
+                label lb = label.new(time, py, txt, xloc=xloc.bar_time, style=label.style_label_left, color=color.new(col, 80), textcolor=col, size=size.tiny)
+                array.push(tlLabels, lb)
+
+if barstate.islast
+    for ln in tlLines
+        line.delete(ln)
+    array.clear(tlLines)
+    for lb in tlLabels
+        label.delete(lb)
+    array.clear(tlLabels)
+    if showTL
+        f_drawTL(on1   and f_ok("1"),   "1m",  c1,   h2t_1,   h2_1,   h1t_1,   h1_1,   true)
+        f_drawTL(on1   and f_ok("1"),   "1m",  c1,   l2t_1,   l2_1,   l1t_1,   l1_1,   false)
+        f_drawTL(on5   and f_ok("5"),   "5m",  c5,   h2t_5,   h2_5,   h1t_5,   h1_5,   true)
+        f_drawTL(on5   and f_ok("5"),   "5m",  c5,   l2t_5,   l2_5,   l1t_5,   l1_5,   false)
+        f_drawTL(on10  and f_ok("10"),  "10m", c10,  h2t_10,  h2_10,  h1t_10,  h1_10,  true)
+        f_drawTL(on10  and f_ok("10"),  "10m", c10,  l2t_10,  l2_10,  l1t_10,  l1_10,  false)
+        f_drawTL(on15  and f_ok("15"),  "15m", c15,  h2t_15,  h2_15,  h1t_15,  h1_15,  true)
+        f_drawTL(on15  and f_ok("15"),  "15m", c15,  l2t_15,  l2_15,  l1t_15,  l1_15,  false)
+        f_drawTL(on30  and f_ok("30"),  "30m", c30,  h2t_30,  h2_30,  h1t_30,  h1_30,  true)
+        f_drawTL(on30  and f_ok("30"),  "30m", c30,  l2t_30,  l2_30,  l1t_30,  l1_30,  false)
+        f_drawTL(on60  and f_ok("60"),  "1H",  c60,  h2t_60,  h2_60,  h1t_60,  h1_60,  true)
+        f_drawTL(on60  and f_ok("60"),  "1H",  c60,  l2t_60,  l2_60,  l1t_60,  l1_60,  false)
+        f_drawTL(on240 and f_ok("240"), "4H",  c240, h2t_240, h2_240, h1t_240, h1_240, true)
+        f_drawTL(on240 and f_ok("240"), "4H",  c240, l2t_240, l2_240, l1t_240, l1_240, false)

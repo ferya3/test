@@ -1,0 +1,213 @@
+//@version=5
+indicator("FVG + IFVG + Order Blocks", shorttitle="FVG·IFVG·OB", overlay=true, max_boxes_count=500, max_bars_back=1000)
+
+// Indicator 2 of 2 - FVG, IFVG and Order Blocks (chart timeframe).
+// Toggle the whole thing with the eye icon next to its name on the chart,
+// or FVG / IFVG / OB separately in Settings > Inputs > Switches.
+
+grpSW = "Switches"
+showFVG   = input.bool(true, "FVG", group=grpSW)
+showIFVG  = input.bool(true, "IFVG (inverse FVG)", group=grpSW)
+showOB    = input.bool(true, "Order Blocks", group=grpSW)
+
+// ───────────────────────── Inputs: FVG / IFVG ─────────────────────────
+grpFVG = "FVG / IFVG (chart timeframe)"
+fvgMinATR  = input.float(0.1, "Min gap size (x ATR14)", minval=0.0, step=0.05, group=grpFVG)
+maxFVG     = input.int(30, "Max active FVG/IFVG zones", minval=1, maxval=100, group=grpFVG)
+keepMitig  = input.bool(false, "Keep mitigated zones (cut at mitigation bar)", group=grpFVG)
+bullFvgCol  = input.color(color.new(#26A69A, 85), "Bullish FVG", inline="f1", group=grpFVG)
+bearFvgCol  = input.color(color.new(#EF5350, 85), "Bearish FVG", inline="f1", group=grpFVG)
+bullIfvgCol = input.color(color.new(#00E676, 75), "Bullish IFVG (support)", inline="f2", group=grpFVG)
+bearIfvgCol = input.color(color.new(#FF1744, 75), "Bearish IFVG (resistance)", inline="f2", group=grpFVG)
+
+// ───────────────────────── Inputs: Order Blocks ─────────────────────────
+grpOB = "Order Blocks"
+obSwing   = input.int(10, "Swing length", minval=2, maxval=50, group=grpOB)
+maxOB     = input.int(15, "Max active order blocks", minval=1, maxval=100, group=grpOB)
+keepOB    = input.bool(false, "Keep mitigated OBs (cut at mitigation bar)", group=grpOB)
+bullObCol = input.color(color.new(#2962FF, 80), "Bullish OB", inline="o1", group=grpOB)
+bearObCol = input.color(color.new(#FF6D00, 80), "Bearish OB", inline="o1", group=grpOB)
+
+// ═══════════════════════════ FVG / IFVG ═══════════════════════════
+// dir:  1 = bullish FVG,  -1 = bearish FVG
+//       2 = bullish IFVG (former bearish FVG closed above -> support)
+//      -2 = bearish IFVG (former bullish FVG closed below -> resistance)
+
+atr14 = ta.atr(14)
+
+var box[]   fzBox = array.new<box>()
+var float[] fzTop = array.new<float>()
+var float[] fzBot = array.new<float>()
+var int[]   fzDir = array.new<int>()
+
+f_addZone(int dir, int left, float top, float bot) =>
+    color col = dir == 1 ? bullFvgCol : dir == -1 ? bearFvgCol : dir == 2 ? bullIfvgCol : bearIfvgCol
+    string txt = math.abs(dir) == 1 ? "FVG" : "IFVG"
+    box bx = box.new(left, top, bar_index + 1, bot, border_color=color.new(col, 40), bgcolor=col, extend=extend.right, text=txt, text_size=size.tiny, text_color=color.new(col, 20), text_halign=text.align_right)
+    array.push(fzBox, bx)
+    array.push(fzTop, top)
+    array.push(fzBot, bot)
+    array.push(fzDir, dir)
+
+f_endBox(box bx, bool keep) =>
+    if keep
+        box.set_extend(bx, extend.none)
+        box.set_right(bx, bar_index)
+    else
+        box.delete(bx)
+
+bool newBullFvg  = false
+bool newBearFvg  = false
+bool newBullIfvg = false
+bool newBearIfvg = false
+
+if barstate.isconfirmed and (showFVG or showIFVG)
+    // 1) update existing zones
+    int i = array.size(fzBox) - 1
+    while i >= 0
+        int   d  = array.get(fzDir, i)
+        float zt = array.get(fzTop, i)
+        float zb = array.get(fzBot, i)
+        box   bx = array.get(fzBox, i)
+        bool  kill = false
+        if d == 1 and close < zb
+            kill := true
+            if showIFVG
+                f_addZone(-2, bar_index, zt, zb)
+                newBearIfvg := true
+        else if d == -1 and close > zt
+            kill := true
+            if showIFVG
+                f_addZone(2, bar_index, zt, zb)
+                newBullIfvg := true
+        else if d == 2 and close < zb
+            kill := true
+        else if d == -2 and close > zt
+            kill := true
+        if kill
+            f_endBox(bx, keepMitig)
+            array.remove(fzBox, i)
+            array.remove(fzTop, i)
+            array.remove(fzBot, i)
+            array.remove(fzDir, i)
+        i -= 1
+
+    // 2) detect new FVG (3-candle pattern)
+    if showFVG and bar_index >= 2
+        if low > high[2] and (low - high[2]) > atr14 * fvgMinATR
+            f_addZone(1, bar_index - 2, low, high[2])
+            newBullFvg := true
+        if high < low[2] and (low[2] - high) > atr14 * fvgMinATR
+            f_addZone(-1, bar_index - 2, low[2], high)
+            newBearFvg := true
+
+    // 3) cap the number of active zones
+    while array.size(fzBox) > maxFVG
+        box.delete(array.get(fzBox, 0))
+        array.remove(fzBox, 0)
+        array.remove(fzTop, 0)
+        array.remove(fzBot, 0)
+        array.remove(fzDir, 0)
+
+// ═══════════════════════════ Order Blocks ═══════════════════════════
+// Bullish OB: when price closes above the last swing high, the candle with the
+// lowest low between that swing high and the break becomes a bullish OB.
+// Bearish OB: mirror image with swing low / highest high.
+
+var box[]   obBox = array.new<box>()
+var float[] obTop = array.new<float>()
+var float[] obBot = array.new<float>()
+var int[]   obDir = array.new<int>()
+
+var float hiY = na
+var int   hiX = na
+var bool  hiCrossed = true
+var float loY = na
+var int   loX = na
+var bool  loCrossed = true
+
+swH = ta.pivothigh(high, obSwing, obSwing)
+swL = ta.pivotlow(low, obSwing, obSwing)
+
+if not na(swH)
+    hiY := swH
+    hiX := bar_index - obSwing
+    hiCrossed := false
+if not na(swL)
+    loY := swL
+    loX := bar_index - obSwing
+    loCrossed := false
+
+bool newBullOB = false
+bool newBearOB = false
+
+if showOB and barstate.isconfirmed
+    // 1) mitigation of existing OBs
+    int j = array.size(obBox) - 1
+    while j >= 0
+        int   od = array.get(obDir, j)
+        float ot = array.get(obTop, j)
+        float ob = array.get(obBot, j)
+        if (od == 1 and close < ob) or (od == -1 and close > ot)
+            f_endBox(array.get(obBox, j), keepOB)
+            array.remove(obBox, j)
+            array.remove(obTop, j)
+            array.remove(obBot, j)
+            array.remove(obDir, j)
+        j -= 1
+
+    // 2) bullish structure break -> bullish OB
+    if not hiCrossed and not na(hiY) and close > hiY
+        hiCrossed := true
+        int cnt = math.min(bar_index - hiX - 1, 500)
+        if cnt >= 1
+            float minL = low[1]
+            int   off  = 1
+            for k = 1 to cnt
+                if low[k] < minL
+                    minL := low[k]
+                    off  := k
+            float t = high[off]
+            float b = low[off]
+            box bx = box.new(bar_index - off, t, bar_index + 1, b, border_color=color.new(bullObCol, 30), bgcolor=bullObCol, extend=extend.right, text="OB", text_size=size.tiny, text_color=color.new(bullObCol, 10), text_halign=text.align_right)
+            array.push(obBox, bx)
+            array.push(obTop, t)
+            array.push(obBot, b)
+            array.push(obDir, 1)
+            newBullOB := true
+
+    // 3) bearish structure break -> bearish OB
+    if not loCrossed and not na(loY) and close < loY
+        loCrossed := true
+        int cnt = math.min(bar_index - loX - 1, 500)
+        if cnt >= 1
+            float maxH = high[1]
+            int   off  = 1
+            for k = 1 to cnt
+                if high[k] > maxH
+                    maxH := high[k]
+                    off  := k
+            float t = high[off]
+            float b = low[off]
+            box bx = box.new(bar_index - off, t, bar_index + 1, b, border_color=color.new(bearObCol, 30), bgcolor=bearObCol, extend=extend.right, text="OB", text_size=size.tiny, text_color=color.new(bearObCol, 10), text_halign=text.align_right)
+            array.push(obBox, bx)
+            array.push(obTop, t)
+            array.push(obBot, b)
+            array.push(obDir, -1)
+            newBearOB := true
+
+    // 4) cap the number of active order blocks
+    while array.size(obBox) > maxOB
+        box.delete(array.get(obBox, 0))
+        array.remove(obBox, 0)
+        array.remove(obTop, 0)
+        array.remove(obBot, 0)
+        array.remove(obDir, 0)
+
+// ═══════════════════════════ Alerts ═══════════════════════════
+alertcondition(newBullFvg,  "Bullish FVG formed",  "Bullish FVG formed")
+alertcondition(newBearFvg,  "Bearish FVG formed",  "Bearish FVG formed")
+alertcondition(newBullIfvg, "Bullish IFVG formed", "Bullish IFVG (support) formed")
+alertcondition(newBearIfvg, "Bearish IFVG formed", "Bearish IFVG (resistance) formed")
+alertcondition(newBullOB,   "Bullish OB formed",   "Bullish Order Block formed")
+alertcondition(newBearOB,   "Bearish OB formed",   "Bearish Order Block formed")
