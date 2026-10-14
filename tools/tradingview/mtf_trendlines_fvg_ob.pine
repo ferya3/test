@@ -7,9 +7,17 @@ indicator("MTF Trendlines + FVG/IFVG + OB", shorttitle="MTF TL·FVG·OB", overla
 //  3) Order Blocks (swing structure break based)
 // ════════════════════════════════════════════════════════════════
 
+// ───────────────────────── Inputs: Panel / Quick toggles ─────────────────────────
+grpPN = "1) Panel & Quick toggles"
+showTL    = input.bool(true, "Trendlines", group=grpPN)
+showFVG   = input.bool(true, "FVG", group=grpPN)
+showIFVG  = input.bool(true, "IFVG (inverse FVG)", group=grpPN)
+showOB    = input.bool(true, "Order Blocks", group=grpPN)
+showPanel = input.bool(true, "Show status panel", group=grpPN)
+panelPos  = input.string("Top right", "Panel position", options=["Top left", "Top right", "Bottom left", "Bottom right"], group=grpPN)
+
 // ───────────────────────── Inputs: Trendlines ─────────────────────────
 grpTL = "Trendlines (multi-timeframe)"
-showTL      = input.bool(true, "Show trendlines", group=grpTL)
 tlPivot     = input.int(3, "Pivot length (on each timeframe)", minval=1, maxval=20, group=grpTL)
 onlyValid   = input.bool(true, "Only valid lines (lower highs / higher lows)", group=grpTL)
 showTLLabel = input.bool(true, "Show timeframe label", group=grpTL)
@@ -33,8 +41,6 @@ c240  = input.color(#F44336, "", inline="t4", group=grpTL)
 
 // ───────────────────────── Inputs: FVG / IFVG ─────────────────────────
 grpFVG = "FVG / IFVG (chart timeframe)"
-showFVG    = input.bool(true, "Show FVG", group=grpFVG)
-showIFVG   = input.bool(true, "Show IFVG (inverse FVG)", group=grpFVG)
 fvgMinATR  = input.float(0.1, "Min gap size (x ATR14)", minval=0.0, step=0.05, group=grpFVG)
 maxFVG     = input.int(30, "Max active FVG/IFVG zones", minval=1, maxval=100, group=grpFVG)
 keepMitig  = input.bool(false, "Keep mitigated zones (cut at mitigation bar)", group=grpFVG)
@@ -45,7 +51,6 @@ bearIfvgCol = input.color(color.new(#FF1744, 75), "Bearish IFVG (resistance)", i
 
 // ───────────────────────── Inputs: Order Blocks ─────────────────────────
 grpOB = "Order Blocks"
-showOB    = input.bool(true, "Show Order Blocks", group=grpOB)
 obSwing   = input.int(10, "Swing length", minval=2, maxval=50, group=grpOB)
 maxOB     = input.int(15, "Max active order blocks", minval=1, maxval=100, group=grpOB)
 keepOB    = input.bool(false, "Keep mitigated OBs (cut at mitigation bar)", group=grpOB)
@@ -315,3 +320,49 @@ alertcondition(newBullIfvg, "Bullish IFVG formed", "Bullish IFVG (support) forme
 alertcondition(newBearIfvg, "Bearish IFVG formed", "Bearish IFVG (resistance) formed")
 alertcondition(newBullOB,   "Bullish OB formed",   "Bullish Order Block formed")
 alertcondition(newBearOB,   "Bearish OB formed",   "Bearish Order Block formed")
+
+// ═══════════════════════════ Status panel ═══════════════════════════
+// (Pine cannot draw clickable buttons; toggle items in the settings dialog,
+//  the panel shows what is currently ON / OFF and how many zones are active.)
+
+f_cnt(int[] arr, int a, int b) =>
+    int n = 0
+    for idx = 0 to array.size(arr) - 1
+        int v = array.get(arr, idx)
+        if v == a or v == b
+            n += 1
+    n
+
+panelPosition = panelPos == "Top left" ? position.top_left : panelPos == "Bottom left" ? position.bottom_left : panelPos == "Bottom right" ? position.bottom_right : position.top_right
+
+var table pn = table.new(panelPosition, 3, 11, bgcolor=color.new(#131722, 10), border_width=1, border_color=color.new(color.gray, 70))
+
+f_tfRow(int row, string name, bool on, string tf, color col) =>
+    string st = not showTL or not on ? "OFF" : f_ok(tf) ? "ON" : "N/A"
+    color stCol = st == "ON" ? color.lime : st == "N/A" ? color.orange : color.gray
+    table.cell(pn, 0, row, "TL " + name, text_color=col, text_size=size.small, text_halign=text.align_left)
+    table.cell(pn, 1, row, st, text_color=stCol, text_size=size.small)
+    table.cell(pn, 2, row, st == "N/A" ? "< chart TF" : "", text_color=color.gray, text_size=size.tiny)
+
+f_zoneRow(int row, string name, bool on, int n) =>
+    table.cell(pn, 0, row, name, text_color=color.white, text_size=size.small, text_halign=text.align_left)
+    table.cell(pn, 1, row, on ? "ON" : "OFF", text_color=on ? color.lime : color.gray, text_size=size.small)
+    table.cell(pn, 2, row, on ? str.tostring(n) + " active" : "", text_color=color.gray, text_size=size.tiny)
+
+if barstate.islast
+    if showPanel
+        table.cell(pn, 0, 0, "MTF TL · FVG · OB", text_color=color.white, text_size=size.small, text_halign=text.align_left)
+        table.cell(pn, 1, 0, "", text_size=size.tiny)
+        table.cell(pn, 2, 0, "", text_size=size.tiny)
+        f_tfRow(1, "1m",  on1,   "1",   c1)
+        f_tfRow(2, "5m",  on5,   "5",   c5)
+        f_tfRow(3, "10m", on10,  "10",  c10)
+        f_tfRow(4, "15m", on15,  "15",  c15)
+        f_tfRow(5, "30m", on30,  "30",  c30)
+        f_tfRow(6, "1H",  on60,  "60",  c60)
+        f_tfRow(7, "4H",  on240, "240", c240)
+        f_zoneRow(8,  "FVG",  showFVG,  f_cnt(fzDir, 1, -1))
+        f_zoneRow(9,  "IFVG", showIFVG, f_cnt(fzDir, 2, -2))
+        f_zoneRow(10, "OB",   showOB,   array.size(obDir))
+    else
+        table.clear(pn, 0, 0, 2, 10)
