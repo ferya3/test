@@ -104,7 +104,7 @@ export function Process() {
 
       <ol
         ref={track}
-        className="relative mt-10 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-4 [scrollbar-width:none] sm:px-6 lg:mt-14 lg:snap-none lg:gap-6 lg:overflow-visible lg:px-[max(2rem,calc((100vw-80rem)/2+2rem))]"
+        className="relative mt-10 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-4 [scrollbar-width:none] sm:px-6 lg:mt-14 lg:snap-none lg:gap-6 lg:overflow-visible lg:px-[max(2rem,calc((100%-80rem)/2+2rem))]"
       >
         {STEPS.map(({ icon: Icon, title, body }, i) => (
           <li

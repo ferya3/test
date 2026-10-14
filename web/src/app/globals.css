@@ -51,6 +51,9 @@
 
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 
+  /* Width of the boxed site frame on desktop. */
+  --site-width: 90rem;
+
   --animate-page-in: page-in 0.5s var(--ease-out-expo) backwards;
 
   @keyframes page-in {
@@ -88,6 +91,15 @@
     @apply bg-paper text-ink-900 font-sans;
     /* Persian reads comfortably with more leading than Latin. */
     line-height: 1.8;
+
+    /* The backdrop around the boxed site: a shade darker than the box, with
+       a faint warm light from the top so it reads as a surface, not a gap. */
+    @media (width >= 64rem) {
+      background:
+        radial-gradient(ellipse 70% 40% at 50% 0%, rgb(230 196 126 / 0.18), transparent 70%),
+        var(--color-ink-100);
+      background-attachment: fixed;
+    }
   }
 
   ::selection {
@@ -111,6 +123,25 @@
   }
   .lenis.lenis-stopped {
     overflow: hidden;
+  }
+}
+
+@layer components {
+  /* The boxed frame around the public site (see app/(site)/layout.tsx). */
+  .site-box {
+    background: var(--color-paper);
+
+    @media (width >= 64rem) {
+      /* Always a visible gap at the sides, even when the screen is only
+         as wide as the box itself. */
+      width: min(var(--site-width), 100% - 2.5rem);
+      margin: 1.25rem auto;
+      border-radius: var(--radius-2xl);
+      overflow: clip;
+      box-shadow:
+        0 0 0 1px rgb(15 13 11 / 0.05),
+        0 30px 80px -30px rgb(15 13 11 / 0.35);
+    }
   }
 }
 
