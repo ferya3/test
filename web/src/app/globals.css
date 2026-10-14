@@ -1,0 +1,158 @@
+@import 'tailwindcss';
+
+/* ==========================================================================
+   Artavil Gold — design tokens
+
+   Warm charcoal and champagne gold. Every text pairing below is verified
+   against WCAG AA by `node scripts/check-contrast.mjs`; do not change a value
+   without re-running it. Two rules fall out of those numbers:
+
+     - a gold *surface* carries dark text (ink-950 on gold-400 is 8.8:1),
+       never white;
+     - gold *text* on a light ground is gold-700 only.
+   ========================================================================== */
+
+@theme {
+  --color-ink-950: #0f0d0b;
+  --color-ink-900: #1a1714;
+  --color-ink-800: #25211c;
+  --color-ink-700: #3a342d;
+  --color-ink-600: #544b42;
+  --color-ink-500: #6e645a;
+  --color-ink-400: #8f857a;
+  --color-ink-300: #b7aea3;
+  --color-ink-200: #d9d2c8;
+  --color-ink-100: #ece7df;
+  --color-ink-50: #f6f3ee;
+  --color-paper: #faf8f5;
+
+  --color-gold-700: #7a5518;
+  --color-gold-600: #946a22;
+  --color-gold-500: #b8893a;
+  --color-gold-400: #d4a853;
+  --color-gold-300: #e6c47e;
+  --color-gold-100: #f5e8c8;
+  --color-gold-50: #fbf5e6;
+
+  --font-sans: 'Vazirmatn Variable', ui-sans-serif, system-ui, sans-serif;
+
+  /* Soft, but still an industrial manufacturer: nothing here is a pill. */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-2xl: 28px;
+
+  /* Two wide, low layers rather than one tight dark one — read as light on a
+     surface, not a sticker dropped on the page. */
+  --shadow-soft: 0 1px 2px rgb(15 13 11 / 0.04), 0 4px 16px -4px rgb(15 13 11 / 0.08);
+  --shadow-lift: 0 2px 4px rgb(15 13 11 / 0.04), 0 18px 48px -12px rgb(15 13 11 / 0.18);
+  --shadow-gold: 0 10px 40px -10px rgb(212 168 83 / 0.45);
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --animate-page-in: page-in 0.5s var(--ease-out-expo) backwards;
+
+  @keyframes page-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* Fluid type: one scale from a 360px phone to a wide desktop. */
+  --text-display: clamp(2.5rem, 1.6rem + 4.2vw, 5rem);
+  --text-display--line-height: 1.08;
+  --text-h1: clamp(2rem, 1.5rem + 2.4vw, 3.5rem);
+  --text-h1--line-height: 1.12;
+  --text-h2: clamp(1.6rem, 1.3rem + 1.4vw, 2.5rem);
+  --text-h2--line-height: 1.2;
+  --text-h3: clamp(1.2rem, 1.1rem + 0.5vw, 1.5rem);
+  --text-h3--line-height: 1.35;
+  --text-lead: clamp(1.05rem, 1rem + 0.3vw, 1.25rem);
+  --text-lead--line-height: 1.85;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    @apply bg-paper text-ink-900 font-sans;
+    /* Persian reads comfortably with more leading than Latin. */
+    line-height: 1.8;
+  }
+
+  ::selection {
+    background: var(--color-gold-300);
+    color: var(--color-ink-950);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-gold-600);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  /* Lenis owns scrolling; native smooth-scroll would fight it. */
+  html.lenis,
+  html.lenis body {
+    height: auto;
+  }
+  .lenis.lenis-smooth {
+    scroll-behavior: auto !important;
+  }
+  .lenis.lenis-stopped {
+    overflow: hidden;
+  }
+}
+
+@layer utilities {
+  /* Latin runs inside Persian — codes, sizes, numbers with units — keep their
+     own direction instead of being reordered by the bidi algorithm. */
+  .ltr-isolate {
+    direction: ltr;
+    unicode-bidi: isolate;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* A faint diagonal grain — a hint of a pressed laminate sheet under raking
+     light — used where a photograph has not been uploaded yet. */
+  .sheet-grain {
+    background-color: var(--color-gold-50);
+    background-image: repeating-linear-gradient(
+      135deg,
+      rgb(15 13 11 / 0.035) 0 1px,
+      transparent 1px 9px
+    );
+  }
+
+  .gold-text {
+    background: linear-gradient(120deg, var(--color-gold-300), var(--color-gold-500) 45%, var(--color-gold-300));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+/* Everything that moves stops moving for someone who asked it to. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

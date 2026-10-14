@@ -1,0 +1,154 @@
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import { Droplets, Flame, ShieldCheck, Sparkles } from 'lucide-react';
+import { Swatch } from '@/components/catalog/swatch';
+import { ProductCard } from '@/components/catalog/product-card';
+import { LeadForm } from '@/components/catalog/lead-form';
+import { Tilt } from '@/components/motion/tilt';
+import { Reveal } from '@/components/motion/reveal';
+import { Badge } from '@/components/ui/card';
+import { FAMILIES, SURFACES, faDigits } from '@/lib/catalog';
+import { getProduct, getRelated, getSettings } from '@/lib/queries';
+import { mediaUrl } from '@/lib/media';
+import { jsonLd, siteUrl } from '@/lib/seo';
+
+type Props = { params: Promise<{ slug: string }> };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const product = getProduct((await params).slug);
+  if (!product) return {};
+
+  return {
+    title: product.name,
+    description: product.short,
+    alternates: { canonical: `/products/${product.slug}` },
+    openGraph: product.image ? { images: [mediaUrl(product.image)] } : undefined,
+  };
+}
+
+const FEATURES = [
+  { icon: ShieldCheck, label: 'مقاوم در برابر خط و خش' },
+  { icon: Flame, label: 'مقاوم در برابر حرارت' },
+  { icon: Droplets, label: 'مقاوم در برابر رطوبت' },
+  { icon: Sparkles, label: 'تمیزکاری آسان' },
+];
+
+export default async function ProductPage({ params }: Props) {
+  const product = getProduct((await params).slug);
+  if (!product) notFound();
+
+  const related = getRelated(product, 4);
+  const settings = getSettings();
+  const thicknesses = product.thicknesses.split(',').filter(Boolean);
+
+  const specs = [
+    ['کد محصول', <span key="c" className="ltr-isolate font-mono">{product.code}</span>],
+    ['گروه', product.category_name],
+    ['طرح', FAMILIES[product.family]],
+    ['سطح', SURFACES[product.surface]],
+    ['ضخامت‌ها', `${thicknesses.map(faDigits).join('، ')} میلی‌متر`],
+  ] as const;
+
+  const schema = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.name,
+    sku: product.code,
+    description: product.short,
+    category: product.category_name,
+    brand: { '@type': 'Brand', name: settings.company_name },
+    url: `${siteUrl()}/products/${product.slug}`,
+    ...(product.image ? { image: `${siteUrl()}${mediaUrl(product.image)}` } : {}),
+  };
+
+  return (
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(schema) }} />
+
+      <section className="mx-auto max-w-7xl px-4 pt-8 pb-16 sm:px-6 sm:pt-12 lg:px-8 lg:pb-24">
+        <nav aria-label="مسیر" className="mb-6 text-sm text-ink-500">
+          <Link href="/" className="hover:text-ink-950">
+            خانه
+          </Link>
+          <span className="mx-2">/</span>
+          <Link href={`/categories/${product.category_slug}`} className="hover:text-ink-950">
+            {product.category_name}
+          </Link>
+          <span className="mx-2">/</span>
+          <span className="text-ink-800">{product.name}</span>
+        </nav>
+
+        <div className="grid gap-8 lg:grid-cols-2 lg:gap-14">
+          <div className="self-start lg:sticky lg:top-28">
+            <Tilt max={5} className="rounded-2xl">
+              <div className="aspect-square overflow-hidden rounded-2xl shadow-[var(--shadow-lift)]">
+                <Swatch
+                  color={product.color_hex}
+                  family={product.family}
+                  seed={product.id}
+                  image={product.image}
+                  alt={product.name}
+                  sizes="(min-width: 1024px) 50vw, 100vw"
+                  priority
+                />
+              </div>
+            </Tilt>
+          </div>
+
+          <div>
+            <div className="flex flex-wrap gap-2">
+              <Badge>{FAMILIES[product.family]}</Badge>
+              <Badge>{SURFACES[product.surface]}</Badge>
+            </div>
+            <h1 className="mt-4 text-h1 font-black text-balance text-ink-950">{product.name}</h1>
+            <p className="mt-4 text-lead text-ink-600">{product.description || product.short}</p>
+
+            <dl className="mt-8 divide-y divide-ink-100 rounded-xl border border-ink-100 bg-white">
+              {specs.map(([term, value]) => (
+                <div key={term} className="flex items-center justify-between gap-4 px-5 py-3.5 text-sm">
+                  <dt className="text-ink-500">{term}</dt>
+                  <dd className="font-bold text-ink-900">{value}</dd>
+                </div>
+              ))}
+            </dl>
+
+            <ul className="mt-6 grid grid-cols-2 gap-3">
+              {FEATURES.map(({ icon: Icon, label }) => (
+                <li key={label} className="flex items-center gap-3 rounded-xl bg-ink-50 p-3 text-sm text-ink-800">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-white text-gold-700 shadow-[var(--shadow-soft)]">
+                    <Icon className="size-4.5" />
+                  </span>
+                  {label}
+                </li>
+              ))}
+            </ul>
+
+            <div id="quote" className="mt-10 scroll-mt-28 rounded-2xl bg-ink-950 p-5 sm:p-8">
+              <h2 className="text-h3 font-bold text-paper">استعلام قیمت این محصول</h2>
+              <p className="mt-1 mb-6 text-sm text-ink-300">شماره‌تان را بگذارید؛ همکاران فروش تماس می‌گیرند.</p>
+              <LeadForm kind="quote" product={product.slug} dark />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {related.length > 0 && (
+        <section className="bg-ink-50 py-16 sm:py-20">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <Reveal>
+              <h2 className="text-h2 font-black text-ink-950">محصولات مشابه</h2>
+            </Reveal>
+            <ul className="mt-8 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
+              {related.map((p) => (
+                <li key={p.id}>
+                  <ProductCard product={p} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      )}
+    </>
+  );
+}

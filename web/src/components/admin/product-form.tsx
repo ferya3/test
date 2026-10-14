@@ -1,0 +1,104 @@
+import { AdminForm, Field } from './form';
+import { ColorInput, ImageInput } from './inputs';
+import { Input, Select, Textarea } from '@/components/ui/input';
+import { saveProduct } from '@/lib/actions/products';
+import { FAMILIES, SURFACES, THICKNESSES, faDigits } from '@/lib/catalog';
+import type { Category, Product } from '@/lib/queries';
+
+export function ProductForm({ product, categories }: { product?: Product; categories: Category[] }) {
+  const p = product;
+  const thicknesses = p?.thicknesses.split(',') ?? [];
+
+  return (
+    <AdminForm action={saveProduct.bind(null, p?.id ?? null)} className="rounded-2xl bg-white p-5 shadow-[var(--shadow-soft)] sm:p-8">
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field name="name" label="نام محصول" className="sm:col-span-2">
+          <Input id="name" name="name" defaultValue={p?.name} required maxLength={120} />
+        </Field>
+
+        <Field name="code" label="کد محصول">
+          <Input id="code" name="code" defaultValue={p?.code} dir="ltr" required maxLength={30} placeholder="AG-1023" />
+        </Field>
+
+        <Field name="slug" label="نشانی (اسلاگ)" hint="خالی بگذارید تا از کد ساخته شود.">
+          <Input id="slug" name="slug" defaultValue={p?.slug} dir="ltr" maxLength={120} placeholder="natural-oak-18" />
+        </Field>
+
+        <Field name="category_id" label="گروه کالا">
+          <Select id="category_id" name="category_id" defaultValue={p?.category_id}>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+
+        <Field name="position" label="ترتیب نمایش" hint="عدد کوچک‌تر، جلوتر.">
+          <Input id="position" name="position" type="number" min={0} max={9999} defaultValue={p?.position ?? 0} dir="ltr" />
+        </Field>
+
+        <Field name="family" label="طرح">
+          <Select id="family" name="family" defaultValue={p?.family}>
+            {Object.entries(FAMILIES).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+
+        <Field name="surface" label="سطح">
+          <Select id="surface" name="surface" defaultValue={p?.surface}>
+            {Object.entries(SURFACES).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+
+        <Field name="thicknesses" label="ضخامت‌ها (میلی‌متر)" className="sm:col-span-2">
+          <div className="flex flex-wrap gap-2">
+            {THICKNESSES.map((t) => (
+              <label
+                key={t}
+                className="flex h-11 cursor-pointer items-center gap-2 rounded-lg border border-ink-200 px-4 text-sm has-checked:border-gold-500 has-checked:bg-gold-50"
+              >
+                <input type="checkbox" name="thicknesses" value={t} defaultChecked={thicknesses.includes(t)} className="size-4 accent-gold-600" />
+                {faDigits(t)}
+              </label>
+            ))}
+          </div>
+        </Field>
+
+        <Field name="color_hex" label="رنگ اصلی" hint="برای نمونهٔ رنگ وقتی عکس نیست.">
+          <ColorInput name="color_hex" defaultValue={p?.color_hex ?? '#d9d2c8'} />
+        </Field>
+
+        <div className="flex flex-col justify-center gap-3 text-sm">
+          <label className="flex items-center gap-2">
+            <input type="checkbox" name="is_active" defaultChecked={p ? !!p.is_active : true} className="size-4 accent-gold-600" />
+            نمایش در سایت
+          </label>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" name="is_featured" defaultChecked={!!p?.is_featured} className="size-4 accent-gold-600" />
+            منتخب (در صفحهٔ اصلی)
+          </label>
+        </div>
+
+        <Field name="image" label="تصویر محصول" className="sm:col-span-2">
+          <ImageInput name="image" current={p?.image ?? null} />
+        </Field>
+
+        <Field name="short" label="توضیح کوتاه" className="sm:col-span-2">
+          <Textarea id="short" name="short" defaultValue={p?.short} maxLength={300} className="min-h-20" />
+        </Field>
+
+        <Field name="description" label="توضیحات کامل" className="sm:col-span-2">
+          <Textarea id="description" name="description" defaultValue={p?.description} maxLength={5000} className="min-h-40" />
+        </Field>
+      </div>
+    </AdminForm>
+  );
+}
