@@ -13,6 +13,8 @@
   // Cheap pre-filter: bodies are only forwarded when they mention something moderator-like
   // (or when the user turned on "capture everything" in the panel).
   const WATCH = /moder|review|curat|inspect|assign|approv|verif|examin|expert|supervis|модер|куратор|проверя|проверк|ревью/i;
+  // Never record bodies of these (money, login, cart, tokens), even in capture-everything mode.
+  const SENSITIVE = /auth|login|finance|payment|billing|cart|notifier|token|password|session|oauth|card|wallet|balance/i;
   const STATE_KEYS = ['__NUXT__', '__NEXT_DATA__', '__INITIAL_STATE__', '__APOLLO_STATE__', '__PRELOADED_STATE__', '__APP_STATE__'];
 
   let captureAll = false;
@@ -55,8 +57,9 @@
   };
 
   const emitBody = (base, text) => {
-    const keep = captureAll || WATCH.test(text);
-    post({ ...base, size: text.length, resBody: keep ? text.slice(0, MAX_BODY) : null });
+    if (SENSITIVE.test(base.url)) { post({ ...base, size: text.length, reqBody: null, resBody: null, redacted: true }); return; }
+    const limit = WATCH.test(text) ? MAX_BODY : captureAll ? 60000 : 0;
+    post({ ...base, size: text.length, resBody: limit ? text.slice(0, limit) : null });
   };
 
   // ---------- fetch ----------
@@ -71,7 +74,7 @@
         url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
         method = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
       } catch (_) { /* ignore */ }
-      const reqBody = describeBody(init && init.body);
+      const reqBody = SENSITIVE.test(url) ? null : describeBody(init && init.body);
       const p = origFetch.apply(this, arguments);
       p.then((res) => {
         try {
@@ -114,7 +117,7 @@
     if (meta) {
       meta.id = ++seq;
       meta.t = Date.now();
-      meta.reqBody = describeBody(body);
+      meta.reqBody = SENSITIVE.test(meta.url) ? null : describeBody(body);
       this.addEventListener('loadend', () => {
         try {
           const ct = this.getResponseHeader('content-type') || '';

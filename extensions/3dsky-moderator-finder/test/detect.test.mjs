@@ -50,4 +50,7 @@ assert.ok(D.scanText(big).length <= 200);
 // 9. headers
 r = D.scanHeaders({ 'x-moderator-id': '9', 'content-type': 'application/json' });
 assert.equal(r.length, 1); assert.equal(r[0].strength, 3);
+// 10. "preview" must not be mistaken for "review"
+assert.equal(D.scanText('{"announce_video_preview":null,"preview_url":"x"}').length, 0);
+assert.equal(D.scanText('{"reviewer":{"id":1}}').length, 1);
 console.log('detect.js: all unit checks passed');

@@ -43,6 +43,7 @@ const srv = http.createServer((req, res) => {
   if (u === '/app.js') { res.setHeader('content-type', 'text/javascript'); return res.end(APP); }
   if (u === '/api/upload') { res.setHeader('content-type', 'application/json'); return res.end('{"id":5,"status":"queued"}'); }
   if (u.startsWith('/api/model/')) { res.setHeader('content-type', 'application/json'); res.setHeader('x-assigned-moderator', 'hdr-Boris'); return res.end('{"model":{"id":5,"moderator":{"id":7,"nickname":"Ivan"},"moderation_status":"pending"}}'); }
+  if (u === '/api/user/finance') { res.setHeader('content-type', 'application/json'); return res.end('{"balance":123,"moderator":"SECRET-FIN"}'); }
   if (u === '/events') { res.writeHead(200, { 'content-type': 'text/event-stream' }); res.write('data: {"moderatorName":"SseKate"}\n\n'); return; }
   res.statusCode = 404; res.end();
 });
@@ -90,8 +91,13 @@ console.log('LOG EXPANDED SHOWS BODY:', /"nickname":"Ivan"/.test(txt));
 await page.screenshot({ path: path.join(WORK, 'shot-log.png') });
 
 // export
+await R(async () => { await fetch('/api/user/finance', { method: 'POST', body: 'card=4111' }); });
+await page.waitForTimeout(500);
 const [dl] = await Promise.all([page.waitForEvent('download'), R(() => document.getElementById('__3dsky_modfinder_host').shadowRoot.querySelector('[data-act=export]').click())]);
 const p = await dl.path(); const exp = JSON.parse(fs.readFileSync(p, 'utf8'));
+const raw0 = fs.readFileSync(p, 'utf8');
+const fin = exp.entries.find((e) => e.url.includes('/api/user/finance'));
+console.log('SENSITIVE REDACTED:', !!fin && fin.redacted === true && !fin.resBody && !fin.reqBody && !/SECRET-FIN|4111/.test(raw0) && !exp.findings.some((f) => /SECRET-FIN/.test(f.text || '')));
 console.log('EXPORT: findings', exp.findings.length, 'entries', exp.entries.length, 'aliases', JSON.stringify(exp.aliases), 'has request headers/cookies:', /cookie|authorization/i.test(fs.readFileSync(p, 'utf8')));
 
 // persistence across a full reload

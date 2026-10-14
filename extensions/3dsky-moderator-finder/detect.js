@@ -13,7 +13,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   const RE_WHO = /moderator|модератор/i;
   const RE_MOD = /moder|модер/i;
-  const RE_WEAK = /review|curat|inspect|assign|approv|verif|examin|expert|supervis|куратор|проверя|проверк|ревью/i;
+  const RE_WEAK = /(?<!p)review|curat|inspect|assign|approv|verif|examin|expert|supervis|куратор|проверя|проверк|ревью/i;
   const RE_WHO_TEXT = /(?:moderator|модератор\S*)\s*[:：\-–—]\s*\S+|(?:checked|reviewed|assigned|handled|moderated)\s+by\s+\S+|на проверке у\s+\S+/i;
   const RE_CONTEXT = /.{0,60}(?:moderator|модератор).{0,80}/gi;
 

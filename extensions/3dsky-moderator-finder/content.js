@@ -13,7 +13,7 @@
     findings: new Map(), // key -> finding
     entries: [], // network log
     aliases: {}, // moderator id/name -> nickname chosen by the user
-    prefs: { captureAll: false, showWeak: false },
+    prefs: { captureAll: true, showWeak: false, v: 2 },
     open: false,
     tab: 'findings',
     filter: '',
@@ -52,7 +52,7 @@
             prefs: S.prefs,
             findings: [...S.findings.values()].slice(-300),
             entries: S.entries.slice(-150).map((e) => ({
-              ...e, resBody: e.matched && e.resBody ? e.resBody.slice(0, 20000) : null,
+              ...e, resBody: e.resBody ? e.resBody.slice(0, e.matched ? 20000 : 6000) : null, reqBody: e.reqBody ? String(e.reqBody).slice(0, 4000) : null,
             })),
           },
         });
@@ -64,7 +64,7 @@
       chrome.storage.local.get('mf', ({ mf }) => {
         if (!mf) return;
         Object.assign(S.aliases, mf.aliases || {});
-        Object.assign(S.prefs, mf.prefs || {});
+        if (mf.prefs && mf.prefs.v === 2) Object.assign(S.prefs, mf.prefs); // older saved prefs had capture off
         for (const f of mf.findings || []) if (!S.findings.has(f.key)) S.findings.set(f.key, f);
         S.entries = [...(mf.entries || []), ...S.entries].slice(-MAX_ENTRIES);
         syncHook();
@@ -337,7 +337,7 @@
       .filter((e) => !q || `${e.method} ${e.url} ${e.status}`.toLowerCase().includes(q))
       .slice(0, 150);
     return `<input type="text" id="filter" placeholder="فیلتر آدرس / متد…" value="${esc(S.filter)}">
-      <div class="muted" style="margin:6px 0">${S.entries.length} درخواست ثبت شده. ردیف‌های سبز یعنی بدنه‌شان چیزی شبیه مدیتور داشت.</div>
+      <div class="muted" style="margin:6px 0">${S.entries.length} درخواست ثبت شده. ردیف‌های دارای برچسب match بدنه‌شان چیزی شبیه مدیتور داشت. آدرس‌های مالی/لاگین/سبد خرید هرگز ثبت نمی‌شوند.</div>
       ${rows.map((e) => `<div class="item log" data-act="expand" data-id="${e.id}-${e.t}">
         <span class="m">${esc(e.kind)} ${esc(e.method || '')}</span><span class="${e.status >= 400 || !e.status ? 's400' : 's200'}">${e.status || 'ERR'}</span>
         ${e.matched ? '<span class="tag t3">match</span>' : ''}
