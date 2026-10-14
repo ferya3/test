@@ -8,7 +8,7 @@ indicator("MTF Trendlines + FVG/IFVG + OB", shorttitle="MTF TL·FVG·OB", overla
 // ════════════════════════════════════════════════════════════════
 
 // ───────────────────────── Inputs: Panel / Quick toggles ─────────────────────────
-grpPN = "1) Panel & Quick toggles"
+grpPN = "★ Control panel (all on/off switches)"
 showTL    = input.bool(true, "Trendlines", group=grpPN)
 showFVG   = input.bool(true, "FVG", group=grpPN)
 showIFVG  = input.bool(true, "IFVG (inverse FVG)", group=grpPN)
@@ -24,20 +24,20 @@ showTLLabel = input.bool(true, "Show timeframe label", group=grpTL)
 tlWidth     = input.int(1, "Line width", minval=1, maxval=4, group=grpTL)
 tlStyleStr  = input.string("Solid", "Line style", options=["Solid", "Dashed", "Dotted"], group=grpTL)
 
-on1  = input.bool(true, "1m",  inline="t1", group=grpTL)
-c1   = input.color(#9E9E9E, "", inline="t1", group=grpTL)
-on5  = input.bool(true, "5m",  inline="t1", group=grpTL)
-c5   = input.color(#2196F3, "", inline="t1", group=grpTL)
-on10 = input.bool(true, "10m", inline="t2", group=grpTL)
-c10  = input.color(#00BCD4, "", inline="t2", group=grpTL)
-on15 = input.bool(true, "15m", inline="t2", group=grpTL)
-c15  = input.color(#4CAF50, "", inline="t2", group=grpTL)
-on30 = input.bool(true, "30m", inline="t3", group=grpTL)
-c30  = input.color(#FFC107, "", inline="t3", group=grpTL)
-on60 = input.bool(true, "1H",  inline="t3", group=grpTL)
-c60  = input.color(#FF9800, "", inline="t3", group=grpTL)
-on240 = input.bool(true, "4H", inline="t4", group=grpTL)
-c240  = input.color(#F44336, "", inline="t4", group=grpTL)
+on1  = input.bool(true, "1m",  inline="t1", group=grpPN)
+c1   = input.color(#9E9E9E, "", inline="t1", group=grpPN)
+on5  = input.bool(true, "5m",  inline="t1", group=grpPN)
+c5   = input.color(#2196F3, "", inline="t1", group=grpPN)
+on10 = input.bool(true, "10m", inline="t2", group=grpPN)
+c10  = input.color(#00BCD4, "", inline="t2", group=grpPN)
+on15 = input.bool(true, "15m", inline="t2", group=grpPN)
+c15  = input.color(#4CAF50, "", inline="t2", group=grpPN)
+on30 = input.bool(true, "30m", inline="t3", group=grpPN)
+c30  = input.color(#FFC107, "", inline="t3", group=grpPN)
+on60 = input.bool(true, "1H",  inline="t3", group=grpPN)
+c60  = input.color(#FF9800, "", inline="t3", group=grpPN)
+on240 = input.bool(true, "4H", inline="t4", group=grpPN)
+c240  = input.color(#F44336, "", inline="t4", group=grpPN)
 
 // ───────────────────────── Inputs: FVG / IFVG ─────────────────────────
 grpFVG = "FVG / IFVG (chart timeframe)"
@@ -322,8 +322,8 @@ alertcondition(newBullOB,   "Bullish OB formed",   "Bullish Order Block formed")
 alertcondition(newBearOB,   "Bearish OB formed",   "Bearish Order Block formed")
 
 // ═══════════════════════════ Status panel ═══════════════════════════
-// (Pine cannot draw clickable buttons; toggle items in the settings dialog,
-//  the panel shows what is currently ON / OFF and how many zones are active.)
+// (Pine cannot draw clickable buttons. All switches live together in the first
+//  group of the settings dialog; this panel mirrors their state on the chart.)
 
 f_cnt(int[] arr, int a, int b) =>
     int n = 0
@@ -335,23 +335,23 @@ f_cnt(int[] arr, int a, int b) =>
 
 panelPosition = panelPos == "Top left" ? position.top_left : panelPos == "Bottom left" ? position.bottom_left : panelPos == "Bottom right" ? position.bottom_right : position.top_right
 
-var table pn = table.new(panelPosition, 3, 11, bgcolor=color.new(#131722, 10), border_width=1, border_color=color.new(color.gray, 70))
+var table pn = table.new(panelPosition, 3, 12, bgcolor=color.new(#131722, 10), border_width=1, border_color=color.new(color.gray, 70))
 
 f_tfRow(int row, string name, bool on, string tf, color col) =>
-    string st = not showTL or not on ? "OFF" : f_ok(tf) ? "ON" : "N/A"
-    color stCol = st == "ON" ? color.lime : st == "N/A" ? color.orange : color.gray
+    string st = not showTL or not on ? "☐ OFF" : f_ok(tf) ? "☑ ON" : "⚠ N/A"
+    color stCol = st == "☑ ON" ? color.lime : st == "⚠ N/A" ? color.orange : color.gray
     table.cell(pn, 0, row, "TL " + name, text_color=col, text_size=size.small, text_halign=text.align_left)
     table.cell(pn, 1, row, st, text_color=stCol, text_size=size.small)
-    table.cell(pn, 2, row, st == "N/A" ? "< chart TF" : "", text_color=color.gray, text_size=size.tiny)
+    table.cell(pn, 2, row, st == "⚠ N/A" ? "< chart TF" : "", text_color=color.gray, text_size=size.tiny)
 
 f_zoneRow(int row, string name, bool on, int n) =>
     table.cell(pn, 0, row, name, text_color=color.white, text_size=size.small, text_halign=text.align_left)
-    table.cell(pn, 1, row, on ? "ON" : "OFF", text_color=on ? color.lime : color.gray, text_size=size.small)
+    table.cell(pn, 1, row, on ? "☑ ON" : "☐ OFF", text_color=on ? color.lime : color.gray, text_size=size.small)
     table.cell(pn, 2, row, on ? str.tostring(n) + " active" : "", text_color=color.gray, text_size=size.tiny)
 
 if barstate.islast
     if showPanel
-        table.cell(pn, 0, 0, "MTF TL · FVG · OB", text_color=color.white, text_size=size.small, text_halign=text.align_left)
+        table.cell(pn, 0, 0, "CONTROL PANEL", text_color=color.white, text_size=size.small, text_halign=text.align_left)
         table.cell(pn, 1, 0, "", text_size=size.tiny)
         table.cell(pn, 2, 0, "", text_size=size.tiny)
         f_tfRow(1, "1m",  on1,   "1",   c1)
@@ -364,5 +364,8 @@ if barstate.islast
         f_zoneRow(8,  "FVG",  showFVG,  f_cnt(fzDir, 1, -1))
         f_zoneRow(9,  "IFVG", showIFVG, f_cnt(fzDir, 2, -2))
         f_zoneRow(10, "OB",   showOB,   array.size(obDir))
+        table.cell(pn, 0, 11, "⚙ Settings > Control panel to toggle", text_color=color.gray, text_size=size.tiny, text_halign=text.align_left)
+        table.cell(pn, 1, 11, "", text_size=size.tiny)
+        table.cell(pn, 2, 11, "", text_size=size.tiny)
     else
-        table.clear(pn, 0, 0, 2, 10)
+        table.clear(pn, 0, 0, 2, 11)
