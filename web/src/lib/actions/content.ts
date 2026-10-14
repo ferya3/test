@@ -5,6 +5,7 @@ import { db, transaction } from '@/lib/db';
 import { requireAdmin } from '@/lib/session';
 import { SETTING_DEFAULTS, type SettingKey } from '@/lib/queries';
 import { bool, int, str } from '@/lib/validate';
+import { deleteImage, replaceImage } from '@/lib/images';
 import type { ActionState } from './types';
 
 export async function saveCategory(id: number, _prev: ActionState, form: FormData): Promise<ActionState> {
@@ -63,4 +64,25 @@ export async function deleteLead(id: number): Promise<void> {
   await requireAdmin();
   db.prepare('DELETE FROM leads WHERE id = ?').run(id);
   revalidatePath('/admin', 'layout');
+}
+
+/** One production step's text and photo. */
+export async function saveProcessStep(id: number, _prev: ActionState, form: FormData): Promise<ActionState> {
+  await requireAdmin();
+
+  const step = db.prepare('SELECT image FROM process_steps WHERE id = ?').get(id) as { image: string | null } | undefined;
+  if (!step) return { ok: false, message: 'این مرحله وجود ندارد.' };
+
+  const title = str(form, 'title', 80);
+  const body = str(form, 'body', 400);
+  if (title.length < 2) return { ok: false, errors: { title: 'عنوان را وارد کنید.' } };
+
+  const image = await replaceImage(form, step.image);
+  if (typeof image === 'object' && image) return image;
+
+  db.prepare('UPDATE process_steps SET title = ?, body = ?, image = ? WHERE id = ?').run(title, body, image, id);
+  if (step.image && step.image !== image) await deleteImage(step.image);
+
+  revalidatePath('/', 'layout');
+  return { ok: true, message: 'ذخیره شد.' };
 }

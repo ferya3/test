@@ -23,6 +23,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'monthly' as const,
       priority: 0.7,
     })),
+    { url: `${base}/projects`, changeFrequency: 'monthly', priority: 0.8 },
     { url: `${base}/about`, changeFrequency: 'yearly', priority: 0.5 },
     { url: `${base}/contact`, changeFrequency: 'yearly', priority: 0.5 },
   ];

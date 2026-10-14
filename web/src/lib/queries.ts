@@ -192,6 +192,52 @@ export function countProducts(): number {
 }
 
 /* --------------------------------------------------------------------------
+   Production steps and projects
+   -------------------------------------------------------------------------- */
+
+export type ProcessStep = { id: number; position: number; title: string; body: string; image: string | null };
+
+/*
+ * node:sqlite returns rows with a null prototype, which React refuses to pass
+ * from a server component to a client one. Lists that go to the client are
+ * copied into ordinary objects.
+ */
+const plain = <T,>(rows: unknown[]) => rows.map((row) => ({ ...(row as object) })) as T[];
+
+export function getProcessSteps(): ProcessStep[] {
+  return plain<ProcessStep>(db.prepare('SELECT * FROM process_steps ORDER BY position, id').all());
+}
+
+export type Project = {
+  id: number;
+  title: string;
+  location: string;
+  year: string;
+  description: string;
+  category_id: number | null;
+  color_hex: string;
+  image: string | null;
+  position: number;
+  is_active: number;
+  category_slug: string | null;
+  category_name: string | null;
+};
+
+/** Active projects, optionally only one product group's, in editor order. */
+export function getProjects({ limit = 100, categorySlug }: { limit?: number; categorySlug?: string } = {}): Project[] {
+  return plain<Project>(
+    db
+      .prepare(
+        `SELECT p.*, c.slug AS category_slug, c.name AS category_name
+           FROM projects p LEFT JOIN categories c ON c.id = p.category_id
+          WHERE p.is_active = 1 AND (? IS NULL OR c.slug = ?)
+          ORDER BY p.position, p.id LIMIT ?`,
+      )
+      .all(categorySlug ?? null, categorySlug ?? null, limit),
+  );
+}
+
+/* --------------------------------------------------------------------------
    Settings
    -------------------------------------------------------------------------- */
 

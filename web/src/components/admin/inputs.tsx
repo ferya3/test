@@ -27,7 +27,7 @@ export function ColorInput({ name, defaultValue }: { name: string; defaultValue:
  * The product photograph. The `accept` list is a convenience for the file
  * picker only — the server decodes every upload and is what actually decides.
  */
-export function ImageInput({ name, current }: { name: string; current: string | null }) {
+export function ImageInput({ name, id = name, current }: { name: string; id?: string; current: string | null }) {
   const [preview, setPreview] = useState<string | null>(current ? mediaUrl(current) : null);
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
 
@@ -45,7 +45,7 @@ export function ImageInput({ name, current }: { name: string; current: string | 
       </div>
       <div className="flex flex-col gap-2 text-sm">
         <input
-          id={name}
+          id={id}
           name={name}
           type="file"
           accept="image/jpeg,image/png,image/webp,image/avif"

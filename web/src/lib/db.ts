@@ -112,6 +112,74 @@ const MIGRATIONS: string[] = [
     -- open nothing except the code form.
     ALTER TABLE sessions ADD COLUMN stage TEXT NOT NULL DEFAULT 'full';
   `,
+
+  /* 3 — production steps and completed projects, both with photos */ `
+    -- The five steps of the production strip on the home and about pages.
+    -- A fixed set: the admin edits their text and photo, not their number.
+    CREATE TABLE process_steps (
+      id       INTEGER PRIMARY KEY,
+      position INTEGER NOT NULL,
+      title    TEXT    NOT NULL,
+      body     TEXT    NOT NULL DEFAULT '',
+      image    TEXT
+    );
+
+    -- Seeded here rather than in the seed script, so a server that only runs
+    -- update.sh gets them too.
+    INSERT INTO process_steps (position, title, body) VALUES
+      (1, 'آغشته‌سازی کاغذ', 'کاغذ کرافت در رزین فنولیک و کاغذ دکور در رزین ملامین غوطه‌ور و خشک می‌شود.'),
+      (2, 'چیدمان لایه‌ها', 'لایه‌ها به تعداد لازم برای هر ضخامت روی هم چیده می‌شوند؛ دکور و لایهٔ محافظ در رو.'),
+      (3, 'پرس فشار بالا', 'زیر فشار بیش از ۷۰ بار و دمای حدود ۱۴۰ درجه، لایه‌ها به یک ورق یکپارچه تبدیل می‌شوند.'),
+      (4, 'برش و کالیبره', 'ورق به ابعاد استاندارد برش می‌خورد و پشت آن برای چسبندگی یکنواخت سنباده می‌شود.'),
+      (5, 'کنترل کیفیت', 'ثبات رنگ، مقاومت سایشی و ضخامت هر بچ در آزمایشگاه کارخانه اندازه‌گیری می‌شود.');
+
+    CREATE TABLE projects (
+      id          INTEGER PRIMARY KEY,
+      title       TEXT    NOT NULL,
+      location    TEXT    NOT NULL DEFAULT '',
+      year        TEXT    NOT NULL DEFAULT '',
+      description TEXT    NOT NULL DEFAULT '',
+      category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+      -- Colour of the material used: drawn into the illustration shown until
+      -- a photograph is uploaded.
+      color_hex   TEXT    NOT NULL DEFAULT '#c49a6c',
+      image       TEXT,
+      position    INTEGER NOT NULL DEFAULT 0,
+      is_active   INTEGER NOT NULL DEFAULT 1,
+      created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX projects_listing ON projects (is_active, position);
+
+    -- The two product groups, in case this runs on a fresh database before
+    -- the seed script has created them (the seed then fills in the rest).
+    INSERT OR IGNORE INTO categories (slug, name, position) VALUES
+      ('hpl-cabinet-panel', 'صفحه کابینت اچ‌پی‌ال', 0),
+      ('hpl-compact', 'کامپکت اچ‌پی‌ال', 1);
+
+    -- Starter entries describing typical uses of each product, so the section
+    -- is not empty on day one. Once, here in the migration: an editor who
+    -- deletes them does not get them back. They carry no photo, client or
+    -- place; the admin replaces them with real projects.
+    INSERT INTO projects (title, description, category_id, color_hex, position) VALUES
+      ('آشپزخانهٔ مسکونی با طرح بلوط',
+       'بدنه و درب کابینت‌ها با صفحه کابینت اچ‌پی‌ال طرح بلوط طبیعی و سطح طرح‌دار.',
+       (SELECT id FROM categories WHERE slug = 'hpl-cabinet-panel'), '#c49a6c', 1),
+      ('سرویس بهداشتی مجتمع اداری',
+       'پارتیشن‌بندی کابین‌ها با کامپکت اچ‌پی‌ال ۱۲ میلی‌متری؛ بدون قاب و مقاوم در برابر شست‌وشوی روزانه.',
+       (SELECT id FROM categories WHERE slug = 'hpl-compact'), '#2f4438', 2),
+      ('آشپزخانهٔ مدرن تک‌رنگ',
+       'درب‌های های‌گلاس گرافیتی با بدنهٔ سفید؛ سطحی که اثر انگشت و لک را راحت پس می‌دهد.',
+       (SELECT id FROM categories WHERE slug = 'hpl-cabinet-panel'), '#3a3d40', 3),
+      ('رختکن و کمدهای باشگاه ورزشی',
+       'کمدها و پارتیشن‌های رختکن از کامپکت اچ‌پی‌ال، در محیطی با رطوبت و رفت‌وآمد زیاد.',
+       (SELECT id FROM categories WHERE slug = 'hpl-compact'), '#a5a29c', 4),
+      ('کمد دیواری و اتاق خواب',
+       'کمد دیواری تمام‌قد با صفحه کابینت سوپرمات سفید و دستگیره‌های مخفی.',
+       (SELECT id FROM categories WHERE slug = 'hpl-cabinet-panel'), '#ecebe6', 5),
+      ('سرویس بهداشتی مدرسه',
+       'کابین‌های کامپکت با رنگ روشن و یراق استیل؛ مقاوم در برابر ضربه و خط‌وخش.',
+       (SELECT id FROM categories WHERE slug = 'hpl-compact'), '#d8cfc2', 6);
+  `,
 ];
 
 function migrate(db: DatabaseSync): void {

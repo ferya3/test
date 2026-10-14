@@ -5,7 +5,7 @@ import { Process } from '@/components/home/process';
 import { Cta } from '@/components/home/cta';
 import { Reveal } from '@/components/motion/reveal';
 import { SectionHeading } from '@/components/site/section-heading';
-import { countProducts, getCategories, getSettings } from '@/lib/queries';
+import { countProducts, getProcessSteps, getCategories, getSettings } from '@/lib/queries';
 import { persianYear } from '@/lib/catalog';
 
 export function generateMetadata(): Metadata {
@@ -73,7 +73,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <Process />
+      <Process steps={getProcessSteps()} />
       <div className="pt-20 sm:pt-28">
         <Cta phone={s.contact_phone} />
       </div>

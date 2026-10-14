@@ -63,3 +63,28 @@ export async function deleteImage(name: string | null): Promise<void> {
 
   await unlink(path.join(UPLOAD_DIR, name)).catch(() => {});
 }
+
+/**
+ * The image a form leaves a record with: a newly uploaded one, none if
+ * "remove" was ticked, or the current one. Returns an error state instead
+ * when the upload is not an acceptable image. The caller deletes the old file
+ * once the record is saved, so a failed save never loses the current photo.
+ */
+export async function replaceImage(
+  form: FormData,
+  current: string | null,
+  field = 'image',
+): Promise<string | null | { ok: false; errors: Record<string, string> }> {
+  const value = form.get(field);
+
+  if (value instanceof File && value.size > 0) {
+    try {
+      return await storeImage(value);
+    } catch (error) {
+      if (error instanceof UploadError) return { ok: false, errors: { [field]: error.message } };
+      throw error;
+    }
+  }
+
+  return form.get('remove_image') === 'on' ? null : current;
+}
