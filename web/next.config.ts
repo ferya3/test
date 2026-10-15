@@ -60,6 +60,24 @@ const config: NextConfig = {
     },
   },
 
+  /**
+   * Persian pages have no language prefix in their address; internally they
+   * are the `fa` value of the `[lang]` segment. Everything that is not
+   * English, the admin, an upload or one of Next's own files goes there.
+   * See src/middleware.ts for why this is not done in middleware.
+   */
+  async rewrites() {
+    return {
+      beforeFiles: [
+        { source: '/', destination: '/fa' },
+        {
+          source: '/:path((?!en(?:/|$)|fa(?:/|$)|admin(?:/|$)|media/|_next/|icon\\.svg$|robots\\.txt$|sitemap\\.xml$|favicon\\.ico$).+)',
+          destination: '/fa/:path',
+        },
+      ],
+    };
+  },
+
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },

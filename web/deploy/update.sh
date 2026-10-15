@@ -43,5 +43,7 @@ for i in $(seq 1 30); do
   [[ $code == 200 ]] && { echo "site is up ($after)"; exit 0; }
   sleep 1
 done
+echo "site did not answer 200 through nginx (last answer: ${code:-none})"
+curl -s -o /dev/null -w '  GET / -> %{http_code} %{redirect_url}\n' -H "Host: localhost" http://127.0.0.1/ || true
 journalctl -u artavil-web -n 30 --no-pager
 exit 1

@@ -1,37 +1,40 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 /**
- * Language routing.
+ * Language routing, part one (part two is the rewrite in next.config.ts).
  *
  * English pages live under `/en` and match the `[lang]` segment directly.
- * Persian pages have no prefix in their public address, so they are
- * rewritten internally to `/fa/…`. Anyone who types `/fa/…` is redirected to
- * the unprefixed address, so each page has exactly one URL per language.
+ * Persian pages have no prefix in their public address; next.config.ts
+ * rewrites them internally to `/fa/…`. Anyone who types `/fa/…` is
+ * redirected here to the unprefixed address, so each page has exactly one
+ * URL per language.
  *
  * The language also travels to the root layout in a request header, which is
  * how `<html lang dir>` is set without the root layout knowing the route.
+ *
+ * The Persian rewrite deliberately does not happen here. Behind nginx the
+ * request's Host (the site's address) differs from the address Next.js
+ * listens on, and Next treats a middleware rewrite to its own address as an
+ * external URL: it fetched `/fa/…` over HTTP, which met the redirect below,
+ * and every Persian page answered 308. Config rewrites are always internal.
  */
 export function middleware(request: NextRequest) {
-  const { pathname, search } = request.nextUrl;
+  const { pathname } = request.nextUrl;
 
   if (pathname === '/fa' || pathname.startsWith('/fa/')) {
-    const url = request.nextUrl.clone();
-    url.pathname = pathname.slice(3) || '/';
-    return NextResponse.redirect(url, 308);
+    // Built from the address the visitor used — the Host and protocol nginx
+    // passes on. request.nextUrl carries the address Next.js listens on
+    // (localhost:3000), which a browser outside the server cannot reach.
+    const host = request.headers.get('host') ?? request.nextUrl.host;
+    const proto = request.headers.get('x-forwarded-proto') ?? request.nextUrl.protocol.replace(':', '');
+    const target = `${proto}://${host}${pathname.slice(3) || '/'}${request.nextUrl.search}`;
+    return NextResponse.redirect(target, 308);
   }
 
-  const english = pathname === '/en' || pathname.startsWith('/en/');
   const headers = new Headers(request.headers);
-  headers.set('x-locale', english ? 'en' : 'fa');
+  headers.set('x-locale', pathname === '/en' || pathname.startsWith('/en/') ? 'en' : 'fa');
 
-  if (english) {
-    return NextResponse.next({ request: { headers } });
-  }
-
-  const url = request.nextUrl.clone();
-  url.pathname = `/fa${pathname === '/' ? '' : pathname}`;
-  url.search = search;
-  return NextResponse.rewrite(url, { request: { headers } });
+  return NextResponse.next({ request: { headers } });
 }
 
 export const config = {
