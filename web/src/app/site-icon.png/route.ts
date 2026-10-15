@@ -22,9 +22,9 @@ export async function GET(request: Request) {
   try {
     source = MEDIA_NAME.test(uploaded)
       ? await readFile(path.join(UPLOAD_DIR, uploaded))
-      : await readFile(path.join(process.cwd(), 'public', 'brand', 'icon.png'));
+      : await readFile(path.join(process.cwd(), 'public', 'icon.svg'));
   } catch {
-    source = await readFile(path.join(process.cwd(), 'public', 'brand', 'icon.png'));
+    source = await readFile(path.join(process.cwd(), 'public', 'icon.svg'));
   }
 
   const png = await sharp(source, { density: 384 })

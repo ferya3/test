@@ -27,8 +27,9 @@ export default async function PanelLayout({ children }: { children: React.ReactN
       <aside className="sticky top-0 z-30 bg-ink-950 px-4 pt-4 pb-3 text-paper lg:h-dvh lg:p-5">
         <div className="mb-4 flex items-center justify-between lg:mb-8">
           <Link href="/admin" className="flex items-center gap-2.5">
-            {/* eslint-disable-next-line @next/next/no-img-element -- a small fixed PNG */}
-            <img src="/brand/mark-light.png" alt="" width={54} height={36} className="h-9 w-auto" />
+            <span className="grid size-9 place-items-center rounded-lg bg-gradient-to-br from-gold-300 to-gold-500 font-black text-ink-950">
+              آ
+            </span>
             <span className="font-bold">پنل مدیریت</span>
           </Link>
           <form action={logout} className="lg:hidden">

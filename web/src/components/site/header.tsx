@@ -10,8 +10,8 @@ import { localePath, type Locale } from '@/i18n/config';
 
 /**
  * The brand mark, from the admin (هویت برند): the uploaded logo — on the dark
- * footer its dark-background version if there is one — or, without a logo,
- * the company's mark. The company name beside it unless switched off.
+ * footer its dark-background version if there is one — or, without a logo, a
+ * gold monogram tile. The company name beside it unless switched off.
  */
 export function Brand({ locale, light = false }: { locale: Locale; light?: boolean }) {
   const settings = getSettings(locale);
@@ -25,15 +25,12 @@ export function Brand({ locale, light = false }: { locale: Locale; light?: boole
         // eslint-disable-next-line @next/next/no-img-element -- already a sized WebP from sharp
         <img src={mediaUrl(logo)} alt={showName ? '' : name} className="h-8 w-auto max-w-[6.5rem] shrink-0 object-contain sm:h-9 sm:max-w-[11rem] lg:h-11" />
       ) : (
-        // The company's mark (public/brand), white-roofed on the dark footer.
-        // eslint-disable-next-line @next/next/no-img-element -- a small fixed PNG
-        <img
-          src={light ? '/brand/mark-light.png' : '/brand/mark.png'}
-          alt=""
-          width={60}
-          height={40}
-          className="h-9 w-auto shrink-0 lg:h-10"
-        />
+        <span
+          aria-hidden
+          className="grid size-10 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-gold-300 to-gold-500 text-lg font-black text-ink-950 shadow-[var(--shadow-gold)]"
+        >
+          {Array.from(name.trim())[0]}
+        </span>
       )}
       {showName && (
         // Shrinks before the header does: a wide logo and a long name share a 360px phone.

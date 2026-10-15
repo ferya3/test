@@ -55,7 +55,7 @@ export function Groups({
                     </div>
                   ) : (
                   <div aria-hidden className="relative h-40 overflow-hidden sm:h-72">
-                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgb(227_195_24/0.12),transparent_65%)]" />
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgb(212_168_83/0.28),transparent_65%)]" />
                     <div className="absolute inset-x-0 top-6 mx-auto h-44 w-28 sm:top-12 sm:h-64 sm:w-44">
                       {category.swatches.map((color, j, all) => {
                         const offset = j - (all.length - 1) / 2;

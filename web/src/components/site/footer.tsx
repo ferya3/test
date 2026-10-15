@@ -20,7 +20,7 @@ export function Footer({ locale }: { locale: Locale }) {
       {/* A single soft pool of gold light in the corner — the footer's only ornament. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -top-40 start-1/4 size-[32rem] rounded-full bg-[rgb(58_108_156/0.3)] blur-3xl"
+        className="pointer-events-none absolute -top-40 start-1/4 size-[32rem] rounded-full bg-gold-500/10 blur-3xl"
       />
 
       <div className="relative mx-auto grid max-w-7xl grid-cols-2 gap-x-6 gap-y-8 px-4 py-12 sm:gap-10 sm:px-6 sm:py-16 lg:grid-cols-4 lg:px-8">

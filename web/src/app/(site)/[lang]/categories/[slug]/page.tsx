@@ -93,7 +93,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
       <section
         className={cn(
           'relative overflow-hidden',
-          !photo && 'bg-ink-50 bg-[radial-gradient(ellipse_60%_80%_at_0%_0%,rgb(227_195_24/0.18),transparent_70%)]',
+          !photo && 'bg-ink-50 bg-[radial-gradient(ellipse_60%_80%_at_0%_0%,rgb(230_196_126/0.35),transparent_70%)]',
         )}
       >
         <div className={cn('relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8', photo ? 'pt-5 pb-4 sm:pt-8' : 'pt-5 pb-6 sm:pt-14 sm:pb-8 lg:pt-16')}>

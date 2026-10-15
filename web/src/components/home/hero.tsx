@@ -114,9 +114,9 @@ export function Hero({
 
       {/* Soft pools of light, so the dark band reads as depth rather than a flat fill. */}
       <div aria-hidden className={image ? 'hidden' : 'absolute inset-0 -z-10'}>
-        <div className="absolute -top-1/3 end-[-10%] size-[42rem] rounded-full bg-[rgb(58_108_156/0.4)] blur-[120px]" />
-        <div className="absolute bottom-[-30%] start-[-15%] size-[36rem] rounded-full bg-gold-400/[0.06] blur-[120px]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,transparent_40%,rgb(11_34_56)_100%)]" />
+        <div className="absolute -top-1/3 end-[-10%] size-[42rem] rounded-full bg-gold-500/15 blur-[120px]" />
+        <div className="absolute bottom-[-30%] start-[-15%] size-[36rem] rounded-full bg-gold-300/10 blur-[120px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,transparent_40%,rgb(15_13_11)_100%)]" />
       </div>
 
       <div

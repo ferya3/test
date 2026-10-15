@@ -85,7 +85,7 @@ function Panel({ panel, index, total, still }: { panel: ScenePanel; index: numbe
       {/* The gold edge band. */}
       <mesh position={[0, 0, -0.045]}>
         <boxGeometry args={[1.53, 2.33, 0.012]} />
-        <meshStandardMaterial color="#e3c318" metalness={0.85} roughness={0.25} />
+        <meshStandardMaterial color="#d4a853" metalness={0.85} roughness={0.25} />
       </mesh>
     </group>
   );
@@ -149,7 +149,7 @@ export default function HeroScene({ panels }: { panels: ScenePanel[] }) {
         <ambientLight intensity={0.55} />
         <directionalLight position={[3, 4, 5]} intensity={1.6} castShadow />
         {/* Warm rim light from behind, catching the gold edges. */}
-        <pointLight position={[-3, 1, -2]} intensity={14} color="#efd856" />
+        <pointLight position={[-3, 1, -2]} intensity={14} color="#e6c47e" />
         <pointLight position={[3, -2, 2]} intensity={4} color="#ffffff" />
 
         <Rig still={still}>
