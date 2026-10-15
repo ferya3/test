@@ -20,6 +20,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description: settings.company_tagline,
     applicationName: settings.company_name,
     openGraph: { type: 'website', locale: lang === 'fa' ? 'fa_IR' : 'en_US', siteName: settings.company_name },
+    // Search Console's "HTML tag" verification, pasted into the admin.
+    verification: settings.google_site_verification ? { google: settings.google_site_verification } : undefined,
   };
 }
 

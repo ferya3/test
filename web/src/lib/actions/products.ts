@@ -39,6 +39,11 @@ export async function saveProduct(id: number | null, _prev: ActionState, form: F
     name_en: str(form, 'name_en', 120),
     short_en: str(form, 'short_en', 300),
     description_en: str(form, 'description_en', 5000),
+    // What search results show; left empty, the page works them out.
+    seo_title: str(form, 'seo_title', 120),
+    seo_description: str(form, 'seo_description', 320),
+    seo_title_en: str(form, 'seo_title_en', 120),
+    seo_description_en: str(form, 'seo_description_en', 320),
   };
 
   const errors: Record<string, string> = {};
@@ -93,19 +98,25 @@ export async function saveProduct(id: number | null, _prev: ActionState, form: F
     data.name_en,
     data.short_en,
     data.description_en,
+    data.seo_title,
+    data.seo_description,
+    data.seo_title_en,
+    data.seo_description_en,
   ];
 
   if (id) {
     db.prepare(
       `UPDATE products SET slug=?, code=?, category_id=?, name=?, short=?, description=?, family=?, surface=?,
          thicknesses=?, color_hex=?, image=?, is_featured=?, is_active=?, position=?,
-         name_en=?, short_en=?, description_en=? WHERE id = ?`,
+         name_en=?, short_en=?, description_en=?,
+         seo_title=?, seo_description=?, seo_title_en=?, seo_description_en=? WHERE id = ?`,
     ).run(...values, id);
   } else {
     db.prepare(
       `INSERT INTO products (slug, code, category_id, name, short, description, family, surface,
-         thicknesses, color_hex, image, is_featured, is_active, position, name_en, short_en, description_en)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         thicknesses, color_hex, image, is_featured, is_active, position, name_en, short_en, description_en,
+         seo_title, seo_description, seo_title_en, seo_description_en)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     ).run(...values);
   }
 

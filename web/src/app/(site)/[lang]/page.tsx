@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import { Hero } from '@/components/home/hero';
 import { Intro } from '@/components/home/intro';
 import { Groups } from '@/components/home/groups';
@@ -9,18 +10,30 @@ import { Projects } from '@/components/home/projects';
 import { countProducts, getProcessSteps, getProjects, getCategoriesWithStats, getFeaturedProducts, getSettings } from '@/lib/queries';
 import { persianYear } from '@/lib/catalog';
 import { catalogFor } from '@/lib/attributes';
-import { alternates, jsonLd, siteUrl } from '@/lib/seo';
+import { jsonLd, siteUrl } from '@/lib/seo';
+import { pageMetadata } from '@/lib/metadata';
 import { getDictionary } from '@/i18n/dictionaries';
-import { localePath, type Locale } from '@/i18n/config';
+import { isLocale, localePath, type Locale } from '@/i18n/config';
 
 type Props = { params: Promise<{ lang: Locale }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  return { alternates: alternates((await params).lang, '/') };
+  const { lang } = await params;
+  const s = getSettings(lang);
+  return pageMetadata({
+    lang,
+    path: '/',
+    brand: s.company_name,
+    absoluteTitle: s.seo_home_title || `${s.company_name} | ${s.company_tagline}`,
+    description: s.seo_home_description || s.hero_lead,
+    image: s.hero_image || null,
+  });
 }
 
 export default async function HomePage({ params }: Props) {
   const { lang } = await params;
+  // Anything at the top level that is not a page or a file lands here.
+  if (!isLocale(lang)) notFound();
   const t = getDictionary(lang);
   const settings = getSettings(lang);
   const categories = getCategoriesWithStats(lang);
@@ -35,15 +48,40 @@ export default async function HomePage({ params }: Props) {
     { value: categories.length, label: t.stats.groups },
   ];
 
+  // Who the site belongs to, and the site itself — what search engines use
+  // for the knowledge panel and the site name shown above results.
+  const base = siteUrl();
   const organization = {
     '@context': 'https://schema.org',
-    '@type': 'Organization',
-    name: settings.company_name,
-    description: settings.company_tagline,
-    url: `${siteUrl()}${localePath(lang, '/')}`,
-    telephone: settings.contact_phone,
-    email: settings.contact_email,
-    address: { '@type': 'PostalAddress', streetAddress: settings.contact_address, addressCountry: 'IR' },
+    '@graph': [
+      {
+        '@type': 'Organization',
+        '@id': `${base}/#organization`,
+        name: settings.company_name,
+        alternateName: getSettings(lang === 'fa' ? 'en' : 'fa').company_name,
+        description: settings.company_tagline,
+        url: `${base}${localePath(lang, '/')}`,
+        logo: `${base}/logo.png`,
+        image: `${base}/og-${lang}.png`,
+        telephone: settings.contact_phone,
+        email: settings.contact_email,
+        address: { '@type': 'PostalAddress', streetAddress: settings.contact_address, addressCountry: 'IR' },
+        contactPoint: {
+          '@type': 'ContactPoint',
+          telephone: settings.contact_phone,
+          contactType: 'sales',
+          availableLanguage: ['fa', 'en'],
+        },
+      },
+      {
+        '@type': 'WebSite',
+        '@id': `${base}/#website`,
+        name: settings.company_name,
+        url: `${base}${localePath(lang, '/')}`,
+        inLanguage: lang,
+        publisher: { '@id': `${base}/#organization` },
+      },
+    ],
   };
 
   return (

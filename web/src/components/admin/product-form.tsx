@@ -1,5 +1,7 @@
 import { AdminForm, Field } from './form';
 import { ColorInput, ImageInput } from './inputs';
+import { SeoFields } from './seo-fields';
+import { seoValues } from './seo-values';
 import { Input, Select, Textarea } from '@/components/ui/input';
 import { saveProduct } from '@/lib/actions/products';
 import { faDigits } from '@/lib/catalog';
@@ -116,6 +118,8 @@ export function ProductForm({ product, categories }: { product?: Product; catego
         <Field name="description_en" label="توضیحات کامل — انگلیسی" className="sm:col-span-2">
           <Textarea id="description_en" name="description_en" defaultValue={p?.description_en} dir="ltr" maxLength={5000} className="min-h-40" />
         </Field>
+
+        <SeoFields values={seoValues(p)} titleHint="خالی بماند: «نام محصول — گروه | نام شرکت»." />
       </div>
     </AdminForm>
   );

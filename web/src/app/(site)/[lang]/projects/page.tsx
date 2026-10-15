@@ -1,18 +1,27 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ProjectGallery } from '@/components/projects/gallery';
-import { getCategories, getProjects } from '@/lib/queries';
+import { getCategories, getProjects, getSettings } from '@/lib/queries';
 import { cn } from '@/lib/utils';
-import { alternates } from '@/lib/seo';
+import { pageMetadata } from '@/lib/metadata';
 import { getDictionary } from '@/i18n/dictionaries';
 import { localePath, type Locale } from '@/i18n/config';
 
 type Props = { params: Promise<{ lang: Locale }>; searchParams: Promise<{ group?: string }> };
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { lang } = await params;
   const t = getDictionary(lang).projects;
-  return { title: t.metaTitle, description: t.metaDescription, alternates: alternates(lang, '/projects') };
+  const { group } = await searchParams;
+  return pageMetadata({
+    lang,
+    path: '/projects',
+    brand: getSettings(lang).company_name,
+    title: t.metaTitle,
+    description: t.metaDescription,
+    // One group's projects are a view of this page; index the full one.
+    noindex: group !== undefined,
+  });
 }
 
 export default async function ProjectsPage({ params, searchParams }: Props) {

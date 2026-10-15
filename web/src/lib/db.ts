@@ -245,6 +245,40 @@ const MIGRATIONS: Migration[] = [
     db.exec(`ALTER TABLE categories ADD COLUMN scene TEXT NOT NULL DEFAULT 'kitchen'`);
     db.exec(`UPDATE categories SET scene = 'cubicles' WHERE slug = 'hpl-compact'`);
   },
+
+  /* 6 — search: page titles and descriptions, and Persian letter forms */
+  (db) => {
+    // Optional search-result title and description per product and group,
+    // in both languages. Empty means "work it out from the content".
+    for (const table of ['products', 'categories']) {
+      for (const column of ['seo_title', 'seo_title_en', 'seo_description', 'seo_description_en']) {
+        db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} TEXT NOT NULL DEFAULT ''`);
+      }
+    }
+
+    // Arabic ي ى ك, typed on some keyboards, look like Persian ی ک but are
+    // different letters: a search for «کابینت» does not match «كابينت».
+    // Every Persian text already stored is brought to the Persian forms;
+    // new text is normalised as it is saved (src/lib/validate.ts).
+    const fix = (column: string) => `replace(replace(replace(${column}, 'ي', 'ی'), 'ى', 'ی'), 'ك', 'ک')`;
+    const columns: Record<string, string[]> = {
+      products: ['name', 'short', 'description'],
+      categories: ['name', 'short', 'description'],
+      projects: ['title', 'location', 'description'],
+      process_steps: ['title', 'body'],
+      attributes: ['name'],
+      settings: ['value'],
+      leads: ['name', 'message'],
+    };
+    for (const [table, cols] of Object.entries(columns)) {
+      db.exec(`UPDATE ${table} SET ${cols.map((c) => `${c} = ${fix(c)}`).join(', ')}`);
+    }
+
+    // The English seed text said "a embossed surface".
+    for (const column of ['short_en', 'description_en']) {
+      db.exec(`UPDATE products SET ${column} = replace(${column}, ' a embossed ', ' an embossed ')`);
+    }
+  },
 ];
 
 /**

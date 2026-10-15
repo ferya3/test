@@ -7,7 +7,7 @@ import { Reveal } from '@/components/motion/reveal';
 import { SectionHeading } from '@/components/site/section-heading';
 import { countProducts, getProcessSteps, getCategories, getSettings } from '@/lib/queries';
 import { persianYear } from '@/lib/catalog';
-import { alternates } from '@/lib/seo';
+import { pageMetadata } from '@/lib/metadata';
 import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
 
@@ -16,11 +16,8 @@ type Props = { params: Promise<{ lang: Locale }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { lang } = await params;
   const s = getSettings(lang);
-  return {
-    title: getDictionary(lang).about.metaTitle,
-    description: `${s.company_name} — ${s.company_tagline}`,
-    alternates: alternates(lang, '/about'),
-  };
+  const t = getDictionary(lang).about;
+  return pageMetadata({ lang, path: '/about', brand: s.company_name, title: t.metaTitle, description: t.metaDescription });
 }
 
 // In the order of the dictionary's `about.values`.

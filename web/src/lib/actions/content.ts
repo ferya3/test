@@ -45,17 +45,23 @@ export async function saveCategory(id: number | null, _prev: ActionState, form: 
     bool(form, 'is_active') ? 1 : 0,
     image,
     scene,
+    str(form, 'seo_title', 120),
+    str(form, 'seo_description', 320),
+    str(form, 'seo_title_en', 120),
+    str(form, 'seo_description_en', 320),
   ];
 
   if (id) {
     db.prepare(
       `UPDATE categories SET name=?, short=?, description=?, name_en=?, short_en=?, description_en=?,
-         position=?, is_active=?, image=?, scene=? WHERE id=?`,
+         position=?, is_active=?, image=?, scene=?,
+         seo_title=?, seo_description=?, seo_title_en=?, seo_description_en=? WHERE id=?`,
     ).run(...values, id);
   } else {
     db.prepare(
-      `INSERT INTO categories (name, short, description, name_en, short_en, description_en, position, is_active, image, scene, slug)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO categories (name, short, description, name_en, short_en, description_en, position, is_active, image, scene,
+         seo_title, seo_description, seo_title_en, seo_description_en, slug)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     ).run(...values, slug);
   }
 
@@ -101,6 +107,14 @@ export async function saveSettings(_prev: ActionState, form: FormData): Promise<
     if (key === 'company_name' && value.length < 2) errors[key] = 'نام شرکت را وارد کنید.';
     if (key === 'founded_year' && value && !/^\d{4}$/.test(value)) errors[key] = 'سال چهاررقمی، مثل ۱۳۷۵.';
     if (key === 'contact_email' && value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) errors[key] = 'ایمیل معتبر نیست.';
+    if (key === 'google_site_verification') {
+      // The whole <meta> tag may be pasted; only its content is kept, and only
+      // if it has the shape of a token, since it is written into every page.
+      const token = value.match(/content=["']([^"']+)["']/)?.[1] ?? value;
+      if (token && !/^[\w-]{10,100}$/.test(token)) errors[key] = 'کد معتبر نیست؛ مقدار content تگ را بچسبانید.';
+      values.push([key, token]);
+      continue;
+    }
     values.push([key, value]);
   }
 

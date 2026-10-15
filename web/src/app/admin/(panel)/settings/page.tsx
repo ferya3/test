@@ -34,6 +34,23 @@ const GROUPS: { title: string; items: Item[] }[] = [
       { key: 'contact_address', label: 'نشانی' },
     ],
   },
+  {
+    title: 'سئو — صفحهٔ اصلی در نتایج گوگل',
+    items: [
+      {
+        key: 'seo_home_title',
+        label: 'عنوان صفحهٔ اصلی',
+        hint: 'تا ۶۰ نویسه؛ مهم‌ترین کلمه‌ای که مشتری جستجو می‌کند اول بیاید، نام شرکت آخر.',
+      },
+      { key: 'seo_home_description', label: 'توضیح صفحهٔ اصلی', long: true, hint: '۱۲۰ تا ۱۶۰ نویسه؛ چه می‌سازید و چرا شما.' },
+      {
+        key: 'google_site_verification',
+        label: 'کد تأیید Google Search Console',
+        ltr: true,
+        hint: 'روش «HTML tag»: خود کد یا کل تگ meta را بچسبانید.',
+      },
+    ],
+  },
 ];
 
 export default async function SettingsPage() {

@@ -78,7 +78,8 @@ const fa = {
     of: 'از',
     productsOf: 'محصولات',
     metaTitle: 'نمونه کارها',
-    metaDescription: 'نمونه‌های اجرا شده با صفحه کابینت و کامپکت اچ‌پی‌ال.',
+    metaDescription:
+      'نمونه کارهای اجرا شده با صفحه کابینت و ورق کامپکت اچ‌پی‌ال: آشپزخانه، کمد دیواری، پارتیشن سرویس بهداشتی و رختکن، با عکس و توضیح هر پروژه.',
   },
   cta: {
     titleA: 'پروژهٔ بعدی‌تان را',
@@ -98,6 +99,7 @@ const fa = {
     emptyLead: 'یکی از فیلترها را بردارید یا همه را پاک کنید.',
     breadcrumb: 'مسیر',
     groupSwitch: 'گروه کالا',
+    listHeading: 'فهرست محصولات',
   },
   product: {
     code: 'کد محصول',
@@ -144,6 +146,8 @@ const fa = {
       { title: 'پشتیبانی فنی', body: 'مشاوره در انتخاب ضخامت، سطح و روش نصب برای هر پروژه.' },
     ],
     metaTitle: 'دربارهٔ ما',
+    metaDescription:
+      'تولیدکنندهٔ صفحه کابینت و ورق کامپکت اچ‌پی‌ال؛ از آغشته‌سازی کاغذ تا پرس و برش نهایی زیر یک سقف، با کنترل کیفیت در هر مرحله و ارسال به سراسر کشور.',
   },
   contact: {
     overline: 'تماس با ما',
@@ -156,7 +160,7 @@ const fa = {
     hoursValue: 'شنبه تا پنجشنبه، ۸ تا ۱۷',
     formTitle: 'فرم تماس',
     metaTitle: 'تماس با ما',
-    metaDescription: 'استعلام قیمت، نمونهٔ رنگ و مشاورهٔ فنی صفحه کابینت و کامپکت اچ‌پی‌ال.',
+    metaDescription: 'برای استعلام قیمت، دریافت نمونهٔ رنگ و مشاورهٔ فنی صفحه کابینت و ورق کامپکت اچ‌پی‌ال با ما تماس بگیرید یا پیام بگذارید.',
   },
   notFound: {
     title: 'این صفحه پیدا نشد',
@@ -237,7 +241,8 @@ const en: Dictionary = {
     of: 'of',
     productsOf: 'Products:',
     metaTitle: 'Projects',
-    metaDescription: 'Completed projects built with HPL cabinet panels and compact sheet.',
+    metaDescription:
+      'Completed projects built with our HPL cabinet panels and compact sheet: kitchens, built-in wardrobes, washroom partitions and changing rooms.',
   },
   cta: {
     titleA: 'Build your next project',
@@ -257,6 +262,7 @@ const en: Dictionary = {
     emptyLead: 'Remove a filter, or clear them all.',
     breadcrumb: 'Breadcrumb',
     groupSwitch: 'Product line',
+    listHeading: 'Product list',
   },
   product: {
     code: 'Product code',
@@ -302,6 +308,8 @@ const en: Dictionary = {
       { title: 'Technical support', body: 'Advice on thickness, surface and installation for every project.' },
     ],
     metaTitle: 'About us',
+    metaDescription:
+      'Maker of HPL cabinet panels and HPL compact sheet: from impregnating the paper to pressing and the final cut in one plant, with quality checks at every step.',
   },
   contact: {
     overline: 'Contact us',
@@ -314,7 +322,7 @@ const en: Dictionary = {
     hoursValue: 'Saturday to Thursday, 8:00–17:00',
     formTitle: 'Contact form',
     metaTitle: 'Contact us',
-    metaDescription: 'Prices, colour samples and technical advice on HPL cabinet panels and compact sheet.',
+    metaDescription: 'Contact us for prices, colour samples and technical advice on HPL cabinet panels and compact sheet, by phone or through the form.',
   },
   notFound: {
     title: 'Page not found',

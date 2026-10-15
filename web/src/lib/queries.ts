@@ -26,6 +26,11 @@ export type Category = {
   image: string | null;
   /** The drawing that stands in for a project photo in this group. */
   scene: 'kitchen' | 'cubicles';
+  /** Search-result title and description; empty means worked out from the content. */
+  seo_title: string;
+  seo_description: string;
+  seo_title_en: string;
+  seo_description_en: string;
   position: number;
   is_active: number;
 };
@@ -50,6 +55,10 @@ export type Product = {
   is_active: number;
   position: number;
   created_at: string;
+  seo_title: string;
+  seo_description: string;
+  seo_title_en: string;
+  seo_description_en: string;
 };
 
 export type ProductWithCategory = Product & { category_slug: string; category_name: string };
@@ -73,6 +82,9 @@ function localize<T>(row: unknown, lang: Lang, fields: string[]): T {
     for (const f of fields) {
       const en = out[`${f}_en`];
       if (typeof en === 'string' && en.trim() !== '') out[f] = en;
+      // A Persian search title is no fallback on an English page: empty
+      // instead, so the page works one out from its English content.
+      else if (f.startsWith('seo_')) out[f] = '';
     }
   }
   return out as T;
@@ -81,8 +93,8 @@ function localize<T>(row: unknown, lang: Lang, fields: string[]): T {
 const many = <T,>(rows: unknown[], lang: Lang, fields: string[]) => rows.map((r) => localize<T>(r, lang, fields));
 const one = <T,>(row: unknown, lang: Lang, fields: string[]) => (row ? localize<T>(row, lang, fields) : undefined);
 
-const CATEGORY_TEXT = ['name', 'short', 'description'];
-const PRODUCT_TEXT = ['name', 'short', 'description', 'category_name'];
+const CATEGORY_TEXT = ['name', 'short', 'description', 'seo_title', 'seo_description'];
+const PRODUCT_TEXT = ['name', 'short', 'description', 'category_name', 'seo_title', 'seo_description'];
 
 export function getCategories(lang: Lang = 'fa'): Category[] {
   return many<Category>(db.prepare('SELECT * FROM categories WHERE is_active = 1 ORDER BY position, id').all(), lang, CATEGORY_TEXT);
@@ -314,6 +326,12 @@ export const SETTING_DEFAULTS = {
   contact_phone: '021-12345678',
   contact_email: 'info@artavilgold.ir',
   contact_address: 'تهران، شهرک صنعتی، کیلومتر ۲۵ جاده مخصوص',
+  // The home page in search results: its title and the line under it.
+  seo_home_title: 'صفحه کابینت و کامپکت اچ‌پی‌ال | آرتاویل گلد',
+  seo_home_description:
+    'آرتاویل گلد، تولیدکنندهٔ صفحه کابینت اچ‌پی‌ال و ورق کامپکت در طرح‌های چوبی، سنگی و تک‌رنگ؛ مقاوم در برابر خط و خش، حرارت و رطوبت. استعلام قیمت و نمونهٔ رنگ.',
+  // The code Google Search Console gives for the "HTML tag" verification method.
+  google_site_verification: '',
 } as const;
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
@@ -334,6 +352,8 @@ export const TRANSLATED_SETTINGS = [
   'intro_heading',
   'intro_body',
   'contact_address',
+  'seo_home_title',
+  'seo_home_description',
 ] as const satisfies readonly SettingKey[];
 
 export type TranslatedSettingKey = (typeof TRANSLATED_SETTINGS)[number];
@@ -351,6 +371,9 @@ export const SETTING_DEFAULTS_EN: Record<TranslatedSettingKey, string> = {
   intro_body:
     'We make HPL: layers of kraft paper impregnated with resin, fused under high pressure and heat into one hard, solid surface. That one process is the basis of both our product lines.\n\nA fully automated line, an in-house quality lab and permanent stock let us deliver workshop orders and large projects with the same consistency of colour and thickness.',
   contact_address: 'Km 25, Makhsous Road, Industrial Park, Tehran',
+  seo_home_title: 'HPL Cabinet Panels & Compact Sheet | Artavil Gold',
+  seo_home_description:
+    'Artavil Gold makes HPL cabinet panels and compact sheet in wood, stone and solid-colour designs: scratch, heat and moisture resistant. Ask for prices and samples.',
 };
 
 export function getSettings(lang: Lang = 'fa'): Settings {

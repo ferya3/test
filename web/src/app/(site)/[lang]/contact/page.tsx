@@ -4,7 +4,7 @@ import { LeadForm } from '@/components/catalog/lead-form';
 import { Reveal } from '@/components/motion/reveal';
 import { getSettings } from '@/lib/queries';
 import { cn } from '@/lib/utils';
-import { alternates } from '@/lib/seo';
+import { pageMetadata } from '@/lib/metadata';
 import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
 
@@ -13,7 +13,7 @@ type Props = { params: Promise<{ lang: Locale }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { lang } = await params;
   const t = getDictionary(lang).contact;
-  return { title: t.metaTitle, description: t.metaDescription, alternates: alternates(lang, '/contact') };
+  return pageMetadata({ lang, path: '/contact', brand: getSettings(lang).company_name, title: t.metaTitle, description: t.metaDescription });
 }
 
 export default async function ContactPage({ params }: Props) {

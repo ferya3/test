@@ -1,9 +1,10 @@
 import Link from 'next/link';
-import { Boxes, FolderPlus, ImagePlus, Inbox, PackagePlus, ShieldAlert, Sparkles, Star } from 'lucide-react';
+import { Boxes, FolderPlus, Globe, ImagePlus, Inbox, PackagePlus, ShieldAlert, Sparkles, Star } from 'lucide-react';
 import { PageHeader } from '@/components/admin/page-header';
 import { db } from '@/lib/db';
 import { requireAdmin } from '@/lib/session';
 import { faDigits } from '@/lib/catalog';
+import { siteUrl } from '@/lib/seo';
 
 export default async function Dashboard() {
   const user = await requireAdmin();
@@ -19,9 +20,30 @@ export default async function Dashboard() {
     .prepare('SELECT id, name, phone, kind, created_at, is_read FROM leads ORDER BY id DESC LIMIT 5')
     .all() as { id: number; name: string; phone: string; kind: string; created_at: string; is_read: number }[];
 
+  // Canonical links, the sitemap and share cards are all built from SITE_URL.
+  // An IP address or plain http there is what search engines index.
+  const site = siteUrl();
+  const host = new URL(site).hostname;
+  const siteProblem = !site.startsWith('https://')
+    ? 'با http شروع می‌شود'
+    : /^[\d.]+$|^localhost$/.test(host)
+      ? 'دامنه نیست'
+      : null;
+
   return (
     <>
       <PageHeader title={`سلام، ${user.name}`} description="خلاصهٔ وضعیت سایت" />
+
+      {siteProblem && (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm leading-7 text-amber-900">
+          <Globe className="mt-0.5 size-5 shrink-0" />
+          <span>
+            <b>نشانی سایت برای گوگل درست نیست:</b> <span className="ltr-isolate font-mono">{site}</span> {siteProblem}. لینک‌های اصلی
+            (canonical) و نقشهٔ سایت از همین نشانی ساخته می‌شوند. روی سرور در فایل <span className="ltr-isolate font-mono">/etc/artavil-web.env</span>{' '}
+            مقدار <span className="ltr-isolate font-mono">SITE_URL=https://دامنه</span> را بگذارید و سرویس را دوباره راه‌اندازی کنید.
+          </span>
+        </div>
+      )}
 
       {!user.totp_enabled && (
         <Link

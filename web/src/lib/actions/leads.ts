@@ -1,6 +1,7 @@
 'use server';
 
 import { db } from '@/lib/db';
+import { persianLetters } from '@/lib/validate';
 import { clientIp, isLimited, recordAttempt } from '@/lib/session';
 import { getDictionary } from '@/i18n/dictionaries';
 import { isLocale } from '@/i18n/config';
@@ -20,7 +21,8 @@ const toLatinDigits = (s: string) =>
 
 const text = (form: FormData, key: string) => {
   const value = form.get(key);
-  return typeof value === 'string' ? value.trim() : '';
+  // ي and ك from an Arabic keyboard become ی and ک, so searches find them.
+  return typeof value === 'string' ? persianLetters(value.trim()) : '';
 };
 
 /**

@@ -1,5 +1,7 @@
 import { AdminForm, Field } from './form';
 import { ImageInput } from './inputs';
+import { SeoFields } from './seo-fields';
+import { seoValues } from './seo-values';
 import { Input, Select, Textarea } from '@/components/ui/input';
 import { saveCategory } from '@/lib/actions/content';
 import type { Category } from '@/lib/queries';
@@ -28,7 +30,7 @@ export function CategoryForm({ category, nextPosition = 0 }: { category?: Catego
           <Input id="position" name="position" type="number" min={0} max={999} defaultValue={c?.position ?? nextPosition} dir="ltr" />
         </Field>
 
-        <Field name="image" label="عکس بالای صفحهٔ گروه" className="sm:col-span-2" hint="عکس افقی و پهن؛ متن روی آن با سایهٔ تیره نوشته می‌شود. بدون عکس، سرصفحهٔ ساده نمایش داده می‌شود.">
+        <Field name="image" label="عکس بالای صفحهٔ گروه" className="sm:col-span-2" hint="عکس افقی و پهن، بدون نوشته روی آن؛ عنوان و توضیح زیر عکس می‌آیند. متن جایگزین عکس همان نام گروه است.">
           <ImageInput name="image" current={c?.image ?? null} />
         </Field>
 
@@ -56,6 +58,8 @@ export function CategoryForm({ category, nextPosition = 0 }: { category?: Catego
           <input type="checkbox" name="is_active" defaultChecked={c ? !!c.is_active : true} className="size-4 accent-gold-600" />
           نمایش در سایت
         </label>
+
+        <SeoFields values={seoValues(c)} titleHint="خالی بماند: «نام گروه | نام شرکت». بهتر است کلمه‌ای که مشتری جستجو می‌کند در آن باشد." />
       </div>
     </AdminForm>
   );

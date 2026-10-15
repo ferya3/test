@@ -13,7 +13,8 @@ import { list } from '@/lib/catalog';
 import { catalogFor } from '@/lib/attributes';
 import { getProduct, getRelated, getSettings } from '@/lib/queries';
 import { mediaUrl } from '@/lib/media';
-import { alternates, jsonLd, siteUrl } from '@/lib/seo';
+import { jsonLd, siteUrl } from '@/lib/seo';
+import { breadcrumbLd, pageMetadata } from '@/lib/metadata';
 import { getDictionary } from '@/i18n/dictionaries';
 import { localePath, type Locale } from '@/i18n/config';
 
@@ -24,12 +25,38 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const product = getProduct(slug, lang);
   if (!product) return {};
 
-  return {
-    title: product.name,
-    description: product.short,
-    alternates: alternates(lang, `/products/${product.slug}`),
-    openGraph: product.image ? { images: [mediaUrl(product.image)] } : undefined,
-  };
+  const dict = getDictionary(lang);
+  const catalog = catalogFor(lang);
+  const thicknesses = list(product.thicknesses.split(',').filter(Boolean), lang);
+  const sep = lang === 'fa' ? '،' : ',';
+  // Without a description written for search, the product's own text plus the
+  // facts people search by: code, decor, surface and thickness.
+  const facts = [
+    `${dict.product.code} ${product.code}`,
+    `${dict.product.family} ${catalog.family(product.family)}`,
+    `${dict.product.surface} ${catalog.surface(product.surface)}`,
+    thicknesses && `${dict.product.thicknesses} ${thicknesses} ${dict.catalog.mm}`,
+  ].filter(Boolean).join(`${sep} `);
+  const text = product.description || product.short;
+
+  return pageMetadata({
+    lang,
+    path: `/products/${product.slug}`,
+    brand: getSettings(lang).company_name,
+    title: productTitle(product.name, product.category_name, getSettings(lang).company_name),
+    absoluteTitle: product.seo_title || undefined,
+    description: product.seo_description || (text.length >= 120 ? text : `${text} ${facts}.`.trim()),
+    image: product.image || null,
+  });
+}
+
+/**
+ * "Name — Group | Brand" when that fits in the ~60 characters a result shows,
+ * otherwise just "Name | Brand" (names usually already say what they are).
+ */
+function productTitle(name: string, group: string, brand: string) {
+  const withGroup = `${name} — ${group}`;
+  return `${withGroup} | ${brand}`.length <= 60 && !name.includes(group) ? withGroup : name;
 }
 
 // In the order of the dictionary's `product.features`.
@@ -56,17 +83,13 @@ export default async function ProductPage({ params }: Props) {
     [t.thicknesses, `${list(thicknesses, lang)} ${dict.catalog.mm}`],
   ] as const;
 
-  const schema = {
-    '@context': 'https://schema.org',
-    '@type': 'Product',
-    name: product.name,
-    sku: product.code,
-    description: product.short,
-    category: product.category_name,
-    brand: { '@type': 'Brand', name: settings.company_name },
-    url: `${siteUrl()}${href(`/products/${product.slug}`)}`,
-    ...(product.image ? { image: `${siteUrl()}${mediaUrl(product.image)}` } : {}),
-  };
+  // Breadcrumbs only. Product markup without a price or reviews is flagged
+  // as invalid in Search Console, and prices here are given on request.
+  const schema = breadcrumbLd(siteUrl(), [
+    { name: dict.home, path: href('/') },
+    { name: product.category_name, path: href(`/categories/${product.category_slug}`) },
+    { name: product.name, path: href(`/products/${product.slug}`) },
+  ]);
 
   return (
     <>

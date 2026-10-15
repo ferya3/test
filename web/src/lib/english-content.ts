@@ -58,16 +58,19 @@ export function productEnglish(slug: string): { name: string; short: string; des
   const surface = SURFACE_EN[surfaceKey!];
   if (!decor || !surface) return null;
 
+  // "a matte surface", but "an embossed surface".
+  const a = (word: string) => (/^[aeiou]/i.test(word) ? `an ${word}` : `a ${word}`);
+
   return kind === 'compact'
     ? {
         name: `${decor} ${surface} Compact Sheet`,
         short: `Solid ${surface.toLowerCase()} compact sheet in ${decor}; self-supporting and waterproof.`,
-        description: `HPL compact sheet with a ${decor} decor and a ${surface.toLowerCase()} surface. With no wood core it does not swell in direct contact with water, and installs without a frame or substrate. Edges can be polished after cutting.`,
+        description: `HPL compact sheet with ${a(decor)} decor and ${a(surface.toLowerCase())} surface. With no wood core it does not swell in direct contact with water, and installs without a frame or substrate. Edges can be polished after cutting.`,
       }
     : {
         name: `${decor} ${surface} Cabinet Panel`,
-        short: `${surface} cabinet panel with a ${decor} HPL face on an MDF core.`,
-        description: `Cabinet panel with a ${decor} HPL face and a ${surface.toLowerCase()} surface on an MDF core. Hot pressing with a moisture-resistant adhesive keeps it dimensionally stable and the surface durable.`,
+        short: `${surface} cabinet panel with ${a(decor)} HPL face on an MDF core.`,
+        description: `Cabinet panel with ${a(decor)} HPL face and ${a(surface.toLowerCase())} surface on an MDF core. Hot pressing with a moisture-resistant adhesive keeps it dimensionally stable and the surface durable.`,
       };
 }
 

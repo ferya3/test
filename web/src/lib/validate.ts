@@ -3,9 +3,16 @@
  * the shape expected and bounded in length; nothing from a form is used as
  * received.
  */
+/**
+ * Persian letter forms. Some keyboards type the Arabic ي ى ك, which look
+ * the same as Persian ی ک but are different characters — to search engines
+ * too, so a page written with them does not match a search for «کابینت».
+ */
+export const persianLetters = (s: string) => s.replace(/[يى]/g, 'ی').replace(/ك/g, 'ک');
+
 export function str(form: FormData, key: string, max = 500): string {
   const value = form.get(key);
-  return typeof value === 'string' ? value.trim().slice(0, max) : '';
+  return typeof value === 'string' ? persianLetters(value.trim()).slice(0, max) : '';
 }
 
 export function int(form: FormData, key: string, min: number, max: number, fallback = 0): number {
