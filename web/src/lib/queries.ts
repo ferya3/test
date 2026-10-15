@@ -10,7 +10,6 @@
  * when it has not been filled in yet, so a page is never blank.
  */
 import { db } from './db.ts';
-import { THICKNESSES, familyLabels, num, surfaceLabels, type Family, type Surface, type Thickness } from './catalog.ts';
 
 export type Lang = 'fa' | 'en';
 
@@ -23,6 +22,10 @@ export type Category = {
   name_en: string;
   short_en: string;
   description_en: string;
+  /** Photo behind the heading of the group's page, or null. */
+  image: string | null;
+  /** The drawing that stands in for a project photo in this group. */
+  scene: 'kitchen' | 'cubicles';
   position: number;
   is_active: number;
 };
@@ -38,8 +41,8 @@ export type Product = {
   name_en: string;
   short_en: string;
   description_en: string;
-  family: Family;
-  surface: Surface;
+  family: string;
+  surface: string;
   thicknesses: string;
   color_hex: string;
   image: string | null;
@@ -52,9 +55,9 @@ export type Product = {
 export type ProductWithCategory = Product & { category_slug: string; category_name: string };
 
 export type Filters = {
-  families: Family[];
-  surfaces: Surface[];
-  thicknesses: Thickness[];
+  families: string[];
+  surfaces: string[];
+  thicknesses: string[];
 };
 
 export const NO_FILTERS: Filters = { families: [], surfaces: [], thicknesses: [] };
@@ -262,6 +265,7 @@ export type Project = {
   is_active: number;
   category_slug: string | null;
   category_name: string | null;
+  category_scene: 'kitchen' | 'cubicles' | null;
 };
 
 /** Active projects, optionally only one product group's, in editor order. */
@@ -273,7 +277,8 @@ export function getProjects({
   return many<Project>(
     db
       .prepare(
-        `SELECT p.*, c.slug AS category_slug, c.name AS category_name, c.name_en AS category_name_en
+        `SELECT p.*, c.slug AS category_slug, c.name AS category_name, c.name_en AS category_name_en,
+                c.scene AS category_scene
            FROM projects p LEFT JOIN categories c ON c.id = p.category_id
           WHERE p.is_active = 1 AND (? IS NULL OR c.slug = ?)
           ORDER BY p.position, p.id LIMIT ?`,
@@ -296,6 +301,12 @@ export const SETTING_DEFAULTS = {
   hero_title: 'سطحی که سال‌ها زیبا می‌ماند',
   hero_lead:
     'صفحه کابینت و کامپکت اچ‌پی‌ال با پرس فشار بالا؛ مقاوم در برابر خط و خش، حرارت و رطوبت، در طرح‌های چوبی، سنگی و تک‌رنگ.',
+  hero_cta_label: 'مشاهدهٔ محصولات',
+  // Where the main button goes: a site path; empty means the first product group.
+  hero_cta_href: '',
+  hero_show_phone: '1',
+  // A background photo (stored image name); empty shows the 3D sheets instead.
+  hero_image: '',
   intro_overline: 'دربارهٔ کارخانه',
   intro_heading: 'ورق اچ‌پی‌ال، از پرس تا برش نهایی',
   intro_body:
@@ -318,6 +329,7 @@ export const TRANSLATED_SETTINGS = [
   'hero_overline',
   'hero_title',
   'hero_lead',
+  'hero_cta_label',
   'intro_overline',
   'intro_heading',
   'intro_body',
@@ -333,6 +345,7 @@ export const SETTING_DEFAULTS_EN: Record<TranslatedSettingKey, string> = {
   hero_title: 'Surfaces that stay beautiful for years',
   hero_lead:
     'High-pressure HPL cabinet panels and compact sheet: resistant to scratches, heat and moisture, in wood, stone and solid-colour designs.',
+  hero_cta_label: 'View products',
   intro_overline: 'About the factory',
   intro_heading: 'HPL sheet, from press to final cut',
   intro_body:
@@ -353,14 +366,4 @@ export function getSettings(lang: Lang = 'fa'): Settings {
   }
 
   return settings;
-}
-
-/** The three filter dropdowns, in the order they are offered, labelled for `lang`. */
-export function filterGroups(lang: Lang) {
-  const mm = lang === 'en' ? 'mm' : 'میلی‌متر';
-  return [
-    { key: 'families', param: 'family', options: Object.entries(familyLabels(lang)) },
-    { key: 'surfaces', param: 'surface', options: Object.entries(surfaceLabels(lang)) },
-    { key: 'thicknesses', param: 'thickness', options: THICKNESSES.map((t) => [t, `${num(t, lang)} ${mm}`] as [string, string]) },
-  ] as const;
 }

@@ -2,7 +2,8 @@ import { AdminForm, Field } from './form';
 import { ColorInput, ImageInput } from './inputs';
 import { Input, Select, Textarea } from '@/components/ui/input';
 import { saveProduct } from '@/lib/actions/products';
-import { FAMILIES, SURFACES, THICKNESSES, faDigits } from '@/lib/catalog';
+import { faDigits } from '@/lib/catalog';
+import { getAttributes } from '@/lib/attributes';
 import type { Category, Product } from '@/lib/queries';
 
 export const EN_HINT = 'برای نسخهٔ انگلیسی سایت. اگر خالی بماند، متن فارسی نمایش داده می‌شود.';
@@ -10,6 +11,9 @@ export const EN_HINT = 'برای نسخهٔ انگلیسی سایت. اگر خا
 export function ProductForm({ product, categories }: { product?: Product; categories: Category[] }) {
   const p = product;
   const thicknesses = p?.thicknesses.split(',') ?? [];
+  const families = getAttributes('family');
+  const surfaces = getAttributes('surface');
+  const thicknessOptions = getAttributes('thickness').sort((a, b) => Number(a.value) - Number(b.value));
 
   return (
     <AdminForm action={saveProduct.bind(null, p?.id ?? null)} className="rounded-2xl bg-white p-5 shadow-[var(--shadow-soft)] sm:p-8">
@@ -44,11 +48,11 @@ export function ProductForm({ product, categories }: { product?: Product; catego
           <Input id="position" name="position" type="number" min={0} max={9999} defaultValue={p?.position ?? 0} dir="ltr" />
         </Field>
 
-        <Field name="family" label="طرح">
+        <Field name="family" label="طرح" hint="فهرست طرح‌ها، سطح‌ها و ضخامت‌ها در «طرح، سطح، ضخامت» قابل ویرایش است.">
           <Select id="family" name="family" defaultValue={p?.family}>
-            {Object.entries(FAMILIES).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
+            {families.map((a) => (
+              <option key={a.value} value={a.value}>
+                {a.name}
               </option>
             ))}
           </Select>
@@ -56,9 +60,9 @@ export function ProductForm({ product, categories }: { product?: Product; catego
 
         <Field name="surface" label="سطح">
           <Select id="surface" name="surface" defaultValue={p?.surface}>
-            {Object.entries(SURFACES).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
+            {surfaces.map((a) => (
+              <option key={a.value} value={a.value}>
+                {a.name}
               </option>
             ))}
           </Select>
@@ -66,7 +70,7 @@ export function ProductForm({ product, categories }: { product?: Product; catego
 
         <Field name="thicknesses" label="ضخامت‌ها (میلی‌متر)" className="sm:col-span-2">
           <div className="flex flex-wrap gap-2">
-            {THICKNESSES.map((t) => (
+            {thicknessOptions.map(({ value: t }) => (
               <label
                 key={t}
                 className="flex h-11 cursor-pointer items-center gap-2 rounded-lg border border-ink-200 px-4 text-sm has-checked:border-gold-500 has-checked:bg-gold-50"

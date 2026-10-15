@@ -5,9 +5,11 @@ import { PackageSearch } from 'lucide-react';
 import { FilterBar, type FilterGroup } from '@/components/catalog/filter-bar';
 import { ProductCard } from '@/components/catalog/product-card';
 import { Button } from '@/components/ui/button';
-import { filterGroups, getCategories, getCategory, getFacets, getProducts } from '@/lib/queries';
+import { getCategories, getCategory, getFacets, getProducts } from '@/lib/queries';
+import { catalogFor } from '@/lib/attributes';
 import { parseFilters } from '@/lib/filters';
 import { cn } from '@/lib/utils';
+import { mediaUrl } from '@/lib/media';
 import { alternates } from '@/lib/seo';
 import { getDictionary } from '@/i18n/dictionaries';
 import { localePath, type Locale } from '@/i18n/config';
@@ -36,55 +38,76 @@ export default async function CategoryPage({ params, searchParams }: Props) {
 
   const t = getDictionary(lang).catalog;
   const href = (p: string) => localePath(lang, p);
-  const filters = parseFilters(await searchParams);
+  const catalog = catalogFor(lang);
+  const filters = parseFilters(await searchParams, catalog);
   const products = getProducts(category.id, filters, lang);
   const facets = getFacets(category.id, filters);
   const categories = getCategories(lang);
+  const photo = category.image;
 
-  const groups: FilterGroup[] = filterGroups(lang).map((g) => ({
+  const groups: FilterGroup[] = catalog.filterGroups.map((g) => ({
     param: g.param,
     label: t.filters[g.key],
-    selected: filters[g.key] as string[],
+    selected: filters[g.key],
     options: g.options
       .map(([value, label]) => ({ value, label, count: facets[g.key][value] ?? 0 }))
       // Thicknesses this group is never made in are not options at all.
-      .filter((o) => g.key !== 'thicknesses' || o.count > 0 || (filters.thicknesses as string[]).includes(o.value)),
+      .filter((o) => g.key !== 'thicknesses' || o.count > 0 || filters.thicknesses.includes(o.value)),
   }));
 
   return (
     <>
-      <section className="relative overflow-hidden bg-ink-50 bg-[radial-gradient(ellipse_60%_80%_at_0%_0%,rgb(230_196_126/0.35),transparent_70%)]">
-        <div className="relative mx-auto max-w-7xl px-4 pt-5 pb-6 sm:px-6 sm:pt-14 sm:pb-8 lg:px-8 lg:pt-16">
-          <nav aria-label={t.breadcrumb} className="mb-6 hidden text-sm text-ink-500 sm:block">
-            <Link href={href('/')} className="hover:text-ink-950">
+      {/* The group's header. With a photo (set in the admin) the photo fills
+          it and the text sits on a dark wash; without, the plain light band. */}
+      <section
+        className={cn(
+          'relative isolate overflow-hidden',
+          photo ? 'bg-ink-950 text-paper' : 'bg-ink-50 bg-[radial-gradient(ellipse_60%_80%_at_0%_0%,rgb(230_196_126/0.35),transparent_70%)]',
+        )}
+      >
+        {photo && (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element -- already a sized WebP from sharp */}
+            <img src={mediaUrl(photo)} alt="" fetchPriority="high" className="absolute inset-0 -z-10 size-full object-cover" />
+            <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-t from-ink-950 via-ink-950/75 to-ink-950/35" />
+          </>
+        )}
+
+        <div className={cn('relative mx-auto max-w-7xl px-4 pt-5 pb-6 sm:px-6 sm:pt-14 sm:pb-8 lg:px-8 lg:pt-16', photo && 'pt-10 sm:pt-24 lg:pt-32')}>
+          <nav aria-label={t.breadcrumb} className={cn('mb-6 hidden text-sm sm:block', photo ? 'text-ink-300' : 'text-ink-500')}>
+            <Link href={href('/')} className={photo ? 'hover:text-paper' : 'hover:text-ink-950'}>
               {getDictionary(lang).home}
             </Link>
             <span className="mx-2">/</span>
-            <span className="text-ink-800">{category.name}</span>
+            <span className={photo ? 'text-paper' : 'text-ink-800'}>{category.name}</span>
           </nav>
 
-          {/* Switch between the two groups without going back to the homepage. */}
-          <div className="mb-5 flex w-full rounded-xl bg-white p-1 shadow-[var(--shadow-soft)] sm:mb-6 sm:inline-flex sm:w-auto">
-            {categories.map((c) => (
-              <Link
-                key={c.id}
-                href={href(`/categories/${c.slug}`)}
-                aria-current={c.id === category.id ? 'page' : undefined}
-                className={cn(
-                  'flex-1 rounded-lg px-3 py-2.5 text-center text-sm font-bold whitespace-nowrap transition-colors sm:flex-none sm:px-4 sm:py-2',
-                  c.id === category.id ? 'bg-ink-950 text-paper' : 'text-ink-600 hover:text-ink-950',
-                )}
-              >
-                {c.name}
-              </Link>
-            ))}
-          </div>
+          {/* Switch between groups without going back to the homepage. A
+              scrolling row when there are more groups than fit. */}
+          {categories.length > 1 && (
+            <div className="mb-5 flex w-full gap-1 overflow-x-auto rounded-xl bg-white p-1 shadow-[var(--shadow-soft)] [scrollbar-width:none] sm:mb-6 sm:inline-flex sm:w-auto sm:max-w-full">
+              {categories.map((c) => (
+                <Link
+                  key={c.id}
+                  href={href(`/categories/${c.slug}`)}
+                  aria-current={c.id === category.id ? 'page' : undefined}
+                  className={cn(
+                    'shrink-0 rounded-lg px-3 py-2.5 text-center text-sm font-bold whitespace-nowrap transition-colors sm:px-4 sm:py-2',
+                    categories.length <= 2 && 'flex-1 sm:flex-none',
+                    c.id === category.id ? 'bg-ink-950 text-paper' : 'text-ink-600 hover:text-ink-950',
+                  )}
+                >
+                  {c.name}
+                </Link>
+              ))}
+            </div>
+          )}
 
-          <h1 className="text-h1 font-black text-balance text-ink-950">{category.name}</h1>
+          <h1 className={cn('text-h1 font-black text-balance', photo ? 'text-paper' : 'text-ink-950')}>{category.name}</h1>
           {/* The one-line summary on a phone, so the products start on the first
               screen; the full description from `sm` up. */}
-          <p className="mt-3 text-ink-600 sm:hidden">{category.short}</p>
-          <p className="mt-4 hidden max-w-3xl text-lead text-ink-600 sm:block">{category.description}</p>
+          <p className={cn('mt-3 sm:hidden', photo ? 'text-ink-200' : 'text-ink-600')}>{category.short}</p>
+          <p className={cn('mt-4 hidden max-w-3xl text-lead sm:block', photo ? 'text-ink-200' : 'text-ink-600')}>{category.description}</p>
         </div>
       </section>
 

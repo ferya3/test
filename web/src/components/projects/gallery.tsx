@@ -18,7 +18,7 @@ function Visual({ project, className }: { project: Project; className?: string }
     <img src={mediaUrl(project.image)} alt={project.title} loading="lazy" decoding="async" className={cn('size-full object-cover', className)} />
   ) : (
     <div className={cn('size-full', className)} role="img" aria-label={project.title}>
-      <ProjectArt color={project.color_hex} categorySlug={project.category_slug} />
+      <ProjectArt color={project.color_hex} scene={project.category_scene} />
     </div>
   );
 }

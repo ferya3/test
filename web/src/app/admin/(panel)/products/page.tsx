@@ -6,8 +6,9 @@ import { Swatch } from '@/components/catalog/swatch';
 import { db } from '@/lib/db';
 import { requireAdmin } from '@/lib/session';
 import { toggleProduct } from '@/lib/actions/products';
-import { getCategories, type Product } from '@/lib/queries';
-import { FAMILIES, SURFACES, faDigits } from '@/lib/catalog';
+import { type Category, type Product } from '@/lib/queries';
+import { faDigits } from '@/lib/catalog';
+import { attributeCatalog } from '@/lib/attributes';
 import { cn } from '@/lib/utils';
 
 type Props = { searchParams: Promise<{ q?: string; category?: string }> };
@@ -15,7 +16,7 @@ type Props = { searchParams: Promise<{ q?: string; category?: string }> };
 export default async function ProductsPage({ searchParams }: Props) {
   await requireAdmin();
   const { q = '', category = '' } = await searchParams;
-  const categories = getCategories();
+  const categories = db.prepare('SELECT * FROM categories ORDER BY position, id').all() as Category[];
   const categoryId = Number.parseInt(category, 10);
 
   const clauses = ['1 = 1'];
@@ -34,6 +35,7 @@ export default async function ProductsPage({ searchParams }: Props) {
     .prepare(`SELECT * FROM products WHERE ${clauses.join(' AND ')} ORDER BY category_id, position, id`)
     .all(...params) as Product[];
   const names = Object.fromEntries(categories.map((c) => [c.id, c.name]));
+  const catalog = attributeCatalog('fa');
 
   return (
     <>
@@ -77,7 +79,7 @@ export default async function ProductsPage({ searchParams }: Props) {
             className={cn('flex items-center gap-3 rounded-xl bg-white p-3 shadow-[var(--shadow-soft)] sm:gap-4', !p.is_active && 'opacity-60')}
           >
             <div className="size-14 shrink-0 overflow-hidden rounded-lg sm:size-16">
-              <Swatch color={p.color_hex} family={p.family} image={p.image} seed={p.id} alt="" sizes="64px" />
+              <Swatch color={p.color_hex} texture={catalog.texture(p.family)} image={p.image} seed={p.id} alt="" sizes="64px" />
             </div>
             <div className="min-w-0 flex-1">
               <p className="flex items-center gap-1.5 font-bold text-ink-950">
@@ -85,7 +87,7 @@ export default async function ProductsPage({ searchParams }: Props) {
                 <span className="truncate">{p.name}</span>
               </p>
               <p className="truncate text-xs text-ink-500">
-                <span className="ltr-isolate font-mono">{p.code}</span> · {names[p.category_id]} · {FAMILIES[p.family]} · {SURFACES[p.surface]}
+                <span className="ltr-isolate font-mono">{p.code}</span> · {names[p.category_id]} · {catalog.family(p.family)} · {catalog.surface(p.surface)}
               </p>
             </div>
             <form action={toggleProduct.bind(null, p.id)}>

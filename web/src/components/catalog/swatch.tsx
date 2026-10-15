@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import type { Family } from '@/lib/catalog';
+import type { Texture } from '@/lib/catalog';
 import { mediaUrl } from '@/lib/media';
 import { cn } from '@/lib/utils';
 
@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
  */
 export function Swatch({
   color,
-  family,
+  texture,
   image,
   alt,
   className,
@@ -20,7 +20,8 @@ export function Swatch({
   seed = 1,
 }: {
   color: string;
-  family: Family;
+  /** How the swatch is drawn: from the product's decor family. */
+  texture: Texture;
   image?: string | null;
   alt: string;
   className?: string;
@@ -50,7 +51,7 @@ export function Swatch({
       className={cn('relative size-full overflow-hidden', className)}
       style={{ backgroundColor: color }}
     >
-      <div aria-hidden className="absolute inset-0" style={pattern(family, seed)} />
+      <div aria-hidden className="absolute inset-0" style={pattern(texture, seed)} />
       {/* Light falling across a pressed surface. */}
       <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-white/35 via-transparent to-black/15" />
     </div>
@@ -69,10 +70,10 @@ const noise = (filter: string) =>
     `<svg xmlns='http://www.w3.org/2000/svg' width='400' height='500' preserveAspectRatio='none'><filter id='f' x='0' y='0' width='100%' height='100%'>${filter}</filter><rect width='100%' height='100%' filter='url(#f)'/></svg>`,
   )}")`;
 
-function pattern(family: Family, seed: number): CSSProperties {
+function pattern(texture: Texture, seed: number): CSSProperties {
   const base: CSSProperties = { mixBlendMode: 'multiply', backgroundSize: '100% 100%' };
 
-  switch (family) {
+  switch (texture) {
     case 'wood':
       return {
         ...base,
@@ -99,7 +100,7 @@ function pattern(family: Family, seed: number): CSSProperties {
           'repeating-linear-gradient(90deg, rgb(0 0 0 / 0.07) 0 1px, transparent 1px 4px)',
         ].join(','),
       };
-    case 'solid':
+    default:
       return { backgroundImage: 'linear-gradient(160deg, rgb(255 255 255 / 0.18), transparent 40%)' };
   }
 }

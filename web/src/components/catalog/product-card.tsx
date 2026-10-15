@@ -1,13 +1,15 @@
 import Link from 'next/link';
 import { Tilt } from '@/components/motion/tilt';
 import { Swatch } from './swatch';
-import { familyLabels, list, surfaceLabels } from '@/lib/catalog';
+import { list } from '@/lib/catalog';
+import { catalogFor } from '@/lib/attributes';
 import { getDictionary } from '@/i18n/dictionaries';
 import { localePath, type Locale } from '@/i18n/config';
 import type { Product } from '@/lib/queries';
 
 export function ProductCard({ product, locale, priority = false }: { product: Product; locale: Locale; priority?: boolean }) {
   const thicknesses = product.thicknesses.split(',').filter(Boolean);
+  const catalog = catalogFor(locale);
 
   return (
     <Tilt max={6} className="h-full rounded-xl">
@@ -18,7 +20,7 @@ export function ProductCard({ product, locale, priority = false }: { product: Pr
         <div className="aspect-square overflow-hidden sm:aspect-[4/5]">
           <Swatch
             color={product.color_hex}
-            family={product.family}
+            texture={catalog.texture(product.family)}
             seed={product.id}
             image={product.image}
             alt={product.name}
@@ -29,12 +31,12 @@ export function ProductCard({ product, locale, priority = false }: { product: Pr
 
         <div className="flex flex-1 flex-col gap-1 p-3 sm:gap-1.5 sm:p-4">
           <div className="flex items-center justify-between gap-2 text-xs text-ink-500">
-            <span>{surfaceLabels(locale)[product.surface]}</span>
+            <span>{catalog.surface(product.surface)}</span>
             <span className="ltr-isolate font-mono">{product.code}</span>
           </div>
           <h3 className="line-clamp-2 text-sm leading-6 font-bold text-ink-950 sm:text-base">{product.name}</h3>
           <p className="mt-auto truncate text-xs text-ink-500">
-            {familyLabels(locale)[product.family]} · {list(thicknesses, locale)} {getDictionary(locale).catalog.mm}
+            {catalog.family(product.family)} · {list(thicknesses, locale)} {getDictionary(locale).catalog.mm}
           </p>
         </div>
       </Link>

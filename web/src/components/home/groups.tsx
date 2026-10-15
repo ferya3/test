@@ -19,7 +19,7 @@ export function Groups({ categories, locale }: { categories: CategoryWithStats[]
           <SectionHeading overline={t.overline} title={t.title} />
         </Reveal>
 
-        <div className="mt-7 grid gap-4 sm:mt-10 sm:gap-5 md:grid-cols-2 lg:mt-14 lg:gap-8">
+        <div className={`mt-7 grid gap-4 sm:mt-10 sm:gap-5 md:grid-cols-2 lg:mt-14 lg:gap-8 ${categories.length >= 3 ? 'lg:grid-cols-3' : ''}`}>
           {categories.map((category, i) => (
             <Reveal key={category.id} delay={i * 0.1} className="h-full">
               <Tilt max={4} className="h-full rounded-2xl">

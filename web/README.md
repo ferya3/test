@@ -46,6 +46,14 @@ npm run build
 `scripts/check-contrast.mjs` verifies every colour pairing in the palette
 against WCAG AA; run it after changing a colour.
 
+## What the admin manages
+
+Products, product groups (with a cover photo for each group's page), decor families,
+surfaces and thicknesses (the filter options — `attributes` table), the home-page
+hero (texts, button, phone, background photo), site text, production steps,
+completed projects, incoming messages, and the admin's own password and two-step
+login. Forgotten password: `sudo bash deploy/reset-admin.sh`.
+
 ## Where things are
 
 - `src/app/(site)/[lang]` — public pages: home, category (filters in the URL), product, projects, about, contact

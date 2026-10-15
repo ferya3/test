@@ -290,7 +290,7 @@ function Cubicles({ color }: { color: string }) {
   );
 }
 
-/** The drawing for a project: cubicles for compact sheet, a kitchen otherwise. */
-export function ProjectArt({ color, categorySlug }: { color: string; categorySlug: string | null }) {
-  return categorySlug === 'hpl-compact' ? <Cubicles color={color} /> : <Kitchen color={color} />;
+/** The drawing for a project: the scene its product group asks for (set in the admin). */
+export function ProjectArt({ color, scene }: { color: string; scene: string | null }) {
+  return scene === 'cubicles' ? <Cubicles color={color} /> : <Kitchen color={color} />;
 }

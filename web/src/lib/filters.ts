@@ -1,5 +1,5 @@
-import { isFamily, isSurface, isThickness } from './catalog.ts';
 import type { Filters } from './queries.ts';
+import type { AttributeCatalog } from './attributes.ts';
 
 type Params = Record<string, string | string[] | undefined>;
 
@@ -10,15 +10,15 @@ const list = (value: string | string[] | undefined) => (Array.isArray(value) ? v
  *
  * Anything else is dropped rather than rejected: a stale bookmark or a
  * hand-edited URL should show the products it still can, not an error page.
- * Only whitelisted values ever reach a query.
+ * Only values that exist in the attributes table ever reach a query.
  */
-export function parseFilters(params: Params): Filters {
-  const unique = <T extends string>(values: T[]) => [...new Set(values)].slice(0, 10);
+export function parseFilters(params: Params, catalog: AttributeCatalog): Filters {
+  const keep = (values: string[], known: Set<string>) => [...new Set(values.filter((v) => known.has(v)))].slice(0, 20);
 
   return {
-    families: unique(list(params.family).filter(isFamily)),
-    surfaces: unique(list(params.surface).filter(isSurface)),
-    thicknesses: unique(list(params.thickness).filter(isThickness)),
+    families: keep(list(params.family), catalog.values.families),
+    surfaces: keep(list(params.surface), catalog.values.surfaces),
+    thicknesses: keep(list(params.thickness), catalog.values.thicknesses),
   };
 }
 

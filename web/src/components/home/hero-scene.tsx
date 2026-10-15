@@ -5,14 +5,14 @@ import { ContactShadows, Float, RoundedBox } from '@react-three/drei';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 
-export type ScenePanel = { color: string; family: 'wood' | 'stone' | 'solid' | 'fabric' };
+export type ScenePanel = { color: string; texture: 'wood' | 'stone' | 'solid' | 'fabric' };
 
 /**
  * A procedural surface for a panel: wood grain, stone veining or a woven
- * texture, drawn once on a canvas. No image files to fetch, which matters for
+ * pattern, drawn once on a canvas. No image files to fetch, which matters for
  * a server that cannot always reach a CDN and for a strict CSP.
  */
-function useSurface(color: string, family: ScenePanel['family']) {
+function useSurface(color: string, texture: ScenePanel['texture']) {
   return useMemo(() => {
     const canvas = document.createElement('canvas');
     canvas.width = 256;
@@ -25,7 +25,7 @@ function useSurface(color: string, family: ScenePanel['family']) {
     let seed = [...color].reduce((a, c) => a + c.charCodeAt(0), 0);
     const rand = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280);
 
-    if (family === 'wood') {
+    if (texture === 'wood') {
       for (let i = 0; i < 70; i++) {
         ctx.strokeStyle = `rgba(0,0,0,${0.03 + rand() * 0.07})`;
         ctx.lineWidth = 0.5 + rand() * 2;
@@ -37,7 +37,7 @@ function useSurface(color: string, family: ScenePanel['family']) {
         }
         ctx.stroke();
       }
-    } else if (family === 'stone') {
+    } else if (texture === 'stone') {
       for (let i = 0; i < 9; i++) {
         ctx.strokeStyle = `rgba(60,55,50,${0.08 + rand() * 0.18})`;
         ctx.lineWidth = 0.6 + rand() * 1.6;
@@ -52,25 +52,25 @@ function useSurface(color: string, family: ScenePanel['family']) {
         }
         ctx.stroke();
       }
-    } else if (family === 'fabric') {
+    } else if (texture === 'fabric') {
       ctx.fillStyle = 'rgba(0,0,0,0.05)';
       for (let i = 0; i < canvas.width; i += 3) ctx.fillRect(i, 0, 1, canvas.height);
       for (let j = 0; j < canvas.height; j += 3) ctx.fillRect(0, j, canvas.width, 1);
     }
 
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.anisotropy = 4;
+    const map = new THREE.CanvasTexture(canvas);
+    map.colorSpace = THREE.SRGBColorSpace;
+    map.anisotropy = 4;
 
-    return texture;
-  }, [color, family]);
+    return map;
+  }, [color, texture]);
 }
 
 function Panel({ panel, index, total, still }: { panel: ScenePanel; index: number; total: number; still: boolean }) {
-  const map = useSurface(panel.color, panel.family);
+  const map = useSurface(panel.color, panel.texture);
   // A fan of sheets, like samples spread on a showroom table.
   const spread = index - (total - 1) / 2;
-  const glossy = panel.family === 'solid' || panel.family === 'stone';
+  const glossy = panel.texture === 'solid' || panel.texture === 'stone';
 
   const body = (
     <group position={[spread * 0.95, spread * 0.12, -Math.abs(spread) * 0.45]} rotation={[0, -spread * 0.22, spread * 0.06]}>

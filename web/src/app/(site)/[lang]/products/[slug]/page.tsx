@@ -9,7 +9,8 @@ import { QuoteBar } from '@/components/catalog/quote-bar';
 import { Tilt } from '@/components/motion/tilt';
 import { Reveal } from '@/components/motion/reveal';
 import { Badge } from '@/components/ui/card';
-import { familyLabels, list, surfaceLabels } from '@/lib/catalog';
+import { list } from '@/lib/catalog';
+import { catalogFor } from '@/lib/attributes';
 import { getProduct, getRelated, getSettings } from '@/lib/queries';
 import { mediaUrl } from '@/lib/media';
 import { alternates, jsonLd, siteUrl } from '@/lib/seo';
@@ -45,12 +46,13 @@ export default async function ProductPage({ params }: Props) {
   const related = getRelated(product, 4, lang);
   const settings = getSettings(lang);
   const thicknesses = product.thicknesses.split(',').filter(Boolean);
+  const catalog = catalogFor(lang);
 
   const specs = [
     [t.code, <span key="c" className="ltr-isolate font-mono">{product.code}</span>],
     [t.group, product.category_name],
-    [t.family, familyLabels(lang)[product.family]],
-    [t.surface, surfaceLabels(lang)[product.surface]],
+    [t.family, catalog.family(product.family)],
+    [t.surface, catalog.surface(product.surface)],
     [t.thicknesses, `${list(thicknesses, lang)} ${dict.catalog.mm}`],
   ] as const;
 
@@ -97,7 +99,7 @@ export default async function ProductPage({ params }: Props) {
               <div className="aspect-square overflow-hidden rounded-2xl shadow-[var(--shadow-lift)]">
                 <Swatch
                   color={product.color_hex}
-                  family={product.family}
+                  texture={catalog.texture(product.family)}
                   seed={product.id}
                   image={product.image}
                   alt={product.name}
@@ -110,8 +112,8 @@ export default async function ProductPage({ params }: Props) {
 
           <div>
             <div className="flex flex-wrap gap-2">
-              <Badge>{familyLabels(lang)[product.family]}</Badge>
-              <Badge>{surfaceLabels(lang)[product.surface]}</Badge>
+              <Badge>{catalog.family(product.family)}</Badge>
+              <Badge>{catalog.surface(product.surface)}</Badge>
             </div>
             <h1 className="mt-3 text-h2 font-black text-balance text-ink-950 sm:mt-4 sm:text-h1">{product.name}</h1>
             <p className="mt-3 text-ink-600 sm:mt-4 sm:text-lead">{product.description || product.short}</p>

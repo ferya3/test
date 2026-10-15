@@ -13,6 +13,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { CATEGORY_EN, PROJECT_EN, STEP_EN, productEnglish } from './english-content.ts';
+import { DEFAULT_ATTRIBUTES } from './catalog.ts';
 
 const DB_PATH = process.env.DATABASE_PATH ?? path.join(process.cwd(), 'data', 'app.db');
 
@@ -212,6 +213,37 @@ const MIGRATIONS: Migration[] = [
 
     const project = db.prepare('UPDATE projects SET title_en = ?, description_en = ? WHERE title = ?');
     for (const [title, en] of Object.entries(PROJECT_EN)) project.run(en.title, en.description, title);
+  },
+
+  /* 5 — editable product attributes; group cover photos */
+  (db) => {
+    // Decor families, surfaces and thicknesses, until now fixed in code.
+    // Products keep storing the `value` (family, surface, comma-separated
+    // thicknesses), so no product row changes.
+    db.exec(`
+      CREATE TABLE attributes (
+        id       INTEGER PRIMARY KEY,
+        kind     TEXT    NOT NULL CHECK (kind IN ('family', 'surface', 'thickness')),
+        value    TEXT    NOT NULL,
+        name     TEXT    NOT NULL,
+        name_en  TEXT    NOT NULL DEFAULT '',
+        -- Families only: how a swatch is drawn when there is no photo.
+        texture  TEXT    NOT NULL DEFAULT 'solid',
+        position INTEGER NOT NULL DEFAULT 0,
+        UNIQUE (kind, value)
+      );
+    `);
+
+    const insert = db.prepare('INSERT INTO attributes (kind, value, name, name_en, texture, position) VALUES (?, ?, ?, ?, ?, ?)');
+    for (const [kind, rows] of Object.entries(DEFAULT_ATTRIBUTES)) {
+      rows.forEach(([value, name, nameEn, texture], i) => insert.run(kind, value, name, nameEn, texture, i));
+    }
+
+    // A photo behind the heading of each product group's page, and which
+    // drawing stands in for a project photo in that group.
+    db.exec(`ALTER TABLE categories ADD COLUMN image TEXT`);
+    db.exec(`ALTER TABLE categories ADD COLUMN scene TEXT NOT NULL DEFAULT 'kitchen'`);
+    db.exec(`UPDATE categories SET scene = 'cubicles' WHERE slug = 'hpl-compact'`);
   },
 ];
 

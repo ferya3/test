@@ -13,8 +13,7 @@ const fa = {
   home: 'خانه',
   nav: {
     home: 'خانه',
-    cabinet: 'صفحه کابینت',
-    compact: 'کامپکت',
+    products: 'محصولات',
     projects: 'نمونه کارها',
     about: 'دربارهٔ ما',
     contact: 'تماس',
@@ -173,8 +172,7 @@ const en: Dictionary = {
   home: 'Home',
   nav: {
     home: 'Home',
-    cabinet: 'Cabinet Panels',
-    compact: 'Compact',
+    products: 'Products',
     projects: 'Projects',
     about: 'About',
     contact: 'Contact',

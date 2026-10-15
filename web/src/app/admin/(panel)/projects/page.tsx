@@ -12,13 +12,13 @@ import { cn } from '@/lib/utils';
 
 export const metadata = { title: 'نمونه کارها' };
 
-type Row = { id: number; title: string; location: string; year: string; image: string | null; color_hex: string; is_active: number; category_slug: string | null; category_name: string | null };
+type Row = { id: number; title: string; location: string; year: string; image: string | null; color_hex: string; is_active: number; category_slug: string | null; category_name: string | null; category_scene: string | null };
 
 export default async function ProjectsAdminPage() {
   await requireAdmin();
   const projects = db
     .prepare(
-      `SELECT p.id, p.title, p.location, p.year, p.image, p.color_hex, p.is_active, c.slug AS category_slug, c.name AS category_name
+      `SELECT p.id, p.title, p.location, p.year, p.image, p.color_hex, p.is_active, c.slug AS category_slug, c.name AS category_name, c.scene AS category_scene
          FROM projects p LEFT JOIN categories c ON c.id = p.category_id ORDER BY p.position, p.id`,
     )
     .all() as Row[];
@@ -54,7 +54,7 @@ export default async function ProjectsAdminPage() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={mediaUrl(p.image)} alt="" className="size-full object-cover" />
               ) : (
-                <ProjectArt color={p.color_hex} categorySlug={p.category_slug} />
+                <ProjectArt color={p.color_hex} scene={p.category_scene} />
               )}
             </div>
             <div className="min-w-0 flex-1">

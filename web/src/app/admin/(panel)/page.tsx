@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Boxes, Inbox, ShieldAlert, Star } from 'lucide-react';
+import { Boxes, FolderPlus, ImagePlus, Inbox, PackagePlus, ShieldAlert, Sparkles, Star } from 'lucide-react';
 import { PageHeader } from '@/components/admin/page-header';
 import { db } from '@/lib/db';
 import { requireAdmin } from '@/lib/session';
@@ -34,6 +34,27 @@ export default async function Dashboard() {
           </span>
         </Link>
       )}
+
+      {/* The things done most often, one tap away. */}
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[
+          { href: '/admin/products/new', label: 'محصول جدید', icon: PackagePlus },
+          { href: '/admin/categories/new', label: 'گروه کالای جدید', icon: FolderPlus },
+          { href: '/admin/projects/new', label: 'نمونه کار جدید', icon: ImagePlus },
+          { href: '/admin/hero', label: 'ویرایش هیرو', icon: Sparkles },
+        ].map(({ href, label, icon: Icon }) => (
+          <Link
+            key={href}
+            href={href}
+            className="flex items-center gap-3 rounded-xl bg-ink-950 p-4 text-sm font-bold text-paper transition-colors hover:bg-ink-800"
+          >
+            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-gold-400 text-ink-950">
+              <Icon className="size-4.5" />
+            </span>
+            {label}
+          </Link>
+        ))}
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
         {cards.map(({ label, value, icon: Icon, href }) => (

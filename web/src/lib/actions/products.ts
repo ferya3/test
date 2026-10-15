@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { requireAdmin } from '@/lib/session';
 import { deleteImage, storeImage, UploadError } from '@/lib/images';
-import { isFamily, isSurface, isThickness, THICKNESSES } from '@/lib/catalog';
+import { attributeCatalog } from '@/lib/attributes';
 import { bool, file, int, SLUG, str } from '@/lib/validate';
 import type { ActionState } from './types';
 
@@ -19,6 +19,7 @@ export async function saveProduct(id: number | null, _prev: ActionState, form: F
   if (id && !existing) return { ok: false, message: 'این محصول دیگر وجود ندارد.' };
 
   const code = str(form, 'code', 30).toUpperCase();
+  const catalog = attributeCatalog('fa');
   const data = {
     name: str(form, 'name', 120),
     code,
@@ -29,7 +30,7 @@ export async function saveProduct(id: number | null, _prev: ActionState, form: F
     family: str(form, 'family', 20),
     surface: str(form, 'surface', 20),
     // Only known thicknesses, in the catalogue's own order.
-    thicknesses: THICKNESSES.filter((t) => form.getAll('thicknesses').includes(t)),
+    thicknesses: catalog.thicknessOrder.filter((t) => form.getAll('thicknesses').includes(t)),
     color_hex: str(form, 'color_hex', 7).toLowerCase(),
     position: int(form, 'position', 0, 9999),
     is_featured: bool(form, 'is_featured') ? 1 : 0,
@@ -45,9 +46,9 @@ export async function saveProduct(id: number | null, _prev: ActionState, form: F
   if (!/^[A-Z0-9-]{2,30}$/.test(data.code)) errors.code = 'کد فقط از حروف انگلیسی، عدد و خط تیره.';
   if (!SLUG.test(data.slug)) errors.slug = 'فقط حروف کوچک انگلیسی، عدد و خط تیره؛ مثل natural-oak-18';
   if (!db.prepare('SELECT 1 FROM categories WHERE id = ?').get(data.category_id)) errors.category_id = 'گروه را انتخاب کنید.';
-  if (!isFamily(data.family)) errors.family = 'طرح را انتخاب کنید.';
-  if (!isSurface(data.surface)) errors.surface = 'سطح را انتخاب کنید.';
-  if (data.thicknesses.length === 0 || !data.thicknesses.every(isThickness)) errors.thicknesses = 'دست‌کم یک ضخامت.';
+  if (!catalog.values.families.has(data.family)) errors.family = 'طرح را انتخاب کنید.';
+  if (!catalog.values.surfaces.has(data.surface)) errors.surface = 'سطح را انتخاب کنید.';
+  if (data.thicknesses.length === 0) errors.thicknesses = 'دست‌کم یک ضخامت.';
   if (!/^#[0-9a-f]{6}$/.test(data.color_hex)) errors.color_hex = 'رنگ معتبر نیست.';
 
   const taken = (column: 'slug' | 'code', value: string) =>

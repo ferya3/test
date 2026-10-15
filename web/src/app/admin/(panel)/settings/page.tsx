@@ -19,14 +19,6 @@ const GROUPS: { title: string; items: Item[] }[] = [
     ],
   },
   {
-    title: 'بخش اول صفحهٔ اصلی',
-    items: [
-      { key: 'hero_overline', label: 'برچسب بالای عنوان' },
-      { key: 'hero_title', label: 'عنوان اصلی', hint: 'آخرین کلمه طلایی نمایش داده می‌شود.' },
-      { key: 'hero_lead', label: 'متن زیر عنوان', long: true },
-    ],
-  },
-  {
     title: 'معرفی شرکت (زیر بخش اول)',
     items: [
       { key: 'intro_overline', label: 'برچسب' },
@@ -52,7 +44,7 @@ export default async function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="محتوای سایت" description="متن‌هایی که در صفحهٔ اصلی و سراسر سایت دیده می‌شوند." />
+      <PageHeader title="محتوای سایت" description="نام شرکت، معرفی زیر هیرو و اطلاعات تماس. هیرو صفحهٔ خودش را دارد." />
       <AdminForm action={saveSettings} className="rounded-2xl bg-white p-5 shadow-[var(--shadow-soft)] sm:p-8">
         {GROUPS.map((group) => (
           <fieldset key={group.title} className="grid gap-5 border-b border-ink-100 pb-6 last-of-type:border-0">

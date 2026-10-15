@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Swatch } from '@/components/catalog/swatch';
 import type { ScenePanel } from './hero-scene';
 import { useLocale } from '@/i18n/client';
+import { mediaUrl } from '@/lib/media';
+import { cn } from '@/lib/utils';
 
 // WebGL exists only in the browser, and only from tablet width up (below).
 const HeroScene = dynamic(() => import('./hero-scene'), {
@@ -42,7 +44,7 @@ function SwatchFan({ panels }: { panels: ScenePanel[] }) {
             }}
           >
             <div className="size-full overflow-hidden rounded-lg shadow-[0_24px_40px_-14px_rgb(0_0_0/0.75)] ring-1 ring-gold-400/40">
-              <Swatch color={panel.color} family={panel.family} seed={i + 3} alt="" />
+              <Swatch color={panel.color} texture={panel.texture} seed={i + 3} alt="" />
             </div>
           </div>
         );
@@ -72,12 +74,22 @@ export function Hero({
   lead,
   phone,
   panels,
+  ctaLabel,
+  ctaHref,
+  showPhone = true,
+  image = null,
 }: {
   overline: string;
   title: string;
   lead: string;
   phone: string;
   panels: ScenePanel[];
+  ctaLabel: string;
+  /** A site path without the language prefix. */
+  ctaHref: string;
+  showPhone?: boolean;
+  /** A background photo (set in the admin); without one, the 3D sheets show. */
+  image?: string | null;
 }) {
   const reduce = useReducedMotion();
   const wide = useWideScreen();
@@ -90,14 +102,30 @@ export function Hero({
 
   return (
     <section className="relative isolate overflow-hidden bg-ink-950 text-paper">
+      {image && (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element -- already a sized WebP from sharp */}
+          <img src={mediaUrl(image)} alt="" fetchPriority="high" className="absolute inset-0 -z-20 size-full object-cover" />
+          {/* Dark from the text's side and from below, so the words read on any photo. */}
+          <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-t from-ink-950 via-ink-950/60 to-ink-950/30 lg:bg-gradient-to-l rtl:lg:bg-gradient-to-l ltr:lg:bg-gradient-to-r lg:from-ink-950 lg:via-ink-950/70 lg:to-transparent" />
+        </>
+      )}
+
       {/* Soft pools of light, so the dark band reads as depth rather than a flat fill. */}
-      <div aria-hidden className="absolute inset-0 -z-10">
+      <div aria-hidden className={image ? 'hidden' : 'absolute inset-0 -z-10'}>
         <div className="absolute -top-1/3 end-[-10%] size-[42rem] rounded-full bg-gold-500/15 blur-[120px]" />
         <div className="absolute bottom-[-30%] start-[-15%] size-[36rem] rounded-full bg-gold-300/10 blur-[120px]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,transparent_40%,rgb(15_13_11)_100%)]" />
       </div>
 
-      <div className="mx-auto grid max-w-7xl items-center gap-2 px-4 pt-8 pb-6 sm:gap-4 sm:px-6 sm:pt-12 sm:pb-10 lg:min-h-[calc(100dvh-5rem)] lg:grid-cols-2 lg:gap-8 lg:px-8 lg:py-16">
+      <div
+        className={cn(
+          'mx-auto grid max-w-7xl items-center gap-2 px-4 pt-8 pb-6 sm:gap-4 sm:px-6 sm:pt-12 sm:pb-10 lg:min-h-[calc(100dvh-5rem)] lg:grid-cols-2 lg:gap-8 lg:px-8 lg:py-16',
+          // With a photo the text gets the room the 3D sheets had, and on a
+          // phone enough height for the photo to be seen above it.
+          image && 'min-h-[min(36rem,calc(100dvh-4rem))] content-end lg:content-center',
+        )}
+      >
         <div className="relative z-10 max-w-xl">
           <motion.p
             {...from(0)}
@@ -132,29 +160,33 @@ export function Hero({
 
           <motion.div {...from(0.6)} className="mt-7 flex gap-3 sm:mt-9">
             <Button asChild size="lg" className="flex-1 sm:flex-none">
-              <Link href={path('/categories/hpl-cabinet-panel')}>
-                {t.hero.viewProducts}
+              <Link href={path(ctaHref)}>
+                {ctaLabel || t.hero.viewProducts}
                 <ArrowLeft className="dir-icon" />
               </Link>
             </Button>
             {/* On a phone the call button is just the icon, beside the main action. */}
-            <Button asChild size="lg" variant="ghostLight" className="w-13 px-0 sm:w-auto sm:px-8">
-              <a href={`tel:${phone.replace(/[^\d+]/g, '')}`} aria-label={`${t.hero.call}: ${phone}`}>
-                <Phone />
-                <span className="ltr-isolate hidden sm:inline">{phone}</span>
-              </a>
-            </Button>
+            {showPhone && (
+              <Button asChild size="lg" variant="ghostLight" className="w-13 px-0 sm:w-auto sm:px-8">
+                <a href={`tel:${phone.replace(/[^\d+]/g, '')}`} aria-label={`${t.hero.call}: ${phone}`}>
+                  <Phone />
+                  <span className="ltr-isolate hidden sm:inline">{phone}</span>
+                </a>
+              </Button>
+            )}
           </motion.div>
         </div>
 
-        <motion.div
-          initial={reduce ? false : { opacity: 0, scale: 0.94 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 1.4, delay: 0.2, ease }}
-          className="relative h-56 sm:h-[28rem] lg:h-[36rem]"
-        >
-          {wide ? <HeroScene panels={panels} /> : <SwatchFan panels={panels} />}
-        </motion.div>
+        {!image && (
+          <motion.div
+            initial={reduce ? false : { opacity: 0, scale: 0.94 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 1.4, delay: 0.2, ease }}
+            className="relative h-56 sm:h-[28rem] lg:h-[36rem]"
+          >
+            {wide ? <HeroScene panels={panels} /> : <SwatchFan panels={panels} />}
+          </motion.div>
+        )}
       </div>
     </section>
   );

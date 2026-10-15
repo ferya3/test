@@ -1,54 +1,73 @@
+import Link from 'next/link';
+import { ImageIcon, Pencil, Plus } from 'lucide-react';
 import { PageHeader } from '@/components/admin/page-header';
-import { AdminForm, Field } from '@/components/admin/form';
-import { Input, Textarea } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { requireAdmin } from '@/lib/session';
-import { saveCategory } from '@/lib/actions/content';
 import { db } from '@/lib/db';
-import type { Category } from '@/lib/queries';
+import { mediaUrl } from '@/lib/media';
+import { faDigits } from '@/lib/catalog';
+import { cn } from '@/lib/utils';
 
 export const metadata = { title: 'گروه‌های کالا' };
 
+type Row = { id: number; slug: string; name: string; name_en: string; image: string | null; is_active: number; products: number };
+
 export default async function CategoriesPage() {
   await requireAdmin();
-  const categories = db.prepare('SELECT * FROM categories ORDER BY position, id').all() as Category[];
+  const rows = db
+    .prepare(
+      `SELECT c.id, c.slug, c.name, c.name_en, c.image, c.is_active,
+              (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id) AS products
+         FROM categories c ORDER BY c.position, c.id`,
+    )
+    .all() as Row[];
 
   return (
     <>
-      <PageHeader title="گروه‌های کالا" description="نام و توضیحی که بالای صفحهٔ هر گروه دیده می‌شود." />
-      <div className="grid gap-6">
-        {categories.map((c) => (
-          <AdminForm key={c.id} action={saveCategory.bind(null, c.id)} className="rounded-2xl bg-white p-5 shadow-[var(--shadow-soft)] sm:p-8">
-            <p className="ltr-isolate text-xs text-ink-500">/categories/{c.slug}</p>
-            <div className="grid gap-5 sm:grid-cols-[1fr_10rem]">
-              <Field name="name" id={`name-${c.id}`} label="نام گروه">
-                <Input id={`name-${c.id}`} name="name" defaultValue={c.name} required maxLength={120} />
-              </Field>
-              <Field name="position" id={`position-${c.id}`} label="ترتیب">
-                <Input id={`position-${c.id}`} name="position" type="number" min={0} max={999} defaultValue={c.position} dir="ltr" />
-              </Field>
-            </div>
-            <Field name="name_en" id={`name_en-${c.id}`} label="نام گروه — انگلیسی">
-              <Input id={`name_en-${c.id}`} name="name_en" defaultValue={c.name_en} dir="ltr" maxLength={120} />
-            </Field>
-            <Field name="short" id={`short-${c.id}`} label="توضیح کوتاه (روی کارت صفحهٔ اصلی)">
-              <Textarea id={`short-${c.id}`} name="short" defaultValue={c.short} maxLength={300} className="min-h-20" />
-            </Field>
-            <Field name="short_en" id={`short_en-${c.id}`} label="توضیح کوتاه — انگلیسی">
-              <Textarea id={`short_en-${c.id}`} name="short_en" defaultValue={c.short_en} dir="ltr" maxLength={300} className="min-h-20" />
-            </Field>
-            <Field name="description" id={`description-${c.id}`} label="توضیح کامل (بالای صفحهٔ گروه)">
-              <Textarea id={`description-${c.id}`} name="description" defaultValue={c.description} maxLength={3000} />
-            </Field>
-            <Field name="description_en" id={`description_en-${c.id}`} label="توضیح کامل — انگلیسی">
-              <Textarea id={`description_en-${c.id}`} name="description_en" defaultValue={c.description_en} dir="ltr" maxLength={3000} />
-            </Field>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" name="is_active" defaultChecked={!!c.is_active} className="size-4 accent-gold-600" />
-              نمایش در سایت
-            </label>
-          </AdminForm>
+      <PageHeader
+        title="گروه‌های کالا"
+        description="هر گروه یک صفحه در سایت، یک کارت در صفحهٔ اصلی و یک لینک در منو دارد."
+        action={
+          <Button asChild>
+            <Link href="/admin/categories/new">
+              <Plus />
+              گروه جدید
+            </Link>
+          </Button>
+        }
+      />
+
+      <ul className="grid grid-cols-1 gap-3">
+        {rows.map((c) => (
+          <li key={c.id}>
+            <Link
+              href={`/admin/categories/${c.id}`}
+              className={cn(
+                'flex items-center gap-4 rounded-xl bg-white p-3 shadow-[var(--shadow-soft)] transition-shadow hover:shadow-[var(--shadow-lift)]',
+                !c.is_active && 'opacity-60',
+              )}
+            >
+              <span className="grid h-14 w-20 shrink-0 place-items-center overflow-hidden rounded-lg bg-ink-100 text-ink-400">
+                {c.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={mediaUrl(c.image)} alt="" className="size-full object-cover" />
+                ) : (
+                  <ImageIcon className="size-5" />
+                )}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-bold text-ink-950">{c.name}</span>
+                <span className="block truncate text-xs text-ink-500">
+                  <span className="ltr-isolate">/categories/{c.slug}</span> · {faDigits(c.products)} محصول
+                  {!c.name_en && ' · بدون نام انگلیسی'}
+                  {!c.is_active && ' · پنهان'}
+                </span>
+              </span>
+              <Pencil className="size-4.5 shrink-0 text-ink-500" />
+            </Link>
+          </li>
         ))}
-      </div>
+      </ul>
     </>
   );
 }

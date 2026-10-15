@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronLeft, Globe, Menu, X, Phone } from 'lucide-react';
-import { useEffect } from 'react';
+import { ChevronDown, ChevronLeft, Globe, Menu, X, Phone } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { useMenu } from '@/store/menu';
 import { lenis } from '@/components/providers/smooth-scroll';
 import { useLocale } from '@/i18n/client';
@@ -70,48 +70,147 @@ export function LanguageSwitch({ className }: { className?: string }) {
   );
 }
 
-export function DesktopNav() {
+type Group = { slug: string; name: string };
+
+/** The menu, in order: home, the product groups, then the fixed pages. */
+function useMenuItems(groups: Group[]) {
+  const { t } = useLocale();
+  const [home, ...rest] = NAV;
+  return {
+    home: { href: home.href, label: t.nav[home.key] },
+    groups: groups.map((g) => ({ href: `/categories/${g.slug}`, label: g.name })),
+    rest: rest.map((item) => ({ href: item.href, label: t.nav[item.key] })),
+  };
+}
+
+function NavLink({ href, label }: { href: string; label: string }) {
+  const { path } = useLocale();
+  const active = useIsActive()(href);
+
+  return (
+    <Link
+      href={path(href)}
+      aria-current={active ? 'page' : undefined}
+      className={cn(
+        'relative rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors xl:px-3.5',
+        active ? 'text-ink-950' : 'text-ink-600 hover:text-ink-950',
+      )}
+    >
+      {label}
+      {active && (
+        <motion.span
+          layoutId="nav-underline"
+          className="absolute inset-x-3 -bottom-0.5 h-0.5 rounded-full bg-gold-500"
+          transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+        />
+      )}
+    </Link>
+  );
+}
+
+/**
+ * Up to two product groups sit in the bar as links; more than that fold into
+ * a "Products" menu, so the header never overflows however many groups the
+ * admin creates.
+ */
+function ProductsMenu({ items }: { items: { href: string; label: string }[] }) {
   const { t, path } = useLocale();
+  const pathname = usePathname();
   const isActive = useIsActive();
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLLIElement>(null);
+  const active = items.some((i) => isActive(i.href));
+
+  useEffect(() => setOpen(false), [pathname]);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <li ref={box} className="relative">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className={cn(
+          'flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors xl:px-3.5',
+          active ? 'text-ink-950' : 'text-ink-600 hover:text-ink-950',
+        )}
+      >
+        {t.nav.products}
+        <ChevronDown className={cn('size-4 transition-transform', open && 'rotate-180')} />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.ul
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.18 }}
+            className="absolute start-0 top-full z-50 mt-2 w-64 rounded-xl border border-ink-100 bg-white p-2 shadow-[var(--shadow-lift)]"
+          >
+            {items.map((item) => (
+              <li key={item.href}>
+                <Link
+                  href={path(item.href)}
+                  aria-current={isActive(item.href) ? 'page' : undefined}
+                  className="block rounded-lg px-3 py-2.5 text-sm text-ink-800 hover:bg-ink-50 aria-[current=page]:font-bold aria-[current=page]:text-ink-950"
+                >
+                  {item.label}
+                </Link>
+              </li>
+            ))}
+          </motion.ul>
+        )}
+      </AnimatePresence>
+    </li>
+  );
+}
+
+export function DesktopNav({ groups }: { groups: Group[] }) {
+  const { t } = useLocale();
+  const { home, groups: groupItems, rest } = useMenuItems(groups);
 
   return (
     <nav aria-label={t.header.mainNav} className="hidden lg:block">
       <ul className="flex items-center gap-1">
-        {NAV.map((item) => {
-          const active = isActive(item.href);
-
-          return (
+        <li>
+          <NavLink {...home} />
+        </li>
+        {groupItems.length <= 2 ? (
+          groupItems.map((item) => (
             <li key={item.href}>
-              <Link
-                href={path(item.href)}
-                aria-current={active ? 'page' : undefined}
-                className={cn(
-                  'relative rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors xl:px-3.5',
-                  active ? 'text-ink-950' : 'text-ink-600 hover:text-ink-950',
-                )}
-              >
-                {t.nav[item.key]}
-                {active && (
-                  <motion.span
-                    layoutId="nav-underline"
-                    className="absolute inset-x-3 -bottom-0.5 h-0.5 rounded-full bg-gold-500"
-                    transition={{ type: 'spring', stiffness: 400, damping: 32 }}
-                  />
-                )}
-              </Link>
+              <NavLink {...item} />
             </li>
-          );
-        })}
+          ))
+        ) : (
+          <ProductsMenu items={groupItems} />
+        )}
+        {rest.map((item) => (
+          <li key={item.href}>
+            <NavLink {...item} />
+          </li>
+        ))}
       </ul>
     </nav>
   );
 }
 
-export function MobileMenu({ phone }: { phone: string }) {
+export function MobileMenu({ phone, groups }: { phone: string; groups: Group[] }) {
   const { open, setOpen } = useMenu();
   const pathname = usePathname();
   const { t, path } = useLocale();
   const isActive = useIsActive();
+  const { home, groups: groupItems, rest } = useMenuItems(groups);
+  const items = [home, ...groupItems, ...rest];
 
   // Navigating closes the drawer — a link that leaves it open over the new
   // page looks like the tap did nothing.
@@ -149,7 +248,7 @@ export function MobileMenu({ phone }: { phone: string }) {
         >
           <nav className="flex h-full flex-col overflow-y-auto px-4 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
             <ul className="flex flex-col gap-1">
-              {NAV.map((item, i) => {
+              {items.map((item, i) => {
                 const active = isActive(item.href);
 
                 return (
@@ -167,7 +266,7 @@ export function MobileMenu({ phone }: { phone: string }) {
                         active ? 'bg-ink-950 text-paper' : 'text-ink-900 active:bg-ink-100',
                       )}
                     >
-                      {t.nav[item.key]}
+                      {item.label}
                       <ChevronLeft className={cn('dir-icon size-5', active ? 'text-gold-300' : 'text-ink-300')} />
                     </Link>
                   </motion.li>

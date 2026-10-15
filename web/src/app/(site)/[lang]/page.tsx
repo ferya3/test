@@ -8,6 +8,7 @@ import { Cta } from '@/components/home/cta';
 import { Projects } from '@/components/home/projects';
 import { countProducts, getProcessSteps, getProjects, getCategoriesWithStats, getFeaturedProducts, getSettings } from '@/lib/queries';
 import { persianYear } from '@/lib/catalog';
+import { catalogFor } from '@/lib/attributes';
 import { alternates, jsonLd, siteUrl } from '@/lib/seo';
 import { getDictionary } from '@/i18n/dictionaries';
 import { localePath, type Locale } from '@/i18n/config';
@@ -53,7 +54,11 @@ export default async function HomePage({ params }: Props) {
         title={settings.hero_title}
         lead={settings.hero_lead}
         phone={settings.contact_phone}
-        panels={featured.slice(0, 4).map((p) => ({ color: p.color_hex, family: p.family }))}
+        panels={featured.slice(0, 4).map((p) => ({ color: p.color_hex, texture: catalogFor(lang).texture(p.family) }))}
+        ctaLabel={settings.hero_cta_label}
+        ctaHref={settings.hero_cta_href || (categories[0] ? `/categories/${categories[0].slug}` : '/projects')}
+        showPhone={settings.hero_show_phone !== '0'}
+        image={settings.hero_image || null}
       />
       <Intro overline={settings.intro_overline} heading={settings.intro_heading} body={settings.intro_body} stats={stats} />
       <Groups categories={categories} locale={lang} />
