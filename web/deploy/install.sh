@@ -182,6 +182,10 @@ server {
 
     location / {
         proxy_pass http://127.0.0.1:3000;
+        # A redirect that names the app's own address (which only this server
+        # can reach) is turned back into one for the visitor's address.
+        proxy_redirect http://localhost:3000/ /;
+        proxy_redirect http://127.0.0.1:3000/ /;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
         # Overwritten, never appended: the app rate-limits on this address.

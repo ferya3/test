@@ -33,6 +33,14 @@ npm ci --no-audit --no-fund --loglevel=error --registry="$registry"
 set -a; . "$ENV_FILE"; set +a
 npm run build
 
+# Servers installed before nginx learned to rewrite redirects that name the
+# app's internal address: add that to their config once.
+SITE_CONF=/etc/nginx/sites-available/artavil-web
+if [[ -f $SITE_CONF ]] && ! grep -q 'proxy_redirect http://localhost:3000/' "$SITE_CONF"; then
+  sed -i '0,/proxy_pass http:\/\/127.0.0.1:3000;/s//proxy_pass http:\/\/127.0.0.1:3000;\n        proxy_redirect http:\/\/localhost:3000\/ \/;\n        proxy_redirect http:\/\/127.0.0.1:3000\/ \/;/' "$SITE_CONF"
+  nginx -t -q && systemctl reload nginx && echo "nginx: redirects to the internal address are now rewritten"
+fi
+
 chown -R root:root "$SRC_DIR"
 chmod -R u=rwX,go=rX "$SRC_DIR"
 install -d -o artavil -g artavil -m 755 "$APP_DIR/.next/cache"

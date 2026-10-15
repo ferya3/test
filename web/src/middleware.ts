@@ -28,7 +28,10 @@ export function middleware(request: NextRequest) {
     const host = request.headers.get('host') ?? request.nextUrl.host;
     const proto = request.headers.get('x-forwarded-proto') ?? request.nextUrl.protocol.replace(':', '');
     const target = `${proto}://${host}${pathname.slice(3) || '/'}${request.nextUrl.search}`;
-    return NextResponse.redirect(target, 308);
+    // Temporary (307), not permanent: browsers keep a permanent redirect
+    // forever and replay it without asking again, so a wrong one could not
+    // be taken back from the server.
+    return NextResponse.redirect(target, 307);
   }
 
   const headers = new Headers(request.headers);
