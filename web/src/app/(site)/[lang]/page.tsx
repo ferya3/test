@@ -12,6 +12,7 @@ import { persianYear } from '@/lib/catalog';
 import { catalogFor } from '@/lib/attributes';
 import { jsonLd, siteUrl } from '@/lib/seo';
 import { pageMetadata } from '@/lib/metadata';
+import { mediaUrl } from '@/lib/media';
 import { getDictionary } from '@/i18n/dictionaries';
 import { isLocale, localePath, type Locale } from '@/i18n/config';
 
@@ -63,7 +64,7 @@ export default async function HomePage({ params }: Props) {
         alternateName: getSettings(lang === 'fa' ? 'en' : 'fa').company_name,
         description: settings.company_tagline,
         url: `${base}${localePath(lang, '/')}`,
-        logo: `${base}/logo.png`,
+        logo: settings.logo ? `${base}${mediaUrl(settings.logo)}` : `${base}/logo.png`,
         image: `${base}/og-${lang}.png`,
         telephone: settings.contact_phone,
         email: settings.contact_email,

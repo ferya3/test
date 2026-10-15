@@ -339,6 +339,12 @@ export const SETTING_DEFAULTS = {
     'آرتاویل گلد، تولیدکنندهٔ صفحه کابینت اچ‌پی‌ال و ورق کامپکت در طرح‌های چوبی، سنگی و تک‌رنگ؛ مقاوم در برابر خط و خش، حرارت و رطوبت. استعلام قیمت و نمونهٔ رنگ.',
   // The code Google Search Console gives for the "HTML tag" verification method.
   google_site_verification: '',
+  // Brand: uploaded logo (light backgrounds), a version for the dark footer,
+  // the square site icon, and whether the name is written beside the logo.
+  logo: '',
+  logo_dark: '',
+  site_icon: '',
+  brand_show_name: '1',
   // Home page sections below the hero: headings, and whether each is shown.
   home_groups_overline: DICT_FA.groups.overline,
   home_groups_title: DICT_FA.groups.title,

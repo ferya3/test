@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { db, transaction } from '@/lib/db';
 import { requireAdmin } from '@/lib/session';
-import { SETTING_DEFAULTS, TRANSLATED_SETTINGS, type SettingKey } from '@/lib/queries';
+import { getSettings, SETTING_DEFAULTS, TRANSLATED_SETTINGS, type SettingKey } from '@/lib/queries';
 import { bool, int, SLUG, str } from '@/lib/validate';
 import { deleteImage, replaceImage } from '@/lib/images';
 import type { ActionState } from './types';
@@ -102,6 +102,8 @@ export async function deleteCategory(id: number): Promise<void> {
   redirect('/admin/categories');
 }
 
+const IMAGE_SETTINGS = new Set<SettingKey>(['hero_image', 'logo', 'logo_dark', 'site_icon']);
+
 /** Long text fields; everything else is a single line. */
 const LONG: SettingKey[] = ['intro_body', 'home_featured_lead', 'home_projects_lead', 'home_cta_lead'];
 
@@ -115,6 +117,8 @@ export async function saveSettings(_prev: ActionState, form: FormData): Promise<
   // field that is not on the page must not be blanked.
   for (const key of Object.keys(SETTING_DEFAULTS) as SettingKey[]) {
     if (!form.has(key)) continue;
+    // Image names are set only by their own forms, from a real upload.
+    if (IMAGE_SETTINGS.has(key)) continue;
     // Line endings normalised so paragraph splitting on the site is reliable.
     const value = str(form, key, LONG.includes(key) ? 6000 : 300).replace(/\r\n?/g, '\n');
     if (key === 'company_name' && value.length < 2) errors[key] = 'نام شرکت را وارد کنید.';
@@ -230,4 +234,40 @@ export async function saveHero(_prev: ActionState, form: FormData): Promise<Acti
 
   revalidatePath('/', 'layout');
   return { ok: true, message: 'هیرو ذخیره شد.' };
+}
+
+/**
+ * Logo, logo for the dark footer, site icon, and whether the name shows
+ * beside the logo. Each image is replaced or removed on its own.
+ */
+export async function saveBrand(_prev: ActionState, form: FormData): Promise<ActionState> {
+  await requireAdmin();
+
+  const fields = ['logo', 'logo_dark', 'site_icon'] as const;
+  const settings = getSettings();
+  const next: Record<string, string | null> = {};
+  for (const field of fields) {
+    const result = await replaceImage(form, settings[field] || null, field);
+    if (typeof result === 'object' && result) {
+      // Do not leave the images stored a moment ago orphaned.
+      for (const done of Object.keys(next)) {
+        const name = next[done];
+        if (name && name !== settings[done as (typeof fields)[number]]) await deleteImage(name);
+      }
+      return result;
+    }
+    next[field] = result;
+  }
+
+  const upsert = db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value');
+  transaction(() => {
+    for (const field of fields) upsert.run(field, next[field] ?? '');
+    upsert.run('brand_show_name', bool(form, 'brand_show_name') ? '1' : '0');
+  });
+  for (const field of fields) {
+    if (settings[field] && settings[field] !== next[field]) await deleteImage(settings[field]);
+  }
+
+  revalidatePath('/', 'layout');
+  return { ok: true, message: 'ذخیره شد.' };
 }

@@ -25,7 +25,7 @@ export function Footer({ locale }: { locale: Locale }) {
 
       <div className="relative mx-auto grid max-w-7xl grid-cols-2 gap-x-6 gap-y-8 px-4 py-12 sm:gap-10 sm:px-6 sm:py-16 lg:grid-cols-4 lg:px-8">
         <div className="col-span-2 flex flex-col gap-4 lg:col-span-1">
-          <Brand name={settings.company_name} locale={locale} light />
+          <Brand locale={locale} light />
           <p className="max-w-xs text-sm leading-7">{settings.company_tagline}</p>
         </div>
 

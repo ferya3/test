@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Boxes, Factory, FolderTree, Images, Inbox, LayoutDashboard, LayoutList, Palette, Settings, ShieldCheck, Sparkles } from 'lucide-react';
+import { Boxes, Factory, FolderTree, Images, Inbox, LayoutDashboard, LayoutList, Palette, Settings, ShieldCheck, Sparkles, Stamp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const ITEMS = [
@@ -16,6 +16,7 @@ const ITEMS = [
   { href: '/admin/process', label: 'فرآیند تولید', icon: Factory },
   { href: '/admin/leads', label: 'پیام‌ها', icon: Inbox },
   { href: '/admin/settings', label: 'محتوای سایت', icon: Settings },
+  { href: '/admin/brand', label: 'لوگو و آیکن', icon: Stamp },
   { href: '/admin/security', label: 'امنیت', icon: ShieldCheck },
 ];
 
