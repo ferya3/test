@@ -106,12 +106,12 @@
     /* Persian reads comfortably with more leading than Latin. */
     line-height: 1.8;
 
-    /* The backdrop around the boxed site: a shade darker than the box, with
-       a faint warm light from the top so it reads as a surface, not a gap. */
+    /* The backdrop around the boxed site: near-black, with a faint warm light
+       from the top so it reads as a surface, not a void. */
     @media (width >= 64rem) {
       background:
-        radial-gradient(ellipse 70% 40% at 50% 0%, rgb(230 196 126 / 0.18), transparent 70%),
-        var(--color-ink-100);
+        radial-gradient(ellipse 70% 40% at 50% 0%, rgb(212 168 83 / 0.12), transparent 70%),
+        var(--color-ink-950);
       background-attachment: fixed;
     }
   }
@@ -153,8 +153,10 @@
       border-radius: var(--radius-2xl);
       overflow: clip;
       box-shadow:
-        0 0 0 1px rgb(15 13 11 / 0.05),
-        0 30px 80px -30px rgb(15 13 11 / 0.35);
+        /* On the dark backdrop a gold hairline, not a shadow, sets the box
+           off — also where its own dark sections meet the black. */
+        0 0 0 1px rgb(212 168 83 / 0.28),
+        0 30px 80px -30px rgb(0 0 0 / 0.6);
     }
   }
 }
