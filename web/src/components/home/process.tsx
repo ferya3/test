@@ -26,7 +26,7 @@ export type ProcessCard = { position: number; title: string; body: string; image
  * is a plain swipeable row with snap points — the same content, native
  * gestures.
  */
-export function Process({ steps }: { steps: ProcessCard[] }) {
+export function Process({ steps, overline, title }: { steps: ProcessCard[]; overline: string; title: string }) {
   const section = useRef<HTMLElement>(null);
   const track = useRef<HTMLOListElement>(null);
   const { t, locale } = useLocale();
@@ -84,8 +84,8 @@ export function Process({ steps }: { steps: ProcessCard[] }) {
       <div aria-hidden className="absolute bottom-0 start-1/3 size-[36rem] translate-y-1/2 rounded-full bg-gold-500/10 blur-[120px]" />
 
       <div className="relative mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-        <p className="mb-3 text-sm font-bold tracking-wide text-gold-300">{t.process.overline}</p>
-        <h2 className="max-w-2xl text-h2 font-black text-balance">{t.process.title}</h2>
+        <p className="mb-3 text-sm font-bold tracking-wide text-gold-300">{overline}</p>
+        <h2 className="max-w-2xl text-h2 font-black text-balance">{title}</h2>
       </div>
 
       <ol

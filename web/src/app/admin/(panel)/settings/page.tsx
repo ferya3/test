@@ -1,15 +1,12 @@
 import { PageHeader } from '@/components/admin/page-header';
-import { AdminForm, Field } from '@/components/admin/form';
-import { Input, Textarea } from '@/components/ui/input';
+import { AdminForm } from '@/components/admin/form';
+import { SettingsFields, type SettingsGroup } from '@/components/admin/settings-fields';
 import { requireAdmin } from '@/lib/session';
 import { saveSettings } from '@/lib/actions/content';
-import { getSettings, TRANSLATED_SETTINGS, type SettingKey, type TranslatedSettingKey } from '@/lib/queries';
 
 export const metadata = { title: 'محتوای سایت' };
 
-type Item = { key: SettingKey; label: string; long?: boolean; ltr?: boolean; hint?: string };
-
-const GROUPS: { title: string; items: Item[] }[] = [
+const GROUPS: SettingsGroup[] = [
   {
     title: 'شرکت',
     items: [
@@ -55,46 +52,12 @@ const GROUPS: { title: string; items: Item[] }[] = [
 
 export default async function SettingsPage() {
   await requireAdmin();
-  const settings = getSettings();
-  // What the English site shows now: the saved English, or its built-in default.
-  const english = getSettings('en');
 
   return (
     <>
-      <PageHeader title="محتوای سایت" description="نام شرکت، معرفی زیر هیرو و اطلاعات تماس. هیرو صفحهٔ خودش را دارد." />
+      <PageHeader title="محتوای سایت" description="نام شرکت، معرفی زیر هیرو، اطلاعات تماس و سئوی صفحهٔ اصلی. هیرو و بخش‌های صفحهٔ اصلی صفحهٔ خودشان را دارند." />
       <AdminForm action={saveSettings} className="rounded-2xl bg-white p-5 shadow-[var(--shadow-soft)] sm:p-8">
-        {GROUPS.map((group) => (
-          <fieldset key={group.title} className="grid gap-5 border-b border-ink-100 pb-6 last-of-type:border-0">
-            <legend className="mb-4 text-h3 font-bold text-ink-950">{group.title}</legend>
-            {group.items.map((item) => {
-              const translated = (TRANSLATED_SETTINGS as readonly string[]).includes(item.key);
-              const enKey = `${item.key}_en`;
-
-              return (
-                <div key={item.key} className={translated ? 'grid gap-3 lg:grid-cols-2 lg:gap-5' : undefined}>
-                  <Field name={item.key} label={item.label} hint={item.hint}>
-                    {item.long ? (
-                      <Textarea id={item.key} name={item.key} defaultValue={settings[item.key]} className="min-h-48" maxLength={6000} />
-                    ) : (
-                      <Input id={item.key} name={item.key} defaultValue={settings[item.key]} dir={item.ltr ? 'ltr' : undefined} maxLength={300} />
-                    )}
-                  </Field>
-
-                  {/* The English version, beside it on wide screens. */}
-                  {translated && (
-                    <Field name={enKey} label={`${item.label} — انگلیسی`}>
-                      {item.long ? (
-                        <Textarea id={enKey} name={enKey} defaultValue={english[item.key as TranslatedSettingKey]} dir="ltr" className="min-h-48" maxLength={6000} />
-                      ) : (
-                        <Input id={enKey} name={enKey} defaultValue={english[item.key as TranslatedSettingKey]} dir="ltr" maxLength={300} />
-                      )}
-                    </Field>
-                  )}
-                </div>
-              );
-            })}
-          </fieldset>
-        ))}
+        <SettingsFields groups={GROUPS} />
       </AdminForm>
     </>
   );

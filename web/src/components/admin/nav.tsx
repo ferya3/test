@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Boxes, Factory, FolderTree, Images, Inbox, LayoutDashboard, Palette, Settings, ShieldCheck, Sparkles } from 'lucide-react';
+import { Boxes, Factory, FolderTree, Images, Inbox, LayoutDashboard, LayoutList, Palette, Settings, ShieldCheck, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const ITEMS = [
   { href: '/admin', label: 'داشبورد', icon: LayoutDashboard },
   { href: '/admin/hero', label: 'هیروی صفحهٔ اصلی', icon: Sparkles },
+  { href: '/admin/home', label: 'بخش‌های صفحهٔ اصلی', icon: LayoutList },
   { href: '/admin/products', label: 'محصولات', icon: Boxes },
   { href: '/admin/categories', label: 'گروه‌ها', icon: FolderTree },
   { href: '/admin/attributes', label: 'طرح، سطح، ضخامت', icon: Palette },

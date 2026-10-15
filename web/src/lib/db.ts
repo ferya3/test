@@ -279,6 +279,13 @@ const MIGRATIONS: Migration[] = [
       db.exec(`UPDATE products SET ${column} = replace(${column}, ' a embossed ', ' an embossed ')`);
     }
   },
+
+  /* 7 — a photo for each group's card on the home page */
+  (db) => {
+    // Separate from the page's cover photo: the card is a different shape,
+    // and a group may want a product close-up there and a room on its page.
+    db.exec(`ALTER TABLE categories ADD COLUMN card_image TEXT`);
+  },
 ];
 
 /**

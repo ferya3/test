@@ -14,7 +14,9 @@ export async function saveCategory(id: number | null, _prev: ActionState, form: 
   await requireAdmin();
 
   const existing = id
-    ? (db.prepare('SELECT image FROM categories WHERE id = ?').get(id) as { image: string | null } | undefined)
+    ? (db.prepare('SELECT image, card_image FROM categories WHERE id = ?').get(id) as
+        | { image: string | null; card_image: string | null }
+        | undefined)
     : undefined;
   if (id && !existing) return { ok: false, message: 'این گروه دیگر وجود ندارد.' };
 
@@ -32,6 +34,12 @@ export async function saveCategory(id: number | null, _prev: ActionState, form: 
 
   const image = await replaceImage(form, existing?.image ?? null);
   if (typeof image === 'object' && image) return image;
+  const cardImage = await replaceImage(form, existing?.card_image ?? null, 'card_image');
+  if (typeof cardImage === 'object' && cardImage) {
+    // The cover photo was already stored: do not leave it orphaned.
+    if (image && image !== existing?.image) await deleteImage(image);
+    return cardImage;
+  }
 
   const scene = str(form, 'scene', 10) === 'cubicles' ? 'cubicles' : 'kitchen';
   const values = [
@@ -44,6 +52,7 @@ export async function saveCategory(id: number | null, _prev: ActionState, form: 
     int(form, 'position', 0, 999),
     bool(form, 'is_active') ? 1 : 0,
     image,
+    cardImage,
     scene,
     str(form, 'seo_title', 120),
     str(form, 'seo_description', 320),
@@ -54,18 +63,19 @@ export async function saveCategory(id: number | null, _prev: ActionState, form: 
   if (id) {
     db.prepare(
       `UPDATE categories SET name=?, short=?, description=?, name_en=?, short_en=?, description_en=?,
-         position=?, is_active=?, image=?, scene=?,
+         position=?, is_active=?, image=?, card_image=?, scene=?,
          seo_title=?, seo_description=?, seo_title_en=?, seo_description_en=? WHERE id=?`,
     ).run(...values, id);
   } else {
     db.prepare(
-      `INSERT INTO categories (name, short, description, name_en, short_en, description_en, position, is_active, image, scene,
-         seo_title, seo_description, seo_title_en, seo_description_en, slug)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO categories (name, short, description, name_en, short_en, description_en, position, is_active, image, card_image,
+         scene, seo_title, seo_description, seo_title_en, seo_description_en, slug)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     ).run(...values, slug);
   }
 
   if (existing?.image && existing.image !== image) await deleteImage(existing.image);
+  if (existing?.card_image && existing.card_image !== cardImage) await deleteImage(existing.card_image);
 
   revalidatePath('/', 'layout');
   if (!id) redirect('/admin/categories');
@@ -79,10 +89,13 @@ export async function deleteCategory(id: number): Promise<void> {
   const { n } = db.prepare('SELECT COUNT(*) AS n FROM products WHERE category_id = ?').get(id) as { n: number };
   if (n > 0) return;
 
-  const row = db.prepare('SELECT image FROM categories WHERE id = ?').get(id) as { image: string | null } | undefined;
+  const row = db.prepare('SELECT image, card_image FROM categories WHERE id = ?').get(id) as
+    | { image: string | null; card_image: string | null }
+    | undefined;
   if (row) {
     db.prepare('DELETE FROM categories WHERE id = ?').run(id);
     await deleteImage(row.image);
+    await deleteImage(row.card_image);
   }
 
   revalidatePath('/', 'layout');
@@ -90,7 +103,7 @@ export async function deleteCategory(id: number): Promise<void> {
 }
 
 /** Long text fields; everything else is a single line. */
-const LONG: SettingKey[] = ['intro_body'];
+const LONG: SettingKey[] = ['intro_body', 'home_featured_lead', 'home_projects_lead', 'home_cta_lead'];
 
 export async function saveSettings(_prev: ActionState, form: FormData): Promise<ActionState> {
   await requireAdmin();
@@ -107,6 +120,9 @@ export async function saveSettings(_prev: ActionState, form: FormData): Promise<
     if (key === 'company_name' && value.length < 2) errors[key] = 'نام شرکت را وارد کنید.';
     if (key === 'founded_year' && value && !/^\d{4}$/.test(value)) errors[key] = 'سال چهاررقمی، مثل ۱۳۷۵.';
     if (key === 'contact_email' && value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) errors[key] = 'ایمیل معتبر نیست.';
+    // Fixed choices: anything else is not from the form.
+    if (key.startsWith('home_show_') && value !== '0' && value !== '1') continue;
+    if (key === 'home_featured_count' && !['3', '6', '9', '12'].includes(value)) continue;
     if (key === 'google_site_verification') {
       // The whole <meta> tag may be pasted; only its content is kept, and only
       // if it has the shape of a token, since it is written into every page.

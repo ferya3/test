@@ -103,7 +103,7 @@ export default async function HeroPage() {
             label="عکس پس‌زمینه (اختیاری)"
             hint="عکس افقی و باکیفیت. با عکس، پشت متن تمام‌عرض نمایش داده می‌شود و با سایهٔ تیره خوانا می‌ماند. بدون عکس، ورق‌های سه‌بعدی نمایش داده می‌شوند."
           >
-            <ImageInput name="image" current={fa.hero_image || null} />
+            <ImageInput name="image" current={fa.hero_image || null} recommended="۱۸۰۰ × ۱۱۲۵ پیکسل (۱۶:۱۰)، موضوع در وسط" />
           </Field>
         </fieldset>
       </AdminForm>

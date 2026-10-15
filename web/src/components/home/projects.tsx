@@ -9,7 +9,19 @@ import { getDictionary } from '@/i18n/dictionaries';
 import { localePath, type Locale } from '@/i18n/config';
 
 /** Completed projects on the home page: the first six, the first one large. */
-export function Projects({ projects, locale }: { projects: Project[]; locale: Locale }) {
+export function Projects({
+  projects,
+  locale,
+  overline,
+  title,
+  lead,
+}: {
+  projects: Project[];
+  locale: Locale;
+  overline: string;
+  title: string;
+  lead: string;
+}) {
   if (projects.length === 0) return null;
   const t = getDictionary(locale).projects;
 
@@ -17,7 +29,7 @@ export function Projects({ projects, locale }: { projects: Project[]; locale: Lo
     <section className="bg-ink-50 py-14 sm:py-20 lg:py-28">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <Reveal className="flex flex-wrap items-end justify-between gap-4">
-          <SectionHeading overline={t.overline} title={t.title} lead={t.lead} />
+          <SectionHeading overline={overline} title={title} lead={lead} />
           <Button asChild variant="outline" className="hidden sm:inline-flex">
             <Link href={localePath(locale, '/projects')}>
               {t.all}

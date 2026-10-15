@@ -4,19 +4,30 @@ import { Reveal } from '@/components/motion/reveal';
 import { Tilt } from '@/components/motion/tilt';
 import { SectionHeading } from '@/components/site/section-heading';
 import { num } from '@/lib/catalog';
+import { mediaUrl } from '@/lib/media';
 import { getDictionary } from '@/i18n/dictionaries';
 import { localePath, type Locale } from '@/i18n/config';
 import type { CategoryWithStats } from '@/lib/queries';
 
 /** The two product groups, as two large cards — the main road into the catalogue. */
-export function Groups({ categories, locale }: { categories: CategoryWithStats[]; locale: Locale }) {
+export function Groups({
+  categories,
+  locale,
+  overline,
+  title,
+}: {
+  categories: CategoryWithStats[];
+  locale: Locale;
+  overline: string;
+  title: string;
+}) {
   const t = getDictionary(locale).groups;
 
   return (
     <section className="bg-ink-50 py-14 sm:py-20 lg:py-28">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <Reveal>
-          <SectionHeading overline={t.overline} title={t.title} />
+          <SectionHeading overline={overline} title={title} />
         </Reveal>
 
         <div className={`mt-7 grid gap-4 sm:mt-10 sm:gap-5 md:grid-cols-2 lg:mt-14 lg:gap-8 ${categories.length >= 3 ? 'lg:grid-cols-3' : ''}`}>
@@ -25,9 +36,24 @@ export function Groups({ categories, locale }: { categories: CategoryWithStats[]
               <Tilt max={4} className="h-full rounded-2xl">
                 <Link
                   href={localePath(locale, `/categories/${category.slug}`)}
-                  className="relative flex h-full flex-col overflow-hidden rounded-2xl bg-ink-950 text-paper shadow-[var(--shadow-lift)]"
+                  className="group relative flex h-full flex-col overflow-hidden rounded-2xl bg-ink-950 text-paper shadow-[var(--shadow-lift)]"
                 >
-                  {/* A fanned stack of this group's real colours, lit from above. */}
+                  {/* The card's photo (set in the admin); without one, a fanned
+                      stack of this group's real colours, lit from above. */}
+                  {category.card_image ? (
+                    // The same height as a drawn card, so titles line up in a row.
+                    <div className="relative h-40 overflow-hidden sm:h-72">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- already a sized WebP from sharp */}
+                      <img
+                        src={mediaUrl(category.card_image)}
+                        alt={category.name}
+                        loading="lazy"
+                        decoding="async"
+                        className="size-full object-cover transition-transform duration-[1.2s] ease-[var(--ease-out-expo)] group-hover:scale-105"
+                      />
+                      <div aria-hidden className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-ink-950 to-transparent" />
+                    </div>
+                  ) : (
                   <div aria-hidden className="relative h-40 overflow-hidden sm:h-72">
                     <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgb(212_168_83/0.28),transparent_65%)]" />
                     <div className="absolute inset-x-0 top-6 mx-auto h-44 w-28 sm:top-12 sm:h-64 sm:w-44">
@@ -50,6 +76,7 @@ export function Groups({ categories, locale }: { categories: CategoryWithStats[]
                     </div>
                     <div className="absolute inset-x-0 bottom-0 z-20 h-28 bg-gradient-to-t from-ink-950 via-ink-950/70 to-transparent" />
                   </div>
+                  )}
 
                   <div className="relative flex flex-1 flex-col p-5 pt-1 sm:p-8 sm:pt-2">
                     <p className="text-sm text-gold-300">{num(category.product_count, locale)} {t.designs}</p>

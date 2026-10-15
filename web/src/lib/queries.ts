@@ -10,6 +10,11 @@
  * when it has not been filled in yet, so a page is never blank.
  */
 import { db } from './db.ts';
+import { getDictionary } from '../i18n/dictionaries.ts';
+
+// The built-in wording of the home page sections, the defaults of their settings.
+const DICT_FA = getDictionary('fa');
+const DICT_EN = getDictionary('en');
 
 export type Lang = 'fa' | 'en';
 
@@ -24,6 +29,8 @@ export type Category = {
   description_en: string;
   /** Photo behind the heading of the group's page, or null. */
   image: string | null;
+  /** Photo on the group's card on the home page; null draws its colours instead. */
+  card_image: string | null;
   /** The drawing that stands in for a project photo in this group. */
   scene: 'kitchen' | 'cubicles';
   /** Search-result title and description; empty means worked out from the content. */
@@ -332,6 +339,27 @@ export const SETTING_DEFAULTS = {
     'آرتاویل گلد، تولیدکنندهٔ صفحه کابینت اچ‌پی‌ال و ورق کامپکت در طرح‌های چوبی، سنگی و تک‌رنگ؛ مقاوم در برابر خط و خش، حرارت و رطوبت. استعلام قیمت و نمونهٔ رنگ.',
   // The code Google Search Console gives for the "HTML tag" verification method.
   google_site_verification: '',
+  // Home page sections below the hero: headings, and whether each is shown.
+  home_groups_overline: DICT_FA.groups.overline,
+  home_groups_title: DICT_FA.groups.title,
+  home_process_overline: DICT_FA.process.overline,
+  home_process_title: DICT_FA.process.title,
+  home_featured_overline: DICT_FA.featured.overline,
+  home_featured_title: DICT_FA.featured.title,
+  home_featured_lead: DICT_FA.featured.lead,
+  home_projects_overline: DICT_FA.projects.overline,
+  home_projects_title: DICT_FA.projects.title,
+  home_projects_lead: DICT_FA.projects.lead,
+  // Words between *stars* are written in gold.
+  home_cta_title: `${DICT_FA.cta.titleA} *${DICT_FA.cta.titleGold}* ${DICT_FA.cta.titleB}`,
+  home_cta_lead: DICT_FA.cta.lead,
+  home_show_intro: '1',
+  home_show_groups: '1',
+  home_show_process: '1',
+  home_show_featured: '1',
+  home_show_projects: '1',
+  home_show_cta: '1',
+  home_featured_count: '6',
 } as const;
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
@@ -354,6 +382,18 @@ export const TRANSLATED_SETTINGS = [
   'contact_address',
   'seo_home_title',
   'seo_home_description',
+  'home_groups_overline',
+  'home_groups_title',
+  'home_process_overline',
+  'home_process_title',
+  'home_featured_overline',
+  'home_featured_title',
+  'home_featured_lead',
+  'home_projects_overline',
+  'home_projects_title',
+  'home_projects_lead',
+  'home_cta_title',
+  'home_cta_lead',
 ] as const satisfies readonly SettingKey[];
 
 export type TranslatedSettingKey = (typeof TRANSLATED_SETTINGS)[number];
@@ -374,6 +414,18 @@ export const SETTING_DEFAULTS_EN: Record<TranslatedSettingKey, string> = {
   seo_home_title: 'HPL Cabinet Panels & Compact Sheet | Artavil Gold',
   seo_home_description:
     'Artavil Gold makes HPL cabinet panels and compact sheet in wood, stone and solid-colour designs: scratch, heat and moisture resistant. Ask for prices and samples.',
+  home_groups_overline: DICT_EN.groups.overline,
+  home_groups_title: DICT_EN.groups.title,
+  home_process_overline: DICT_EN.process.overline,
+  home_process_title: DICT_EN.process.title,
+  home_featured_overline: DICT_EN.featured.overline,
+  home_featured_title: DICT_EN.featured.title,
+  home_featured_lead: DICT_EN.featured.lead,
+  home_projects_overline: DICT_EN.projects.overline,
+  home_projects_title: DICT_EN.projects.title,
+  home_projects_lead: DICT_EN.projects.lead,
+  home_cta_title: `${DICT_EN.cta.titleA} *${DICT_EN.cta.titleGold}* ${DICT_EN.cta.titleB}`,
+  home_cta_lead: DICT_EN.cta.lead,
 };
 
 export function getSettings(lang: Lang = 'fa'): Settings {

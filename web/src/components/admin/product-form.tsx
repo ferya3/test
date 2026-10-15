@@ -99,8 +99,13 @@ export function ProductForm({ product, categories }: { product?: Product; catego
           </label>
         </div>
 
-        <Field name="image" label="تصویر محصول" className="sm:col-span-2">
-          <ImageInput name="image" current={p?.image ?? null} />
+        <Field
+          name="image"
+          label="تصویر محصول"
+          className="sm:col-span-2"
+          hint="همین عکس روی کارت محصول (صفحهٔ اصلی و صفحهٔ گروه) و در صفحهٔ خود محصول می‌آید. بدون عکس، نمونهٔ رنگ و بافت کشیده می‌شود."
+        >
+          <ImageInput name="image" current={p?.image ?? null} recommended="۱۲۰۰ × ۱۲۰۰ پیکسل (مربع)، موضوع در ۸۰٪ وسط" />
         </Field>
 
         <Field name="short" label="توضیح کوتاه" className="sm:col-span-2">

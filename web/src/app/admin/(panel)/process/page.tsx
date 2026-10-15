@@ -36,7 +36,7 @@ export default async function ProcessPage() {
               <Textarea id={`body_en-${step.id}`} name="body_en" defaultValue={step.body_en} dir="ltr" maxLength={400} className="min-h-24" />
             </Field>
             <Field name="image" id={`image-${step.id}`} label="عکس" hint="عکس عمودی بهتر است؛ متن روی پایین عکس می‌نشیند.">
-              <ImageInput name="image" id={`image-${step.id}`} current={step.image} />
+              <ImageInput name="image" id={`image-${step.id}`} current={step.image} recommended="۹۰۰ × ۱۲۰۰ پیکسل (عمودی ۳:۴)" />
             </Field>
           </AdminForm>
         ))}

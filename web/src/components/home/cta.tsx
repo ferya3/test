@@ -5,7 +5,20 @@ import { Reveal } from '@/components/motion/reveal';
 import { getDictionary } from '@/i18n/dictionaries';
 import { localePath, type Locale } from '@/i18n/config';
 
-export function Cta({ phone, locale }: { phone: string; locale: Locale }) {
+/** "Build *with us*": the words between stars in gold. */
+function withGold(text: string) {
+  return text.split(/\*([^*]+)\*/).map((part, i) =>
+    i % 2 === 1 ? (
+      <span key={i} className="gold-text">
+        {part}
+      </span>
+    ) : (
+      part
+    ),
+  );
+}
+
+export function Cta({ phone, locale, title, lead }: { phone: string; locale: Locale; title: string; lead: string }) {
   const t = getDictionary(locale).cta;
 
   return (
@@ -14,10 +27,10 @@ export function Cta({ phone, locale }: { phone: string; locale: Locale }) {
         <div aria-hidden className="absolute -top-1/2 left-1/2 size-[40rem] -translate-x-1/2 rounded-full bg-gold-500/20 blur-[110px]" />
         <div className="relative">
           <h2 className="text-h1 font-black text-balance">
-            {t.titleA} <span className="gold-text">{t.titleGold}</span> {t.titleB}
+            {withGold(title)}
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-lead text-ink-300">
-            {t.lead}
+            {lead}
           </p>
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
             <Button asChild size="lg">

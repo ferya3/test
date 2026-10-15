@@ -30,8 +30,17 @@ export function CategoryForm({ category, nextPosition = 0 }: { category?: Catego
           <Input id="position" name="position" type="number" min={0} max={999} defaultValue={c?.position ?? nextPosition} dir="ltr" />
         </Field>
 
-        <Field name="image" label="عکس بالای صفحهٔ گروه" className="sm:col-span-2" hint="عکس افقی و پهن، بدون نوشته روی آن؛ عنوان و توضیح زیر عکس می‌آیند. متن جایگزین عکس همان نام گروه است.">
-          <ImageInput name="image" current={c?.image ?? null} />
+        <Field
+          name="card_image"
+          label="عکس کارت گروه در صفحهٔ اصلی"
+          className="sm:col-span-2"
+          hint="بالای کارت بزرگ این گروه در صفحهٔ اصلی. بدون عکس، رنگ‌های محصولات گروه به شکل بادبزن کشیده می‌شوند."
+        >
+          <ImageInput name="card_image" current={c?.card_image ?? null} recommended="۱۶۰۰ × ۱۰۰۰ پیکسل (۱۶:۱۰)، موضوع در وسط؛ کناره‌ها بسته به عرض صفحه بریده می‌شوند" />
+        </Field>
+
+        <Field name="image" label="عکس بالای صفحهٔ گروه" className="sm:col-span-2" hint="نوار پهن بالای صفحهٔ گروه، بدون نوشته روی آن؛ عنوان و توضیح زیر عکس می‌آیند.">
+          <ImageInput name="image" current={c?.image ?? null} recommended="۱۸۰۰ × ۶۷۵ پیکسل (۸:۳)، موضوع در وسط" />
         </Field>
 
         <Field name="short" label="توضیح کوتاه (روی کارت صفحهٔ اصلی)">

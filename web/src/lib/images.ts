@@ -70,6 +70,9 @@ export async function deleteImage(name: string | null): Promise<void> {
  * when the upload is not an acceptable image. The caller deletes the old file
  * once the record is saved, so a failed save never loses the current photo.
  */
+/** The "remove the current image" checkbox of an image field (see ImageInput). */
+export const removeField = (field: string) => (field === 'image' ? 'remove_image' : `remove_${field}`);
+
 export async function replaceImage(
   form: FormData,
   current: string | null,
@@ -86,5 +89,5 @@ export async function replaceImage(
     }
   }
 
-  return form.get('remove_image') === 'on' ? null : current;
+  return form.get(removeField(field)) === 'on' ? null : current;
 }

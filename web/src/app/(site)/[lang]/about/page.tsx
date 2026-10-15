@@ -77,9 +77,9 @@ export default async function AboutPage({ params }: Props) {
         </div>
       </section>
 
-      <Process steps={getProcessSteps(lang)} />
+      <Process steps={getProcessSteps(lang)} overline={s.home_process_overline} title={s.home_process_title} />
       <div className="pt-14 sm:pt-20 lg:pt-28">
-        <Cta phone={s.contact_phone} locale={lang} />
+        <Cta phone={s.contact_phone} locale={lang} title={s.home_cta_title} lead={s.home_cta_lead} />
       </div>
     </>
   );

@@ -63,7 +63,7 @@ export function ProjectForm({ project, categories }: { project?: ProjectRow; cat
         </Field>
 
         <Field name="image" label="عکس پروژه" className="sm:col-span-2" hint="عکس افقی بهتر است. تا عکس نگذارید، یک تصویرسازی به رنگ زیر نمایش داده می‌شود.">
-          <ImageInput name="image" current={p?.image ?? null} />
+          <ImageInput name="image" current={p?.image ?? null} recommended="۱۶۰۰ × ۱۲۰۰ پیکسل (۴:۳)" />
         </Field>
 
         <Field name="color_hex" label="رنگ ورق به‌کاررفته">

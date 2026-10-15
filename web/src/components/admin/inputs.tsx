@@ -27,7 +27,18 @@ export function ColorInput({ name, defaultValue }: { name: string; defaultValue:
  * The product photograph. The `accept` list is a convenience for the file
  * picker only — the server decodes every upload and is what actually decides.
  */
-export function ImageInput({ name, id = name, current }: { name: string; id?: string; current: string | null }) {
+export function ImageInput({
+  name,
+  id = name,
+  current,
+  recommended,
+}: {
+  name: string;
+  id?: string;
+  current: string | null;
+  /** The size that fits where the image is shown, e.g. "۱۲۰۰ × ۱۲۰۰ پیکسل (مربع)". */
+  recommended?: string;
+}) {
   const [preview, setPreview] = useState<string | null>(current ? mediaUrl(current) : null);
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
 
@@ -60,10 +71,11 @@ export function ImageInput({ name, id = name, current }: { name: string; id?: st
         />
         {current && (
           <label className="flex items-center gap-2 text-ink-600">
-            <input type="checkbox" name="remove_image" className="size-4 accent-gold-600" />
+            <input type="checkbox" name={name === 'image' ? 'remove_image' : `remove_${name}`} className="size-4 accent-gold-600" />
             حذف تصویر فعلی
           </label>
         )}
+        {recommended && <p className="text-xs font-bold text-ink-700">اندازهٔ مناسب: {recommended}</p>}
         <p className="text-xs text-ink-500">JPG، PNG، WebP یا AVIF تا ۶ مگابایت؛ خودکار به WebP تبدیل می‌شود.</p>
       </div>
     </div>

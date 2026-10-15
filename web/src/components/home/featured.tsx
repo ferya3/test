@@ -2,18 +2,28 @@ import { Reveal } from '@/components/motion/reveal';
 import { SectionHeading } from '@/components/site/section-heading';
 import { ProductCard } from '@/components/catalog/product-card';
 import type { Product } from '@/lib/queries';
-import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
 
-export function Featured({ products, locale }: { products: Product[]; locale: Locale }) {
+export function Featured({
+  products,
+  locale,
+  overline,
+  title,
+  lead,
+}: {
+  products: Product[];
+  locale: Locale;
+  overline: string;
+  title: string;
+  lead: string;
+}) {
   if (products.length === 0) return null;
-  const t = getDictionary(locale).featured;
 
   return (
     <section className="py-14 sm:py-20 lg:py-28">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <Reveal>
-          <SectionHeading overline={t.overline} title={t.title} lead={t.lead} />
+          <SectionHeading overline={overline} title={title} lead={lead} />
         </Reveal>
 
         {/* A swipeable row on phones — six tall cards stacked two by two would

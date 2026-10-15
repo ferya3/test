@@ -37,8 +37,10 @@ export default async function HomePage({ params }: Props) {
   const t = getDictionary(lang);
   const settings = getSettings(lang);
   const categories = getCategoriesWithStats(lang);
-  const featured = getFeaturedProducts(6, lang);
+  const featured = getFeaturedProducts(Math.min(12, Math.max(3, parseInt(settings.home_featured_count, 10) || 6)), lang);
   const founded = parseInt(settings.founded_year, 10);
+  const show = (section: 'intro' | 'groups' | 'process' | 'featured' | 'projects' | 'cta') =>
+    settings[`home_show_${section}`] !== '0';
 
   const stats = [
     ...(Number.isFinite(founded) && founded < persianYear()
@@ -98,12 +100,36 @@ export default async function HomePage({ params }: Props) {
         showPhone={settings.hero_show_phone !== '0'}
         image={settings.hero_image || null}
       />
-      <Intro overline={settings.intro_overline} heading={settings.intro_heading} body={settings.intro_body} stats={stats} />
-      <Groups categories={categories} locale={lang} />
-      <Process steps={getProcessSteps(lang)} />
-      <Featured products={featured} locale={lang} />
-      <Projects projects={getProjects({ limit: 6, lang })} locale={lang} />
-      <Cta phone={settings.contact_phone} locale={lang} />
+      {/* Each section below the hero can be hidden, and its heading
+          rewritten, in the admin (صفحهٔ اصلی — بخش‌ها). */}
+      {show('intro') && (
+        <Intro overline={settings.intro_overline} heading={settings.intro_heading} body={settings.intro_body} stats={stats} />
+      )}
+      {show('groups') && (
+        <Groups categories={categories} locale={lang} overline={settings.home_groups_overline} title={settings.home_groups_title} />
+      )}
+      {show('process') && (
+        <Process steps={getProcessSteps(lang)} overline={settings.home_process_overline} title={settings.home_process_title} />
+      )}
+      {show('featured') && (
+        <Featured
+          products={featured}
+          locale={lang}
+          overline={settings.home_featured_overline}
+          title={settings.home_featured_title}
+          lead={settings.home_featured_lead}
+        />
+      )}
+      {show('projects') && (
+        <Projects
+          projects={getProjects({ limit: 6, lang })}
+          locale={lang}
+          overline={settings.home_projects_overline}
+          title={settings.home_projects_title}
+          lead={settings.home_projects_lead}
+        />
+      )}
+      {show('cta') && <Cta phone={settings.contact_phone} locale={lang} title={settings.home_cta_title} lead={settings.home_cta_lead} />}
     </>
   );
 }
