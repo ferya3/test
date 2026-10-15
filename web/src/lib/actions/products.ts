@@ -51,9 +51,13 @@ export async function saveProduct(id: number | null, _prev: ActionState, form: F
   if (!/^[A-Z0-9-]{2,30}$/.test(data.code)) errors.code = 'کد فقط از حروف انگلیسی، عدد و خط تیره.';
   if (!SLUG.test(data.slug)) errors.slug = 'فقط حروف کوچک انگلیسی، عدد و خط تیره؛ مثل natural-oak-18';
   if (!db.prepare('SELECT 1 FROM categories WHERE id = ?').get(data.category_id)) errors.category_id = 'گروه را انتخاب کنید.';
-  if (!catalog.values.families.has(data.family)) errors.family = 'طرح را انتخاب کنید.';
-  if (!catalog.values.surfaces.has(data.surface)) errors.surface = 'سطح را انتخاب کنید.';
-  if (data.thicknesses.length === 0) errors.thicknesses = 'دست‌کم یک ضخامت.';
+  // A switched-off attribute is optional (empty allowed); any value given
+  // must still be a known one.
+  const { show } = catalog;
+  const pick = (value: string, known: Set<string>, required: boolean) => (value === '' ? !required : known.has(value));
+  if (!pick(data.family, catalog.values.families, show.family)) errors.family = 'طرح را انتخاب کنید.';
+  if (!pick(data.surface, catalog.values.surfaces, show.surface)) errors.surface = 'سطح را انتخاب کنید.';
+  if (show.thickness && data.thicknesses.length === 0) errors.thicknesses = 'دست‌کم یک ضخامت.';
   if (!/^#[0-9a-f]{6}$/.test(data.color_hex)) errors.color_hex = 'رنگ معتبر نیست.';
 
   const taken = (column: 'slug' | 'code', value: string) =>

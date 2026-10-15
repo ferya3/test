@@ -10,6 +10,12 @@ import type { Product } from '@/lib/queries';
 export function ProductCard({ product, locale, priority = false }: { product: Product; locale: Locale; priority?: boolean }) {
   const thicknesses = product.thicknesses.split(',').filter(Boolean);
   const catalog = catalogFor(locale);
+  const { show } = catalog;
+  // Decor and thicknesses under the name, each only if switched on.
+  const details = [
+    show.family && catalog.family(product.family),
+    show.thickness && thicknesses.length > 0 && `${list(thicknesses, locale)} ${getDictionary(locale).catalog.mm}`,
+  ].filter(Boolean);
 
   return (
     <Tilt max={6} className="h-full rounded-xl">
@@ -31,13 +37,11 @@ export function ProductCard({ product, locale, priority = false }: { product: Pr
 
         <div className="flex flex-1 flex-col gap-1 p-3 sm:gap-1.5 sm:p-4">
           <div className="flex items-center justify-between gap-2 text-xs text-ink-500">
-            <span>{catalog.surface(product.surface)}</span>
+            <span>{show.surface ? catalog.surface(product.surface) : null}</span>
             <span className="ltr-isolate font-mono">{product.code}</span>
           </div>
           <h3 className="line-clamp-2 text-sm leading-6 font-bold text-ink-950 sm:text-base">{product.name}</h3>
-          <p className="mt-auto truncate text-xs text-ink-500">
-            {catalog.family(product.family)} · {list(thicknesses, locale)} {getDictionary(locale).catalog.mm}
-          </p>
+          {details.length > 0 && <p className="mt-auto truncate text-xs text-ink-500">{details.join(' · ')}</p>}
         </div>
       </Link>
     </Tilt>

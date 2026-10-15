@@ -107,3 +107,14 @@ export async function deleteAttribute(id: number): Promise<void> {
   db.prepare('DELETE FROM attributes WHERE id = ?').run(id);
   revalidatePath('/', 'layout');
 }
+
+/** Which attributes the public site shows; see attributeVisibility(). */
+export async function saveAttributeVisibility(_prev: ActionState, form: FormData): Promise<ActionState> {
+  await requireAdmin();
+
+  const upsert = db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value');
+  for (const kind of KINDS) upsert.run(`attr_show_${kind}`, form.get(`show_${kind}`) === 'on' ? '1' : '0');
+
+  revalidatePath('/', 'layout');
+  return { ok: true, message: 'ذخیره شد.' };
+}

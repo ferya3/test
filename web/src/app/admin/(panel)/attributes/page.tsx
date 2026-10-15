@@ -4,8 +4,8 @@ import { AdminForm, Field } from '@/components/admin/form';
 import { ConfirmButton } from '@/components/admin/confirm-button';
 import { Input, Select } from '@/components/ui/input';
 import { requireAdmin } from '@/lib/session';
-import { addAttribute, deleteAttribute, saveAttribute } from '@/lib/actions/attributes';
-import { attributeUsage, getAttributes, type AttributeKind } from '@/lib/attributes';
+import { addAttribute, deleteAttribute, saveAttribute, saveAttributeVisibility } from '@/lib/actions/attributes';
+import { attributeUsage, attributeVisibility, getAttributes, type AttributeKind } from '@/lib/attributes';
 import { TEXTURES, faDigits } from '@/lib/catalog';
 
 export const metadata = { title: 'طرح، سطح، ضخامت' };
@@ -30,6 +30,7 @@ function TextureSelect({ id, value }: { id: string; value?: string }) {
 
 export default async function AttributesPage() {
   await requireAdmin();
+  const visible = attributeVisibility();
 
   return (
     <>
@@ -38,6 +39,26 @@ export default async function AttributesPage() {
         description="گزینه‌های فیلتر بالای محصولات و فرم محصول. موردی که محصولی از آن استفاده می‌کند حذف نمی‌شود."
       />
 
+      {/* On/off for the whole site: filters, product cards and product pages. */}
+      <AdminForm action={saveAttributeVisibility} submitLabel="ذخیره" className="mb-8 rounded-2xl bg-white p-5 shadow-[var(--shadow-soft)] sm:p-6">
+        <h2 className="text-h3 font-bold text-ink-950">نمایش در سایت</h2>
+        <p className="-mt-2 text-sm text-ink-600">
+          هر کدام را خاموش کنید، از فیلترها، کارت محصولات و صفحهٔ محصول برداشته می‌شود و در فرم محصول اختیاری می‌شود. مقدارهای ثبت‌شدهٔ محصولات
+          پاک نمی‌شوند؛ با روشن کردن دوباره همه برمی‌گردند.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          {SECTIONS.map(({ kind, title }) => (
+            <label
+              key={kind}
+              className="flex h-12 cursor-pointer items-center gap-3 rounded-xl border border-ink-200 px-4 text-sm font-bold has-checked:border-gold-500 has-checked:bg-gold-50"
+            >
+              <input type="checkbox" name={`show_${kind}`} defaultChecked={visible[kind]} className="size-4 accent-gold-600" />
+              {title}
+            </label>
+          ))}
+        </div>
+      </AdminForm>
+
       <div className="grid gap-8">
         {SECTIONS.map(({ kind, title, lead }) => {
           const rows = getAttributes(kind);
@@ -45,7 +66,10 @@ export default async function AttributesPage() {
 
           return (
             <section key={kind} className="rounded-2xl bg-white p-5 shadow-[var(--shadow-soft)] sm:p-6">
-              <h2 className="text-h3 font-bold text-ink-950">{title}</h2>
+              <h2 className="flex items-center gap-2 text-h3 font-bold text-ink-950">
+                {title}
+                {!visible[kind] && <span className="rounded-full bg-ink-100 px-2.5 py-0.5 text-xs font-bold text-ink-600">خاموش در سایت</span>}
+              </h2>
               <p className="mt-1 mb-5 text-sm text-ink-600">{lead}</p>
 
               <ul className="grid gap-3">

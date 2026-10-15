@@ -5,7 +5,7 @@ import { seoValues } from './seo-values';
 import { Input, Select, Textarea } from '@/components/ui/input';
 import { saveProduct } from '@/lib/actions/products';
 import { faDigits } from '@/lib/catalog';
-import { getAttributes } from '@/lib/attributes';
+import { attributeVisibility, getAttributes } from '@/lib/attributes';
 import type { Category, Product } from '@/lib/queries';
 
 export const EN_HINT = 'برای نسخهٔ انگلیسی سایت. اگر خالی بماند، متن فارسی نمایش داده می‌شود.';
@@ -16,6 +16,8 @@ export function ProductForm({ product, categories }: { product?: Product; catego
   const families = getAttributes('family');
   const surfaces = getAttributes('surface');
   const thicknessOptions = getAttributes('thickness').sort((a, b) => Number(a.value) - Number(b.value));
+  const show = attributeVisibility();
+  const off = ' — در سایت خاموش است (اختیاری)';
 
   return (
     <AdminForm action={saveProduct.bind(null, p?.id ?? null)} className="rounded-2xl bg-white p-5 shadow-[var(--shadow-soft)] sm:p-8">
@@ -50,8 +52,13 @@ export function ProductForm({ product, categories }: { product?: Product; catego
           <Input id="position" name="position" type="number" min={0} max={9999} defaultValue={p?.position ?? 0} dir="ltr" />
         </Field>
 
-        <Field name="family" label="طرح" hint="فهرست طرح‌ها، سطح‌ها و ضخامت‌ها در «طرح، سطح، ضخامت» قابل ویرایش است.">
+        <Field
+          name="family"
+          label={`طرح${show.family ? '' : off}`}
+          hint="فهرست طرح‌ها، سطح‌ها و ضخامت‌ها و روشن/خاموش بودنشان در «طرح، سطح، ضخامت»."
+        >
           <Select id="family" name="family" defaultValue={p?.family}>
+            {!show.family && <option value="">—</option>}
             {families.map((a) => (
               <option key={a.value} value={a.value}>
                 {a.name}
@@ -60,8 +67,9 @@ export function ProductForm({ product, categories }: { product?: Product; catego
           </Select>
         </Field>
 
-        <Field name="surface" label="سطح">
+        <Field name="surface" label={`سطح${show.surface ? '' : off}`}>
           <Select id="surface" name="surface" defaultValue={p?.surface}>
+            {!show.surface && <option value="">—</option>}
             {surfaces.map((a) => (
               <option key={a.value} value={a.value}>
                 {a.name}
@@ -70,7 +78,7 @@ export function ProductForm({ product, categories }: { product?: Product; catego
           </Select>
         </Field>
 
-        <Field name="thicknesses" label="ضخامت‌ها (میلی‌متر)" className="sm:col-span-2">
+        <Field name="thicknesses" label={`ضخامت‌ها (میلی‌متر)${show.thickness ? '' : off}`} className="sm:col-span-2">
           <div className="flex flex-wrap gap-2">
             {thicknessOptions.map(({ value: t }) => (
               <label

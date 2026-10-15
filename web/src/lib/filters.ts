@@ -15,10 +15,12 @@ const list = (value: string | string[] | undefined) => (Array.isArray(value) ? v
 export function parseFilters(params: Params, catalog: AttributeCatalog): Filters {
   const keep = (values: string[], known: Set<string>) => [...new Set(values.filter((v) => known.has(v)))].slice(0, 20);
 
+  // A switched-off attribute has no filter on the page, so none in the URL either.
+  const { show } = catalog;
   return {
-    families: keep(list(params.family), catalog.values.families),
-    surfaces: keep(list(params.surface), catalog.values.surfaces),
-    thicknesses: keep(list(params.thickness), catalog.values.thicknesses),
+    families: show.family ? keep(list(params.family), catalog.values.families) : [],
+    surfaces: show.surface ? keep(list(params.surface), catalog.values.surfaces) : [],
+    thicknesses: show.thickness ? keep(list(params.thickness), catalog.values.thicknesses) : [],
   };
 }
 

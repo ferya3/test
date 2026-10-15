@@ -33,9 +33,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // facts people search by: code, decor, surface and thickness.
   const facts = [
     `${dict.product.code} ${product.code}`,
-    `${dict.product.family} ${catalog.family(product.family)}`,
-    `${dict.product.surface} ${catalog.surface(product.surface)}`,
-    thicknesses && `${dict.product.thicknesses} ${thicknesses} ${dict.catalog.mm}`,
+    catalog.show.family && `${dict.product.family} ${catalog.family(product.family)}`,
+    catalog.show.surface && `${dict.product.surface} ${catalog.surface(product.surface)}`,
+    catalog.show.thickness && thicknesses && `${dict.product.thicknesses} ${thicknesses} ${dict.catalog.mm}`,
   ].filter(Boolean).join(`${sep} `);
   const text = product.description || product.short;
 
@@ -75,13 +75,14 @@ export default async function ProductPage({ params }: Props) {
   const thicknesses = product.thicknesses.split(',').filter(Boolean);
   const catalog = catalogFor(lang);
 
-  const specs = [
+  // Code and group always; decor, surface and thicknesses only if switched on.
+  const specs: [string, React.ReactNode][] = [
     [t.code, <span key="c" className="ltr-isolate font-mono">{product.code}</span>],
     [t.group, product.category_name],
-    [t.family, catalog.family(product.family)],
-    [t.surface, catalog.surface(product.surface)],
-    [t.thicknesses, `${list(thicknesses, lang)} ${dict.catalog.mm}`],
-  ] as const;
+  ];
+  if (catalog.show.family) specs.push([t.family, catalog.family(product.family)]);
+  if (catalog.show.surface) specs.push([t.surface, catalog.surface(product.surface)]);
+  if (catalog.show.thickness && thicknesses.length > 0) specs.push([t.thicknesses, `${list(thicknesses, lang)} ${dict.catalog.mm}`]);
 
   // Breadcrumbs only. Product markup without a price or reviews is flagged
   // as invalid in Search Console, and prices here are given on request.
@@ -134,11 +135,13 @@ export default async function ProductPage({ params }: Props) {
           </div>
 
           <div>
-            <div className="flex flex-wrap gap-2">
-              <Badge>{catalog.family(product.family)}</Badge>
-              <Badge>{catalog.surface(product.surface)}</Badge>
-            </div>
-            <h1 className="mt-3 text-h2 font-black text-balance text-ink-950 sm:mt-4 sm:text-h1">{product.name}</h1>
+            {(catalog.show.family || catalog.show.surface) && (
+              <div className="mb-3 flex flex-wrap gap-2 sm:mb-4">
+                {catalog.show.family && <Badge>{catalog.family(product.family)}</Badge>}
+                {catalog.show.surface && <Badge>{catalog.surface(product.surface)}</Badge>}
+              </div>
+            )}
+            <h1 className="text-h2 font-black text-balance text-ink-950 sm:text-h1">{product.name}</h1>
             <p className="mt-3 text-ink-600 sm:mt-4 sm:text-lead">{product.description || product.short}</p>
 
             <dl className="mt-6 divide-y divide-ink-100 rounded-xl border border-ink-100 bg-white">

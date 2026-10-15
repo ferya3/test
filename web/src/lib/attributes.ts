@@ -32,6 +32,23 @@ export function getAttributes(kind?: AttributeKind): Attribute[] {
   return rows.map((r) => ({ ...(r as object) })) as Attribute[];
 }
 
+/**
+ * Which of the three attributes the public site shows, switched in the admin
+ * (stored in settings as `attr_show_<kind>`; on unless set to '0'). A hidden
+ * one disappears from filters, product cards and product pages, and becomes
+ * optional in the product form. Products keep their values, so switching it
+ * back on restores everything.
+ */
+export function attributeVisibility(): Record<AttributeKind, boolean> {
+  const rows = db.prepare("SELECT key, value FROM settings WHERE key LIKE 'attr_show_%'").all() as { key: string; value: string }[];
+  const off = new Set(rows.filter((r) => r.value === '0').map((r) => r.key));
+  return {
+    family: !off.has('attr_show_family'),
+    surface: !off.has('attr_show_surface'),
+    thickness: !off.has('attr_show_thickness'),
+  };
+}
+
 /** Thicknesses sort by their number, not as text: 6, 8, 10 — not 10, 6, 8. */
 const byNumber = (a: string, b: string) => Number(a) - Number(b);
 
@@ -49,15 +66,17 @@ export function attributeCatalog(lang: Lang) {
   const familyLabel = Object.fromEntries(families.map((a) => [a.value, label(a)]));
   const surfaceLabel = Object.fromEntries(surfaces.map((a) => [a.value, label(a)]));
   const texture = Object.fromEntries(families.map((a) => [a.value, a.texture])) as Record<string, Texture>;
+  const show = attributeVisibility();
 
   return {
+    show,
     // An unknown value (an attribute deleted after the fact) shows as itself
     // rather than as nothing.
     family: (v: string) => familyLabel[v] ?? v,
     surface: (v: string) => surfaceLabel[v] ?? v,
     texture: (family: string): Texture => texture[family] ?? 'solid',
-    /** The three filter dropdowns, in order, as [value, label] options. */
-    filterGroups: [
+    /** The filter dropdowns that are switched on, in order, as [value, label] options. */
+    filterGroups: ([
       { key: 'families', param: 'family', options: families.map((a) => [a.value, label(a)] as [string, string]) },
       { key: 'surfaces', param: 'surface', options: surfaces.map((a) => [a.value, label(a)] as [string, string]) },
       {
@@ -65,7 +84,7 @@ export function attributeCatalog(lang: Lang) {
         param: 'thickness',
         options: thicknesses.map((a) => [a.value, `${num(a.value, lang)} ${mm}`] as [string, string]),
       },
-    ] as const,
+    ] as const).filter((g) => show[KIND_OF[g.key]]),
     values: {
       families: new Set(families.map((a) => a.value)),
       surfaces: new Set(surfaces.map((a) => a.value)),
@@ -76,6 +95,8 @@ export function attributeCatalog(lang: Lang) {
 }
 
 export type AttributeCatalog = ReturnType<typeof attributeCatalog>;
+
+const KIND_OF = { families: 'family', surfaces: 'surface', thicknesses: 'thickness' } as const;
 
 /** The same, read once per request however many product cards ask for it. */
 export const catalogFor = cache((lang: Lang) => attributeCatalog(lang));
