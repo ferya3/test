@@ -1,6 +1,7 @@
 'use client';
 
-import { animate, useInView, useReducedMotion } from 'framer-motion';
+import { animate, useInView } from 'framer-motion';
+import { useReducedMotionSafe } from './use-reduced-motion';
 import { useEffect, useRef } from 'react';
 import { num } from '@/lib/catalog';
 import { useLocale } from '@/i18n/client';
@@ -16,7 +17,7 @@ import { useLocale } from '@/i18n/client';
 export function Counter({ value, suffix = '' }: { value: number; suffix?: string }) {
   const ref = useRef<HTMLSpanElement>(null);
   const inView = useInView(ref, { once: true, margin: '0px 0px -15% 0px' });
-  const reduce = useReducedMotion();
+  const reduce = useReducedMotionSafe();
   const { locale } = useLocale();
 
   useEffect(() => {

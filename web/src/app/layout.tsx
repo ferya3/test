@@ -34,7 +34,7 @@ export function generateMetadata(): Metadata {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#faf8f5',
+  themeColor: '#f8fafb',
   width: 'device-width',
   initialScale: 1,
 };

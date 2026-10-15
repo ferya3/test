@@ -24,7 +24,7 @@ export function Cta({ phone, locale, title, lead }: { phone: string; locale: Loc
   return (
     <section className="px-4 pb-14 sm:px-6 sm:pb-20 lg:px-8 lg:pb-28">
       <Reveal className="relative mx-auto max-w-7xl overflow-hidden rounded-2xl bg-ink-950 px-5 py-10 text-center text-paper sm:px-12 sm:py-20">
-        <div aria-hidden className="absolute -top-1/2 left-1/2 size-[40rem] -translate-x-1/2 rounded-full bg-gold-500/20 blur-[110px]" />
+        <div aria-hidden className="absolute -top-1/2 left-1/2 size-[40rem] -translate-x-1/2 rounded-full bg-[rgb(58_108_156/0.45)] blur-[110px]" />
         <div className="relative">
           <h2 className="text-h1 font-black text-balance">
             {withGold(title)}

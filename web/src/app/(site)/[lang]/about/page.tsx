@@ -33,7 +33,7 @@ export default async function AboutPage({ params }: Props) {
   return (
     <>
       <section className="relative overflow-hidden bg-ink-950 text-paper">
-        <div aria-hidden className="absolute -top-1/2 end-0 size-[40rem] rounded-full bg-gold-500/15 blur-[120px]" />
+        <div aria-hidden className="absolute -top-1/2 end-0 size-[40rem] rounded-full bg-[rgb(58_108_156/0.4)] blur-[120px]" />
         <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-24 lg:px-8">
           <p className="mb-3 text-sm font-bold text-gold-300">{t.about.overline}</p>
           <h1 className="max-w-3xl text-h1 font-black text-balance sm:text-display">

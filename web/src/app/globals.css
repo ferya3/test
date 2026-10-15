@@ -13,26 +13,26 @@
    ========================================================================== */
 
 @theme {
-  --color-ink-950: #0f0d0b;
-  --color-ink-900: #1a1714;
-  --color-ink-800: #25211c;
-  --color-ink-700: #3a342d;
-  --color-ink-600: #544b42;
-  --color-ink-500: #6e645a;
-  --color-ink-400: #8f857a;
-  --color-ink-300: #b7aea3;
-  --color-ink-200: #d9d2c8;
-  --color-ink-100: #ece7df;
-  --color-ink-50: #f6f3ee;
-  --color-paper: #faf8f5;
+  --color-ink-950: #0b2238;
+  --color-ink-900: #102f4c;
+  --color-ink-800: #1c3d5c;
+  --color-ink-700: #2f4f6e;
+  --color-ink-600: #4a6683;
+  --color-ink-500: #526a83;
+  --color-ink-400: #8fa2b6;
+  --color-ink-300: #b7c4d1;
+  --color-ink-200: #d5dee7;
+  --color-ink-100: #e7edf2;
+  --color-ink-50: #f2f5f8;
+  --color-paper: #f8fafb;
 
-  --color-gold-700: #7a5518;
-  --color-gold-600: #946a22;
-  --color-gold-500: #b8893a;
-  --color-gold-400: #d4a853;
-  --color-gold-300: #e6c47e;
-  --color-gold-100: #f5e8c8;
-  --color-gold-50: #fbf5e6;
+  --color-gold-700: #6b5a06;
+  --color-gold-600: #806b07;
+  --color-gold-500: #c4a50e;
+  --color-gold-400: #e3c318;
+  --color-gold-300: #efd856;
+  --color-gold-100: #f9efbb;
+  --color-gold-50: #fdfae8;
 
   --font-sans: 'Vazirmatn Variable', ui-sans-serif, system-ui, sans-serif;
 
@@ -45,9 +45,9 @@
 
   /* Two wide, low layers rather than one tight dark one — read as light on a
      surface, not a sticker dropped on the page. */
-  --shadow-soft: 0 1px 2px rgb(15 13 11 / 0.04), 0 4px 16px -4px rgb(15 13 11 / 0.08);
-  --shadow-lift: 0 2px 4px rgb(15 13 11 / 0.04), 0 18px 48px -12px rgb(15 13 11 / 0.18);
-  --shadow-gold: 0 10px 40px -10px rgb(212 168 83 / 0.45);
+  --shadow-soft: 0 1px 2px rgb(11 34 56 / 0.04), 0 4px 16px -4px rgb(11 34 56 / 0.08);
+  --shadow-lift: 0 2px 4px rgb(11 34 56 / 0.04), 0 18px 48px -12px rgb(11 34 56 / 0.18);
+  --shadow-gold: 0 10px 40px -10px rgb(227 195 24 / 0.4);
 
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 
@@ -110,7 +110,7 @@
        a faint warm light from the top so it reads as a surface, not a gap. */
     @media (width >= 64rem) {
       background:
-        radial-gradient(ellipse 70% 40% at 50% 0%, rgb(230 196 126 / 0.18), transparent 70%),
+        radial-gradient(ellipse 70% 40% at 50% 0%, rgb(227 195 24 / 0.12), transparent 70%),
         var(--color-ink-100);
       background-attachment: fixed;
     }
@@ -153,8 +153,8 @@
       border-radius: var(--radius-2xl);
       overflow: clip;
       box-shadow:
-        0 0 0 1px rgb(15 13 11 / 0.05),
-        0 30px 80px -30px rgb(15 13 11 / 0.35);
+        0 0 0 1px rgb(11 34 56 / 0.05),
+        0 30px 80px -30px rgb(11 34 56 / 0.35);
     }
   }
 }
@@ -183,7 +183,7 @@
     background-color: var(--color-gold-50);
     background-image: repeating-linear-gradient(
       135deg,
-      rgb(15 13 11 / 0.035) 0 1px,
+      rgb(11 34 56 / 0.035) 0 1px,
       transparent 1px 9px
     );
   }

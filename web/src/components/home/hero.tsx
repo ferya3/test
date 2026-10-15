@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { ArrowLeft, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Swatch } from '@/components/catalog/swatch';
@@ -91,14 +91,15 @@ export function Hero({
   /** A background photo (set in the admin); without one, the 3D sheets show. */
   image?: string | null;
 }) {
-  const reduce = useReducedMotion();
   const wide = useWideScreen();
   const { t, path } = useLocale();
   const words = title.split(' ');
-  const from = (delay: number) =>
-    reduce
-      ? {}
-      : { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.9, delay, ease } };
+  // The same on server and client; MotionProvider drops the rise for reduced motion.
+  const from = (delay: number) => ({
+    initial: { opacity: 0, y: 20 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.9, delay, ease },
+  });
 
   return (
     <section className="relative isolate overflow-hidden bg-ink-950 text-paper">
@@ -113,9 +114,9 @@ export function Hero({
 
       {/* Soft pools of light, so the dark band reads as depth rather than a flat fill. */}
       <div aria-hidden className={image ? 'hidden' : 'absolute inset-0 -z-10'}>
-        <div className="absolute -top-1/3 end-[-10%] size-[42rem] rounded-full bg-gold-500/15 blur-[120px]" />
-        <div className="absolute bottom-[-30%] start-[-15%] size-[36rem] rounded-full bg-gold-300/10 blur-[120px]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,transparent_40%,rgb(15_13_11)_100%)]" />
+        <div className="absolute -top-1/3 end-[-10%] size-[42rem] rounded-full bg-[rgb(58_108_156/0.4)] blur-[120px]" />
+        <div className="absolute bottom-[-30%] start-[-15%] size-[36rem] rounded-full bg-gold-400/[0.06] blur-[120px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,transparent_40%,rgb(11_34_56)_100%)]" />
       </div>
 
       <div
@@ -140,13 +141,9 @@ export function Hero({
               <motion.span
                 key={i}
                 className={i === words.length - 1 ? 'gold-text inline-block' : 'inline-block'}
-                {...(reduce
-                  ? {}
-                  : {
-                      initial: { opacity: 0, y: '0.5em', filter: 'blur(8px)' },
-                      animate: { opacity: 1, y: 0, filter: 'blur(0px)' },
-                      transition: { duration: 0.9, delay: 0.1 + i * 0.08, ease },
-                    })}
+                initial={{ opacity: 0, y: '0.5em', filter: 'blur(8px)' }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                transition={{ duration: 0.9, delay: 0.1 + i * 0.08, ease }}
               >
                 {word}
                 {i < words.length - 1 && ' '}
@@ -179,7 +176,7 @@ export function Hero({
 
         {!image && (
           <motion.div
-            initial={reduce ? false : { opacity: 0, scale: 0.94 }}
+            initial={{ opacity: 0, scale: 0.94 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 1.4, delay: 0.2, ease }}
             className="relative h-56 sm:h-[28rem] lg:h-[36rem]"

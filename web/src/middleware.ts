@@ -43,5 +43,5 @@ export function middleware(request: NextRequest) {
 export const config = {
   // Everything except the admin, uploaded images, Next's own files, and the
   // files at the root (icon, robots, sitemap).
-  matcher: ['/((?!admin|media|_next|[^/]+\\.[a-z0-9]+$).*)'],
+  matcher: ['/((?!admin|media|brand/|_next|[^/]+\\.[a-z0-9]+$).*)'],
 };

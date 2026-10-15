@@ -73,7 +73,7 @@ const config: NextConfig = {
         {
           // A top-level name with an extension is a file — public/ (logo,
           // share images) or a generated one (icons, robots, sitemap) — never a page.
-          source: '/:path((?!en(?:/|$)|fa(?:/|$)|admin(?:/|$)|media/|_next/|[^/]+\\.[a-z0-9]+$).+)',
+          source: '/:path((?!en(?:/|$)|fa(?:/|$)|admin(?:/|$)|media/|brand/|_next/|[^/]+\\.[a-z0-9]+$).+)',
           destination: '/fa/:path',
         },
       ],

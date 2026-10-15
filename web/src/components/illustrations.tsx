@@ -8,8 +8,8 @@
  * Pure SVG, no state: these render on the server.
  */
 
-const GOLD = '#d4a853';
-const GOLD_LIGHT = '#e6c47e';
+const GOLD = '#e3c318';
+const GOLD_LIGHT = '#efd856';
 const KRAFT = '#8a6a45';
 
 /** Scale a hex colour's channels — below 1 darkens, above 1 lightens. */
@@ -36,7 +36,7 @@ function Backdrop({ id }: { id: string }) {
           <path d="M24 0H0V24" fill="none" stroke="#fff" strokeOpacity="0.04" />
         </pattern>
       </defs>
-      <rect width="400" height="500" fill="#1a1714" />
+      <rect width="400" height="500" fill="#102f4c" />
       <rect width="400" height="500" fill={`url(#${id}-grid)`} />
       <rect width="400" height="500" fill={`url(#${id}-glow)`} />
     </>
@@ -89,12 +89,12 @@ function Layering() {
             <polygon
               points={sheet(200, y, 140, 62)}
               fill={top ? GOLD_LIGHT : i % 2 ? KRAFT : '#7a5c3c'}
-              stroke="#0f0d0b"
+              stroke="#0b2238"
               strokeOpacity="0.5"
             />
             {top &&
               [-60, -30, 0, 30, 60].map((o) => (
-                <line key={o} x1={200 - 70 + o} y1={y + 31 - o / 2.25 - 31} x2={200 + 70 + o} y2={y - o / 2.25} stroke="#7a5518" strokeOpacity="0.35" strokeWidth="3" />
+                <line key={o} x1={200 - 70 + o} y1={y + 31 - o / 2.25 - 31} x2={200 + 70 + o} y2={y - o / 2.25} stroke="#6b5a06" strokeOpacity="0.35" strokeWidth="3" />
               ))}
           </g>
         );
@@ -116,7 +116,7 @@ function Pressing() {
       <rect x="60" y="56" width="280" height="54" rx="6" fill="#3a342d" stroke={GOLD} strokeWidth="2" />
       {/* the stack, squeezed */}
       {Array.from({ length: 7 }, (_, i) => (
-        <rect key={i} x="78" y={124 + i * 8} width="244" height="7" fill={i === 0 ? GOLD_LIGHT : KRAFT} stroke="#0f0d0b" strokeOpacity="0.35" />
+        <rect key={i} x="78" y={124 + i * 8} width="244" height="7" fill={i === 0 ? GOLD_LIGHT : KRAFT} stroke="#0b2238" strokeOpacity="0.35" />
       ))}
       {/* lower platen */}
       <rect x="60" y="184" width="280" height="54" rx="6" fill="#3a342d" stroke={GOLD} strokeWidth="2" />
@@ -141,13 +141,13 @@ function Cutting() {
   return (
     <svg viewBox="0 0 400 500" className="size-full" preserveAspectRatio="xMidYMid slice" aria-hidden>
       <Backdrop id="s4" />
-      <polygon points={sheet(200, 170, 160, 74)} fill="#c49a6c" stroke="#0f0d0b" strokeOpacity="0.4" />
+      <polygon points={sheet(200, 170, 160, 74)} fill="#c49a6c" stroke="#0b2238" strokeOpacity="0.4" />
       <polygon points={`40,170 200,244 200,252 40,178`} fill="#8a6a45" />
       <polygon points={`200,244 360,170 360,178 200,252`} fill="#6b4f33" />
       {/* cut already made, and the line still to go */}
-      <line x1="118" y1="208" x2="200" y2="170" stroke="#0f0d0b" strokeOpacity="0.6" strokeWidth="3" />
+      <line x1="118" y1="208" x2="200" y2="170" stroke="#0b2238" strokeOpacity="0.6" strokeWidth="3" />
       <line x1="200" y1="170" x2="282" y2="132" stroke="#fff" strokeWidth="2" strokeDasharray="8 7" opacity="0.85" />
-      <polygon points={teeth} fill="#b7aea3" stroke="#0f0d0b" strokeOpacity="0.4" />
+      <polygon points={teeth} fill="#b7aea3" stroke="#0b2238" strokeOpacity="0.4" />
       <circle cx="285" cy="105" r="12" fill="#3a342d" stroke={GOLD} strokeWidth="2" />
       {/* sawdust */}
       {[[250, 150], [262, 160], [240, 162], [272, 150]].map(([x, y]) => (
@@ -161,14 +161,14 @@ function Inspection() {
   return (
     <svg viewBox="0 0 400 500" className="size-full" preserveAspectRatio="xMidYMid slice" aria-hidden>
       <Backdrop id="s5" />
-      <polygon points={sheet(190, 190, 150, 70)} fill="#ecebe6" stroke="#0f0d0b" strokeOpacity="0.4" />
+      <polygon points={sheet(190, 190, 150, 70)} fill="#ecebe6" stroke="#0b2238" strokeOpacity="0.4" />
       <path d="M100 205 q 40 -30 70 -10 t 80 -20" fill="none" stroke="#8f857a" strokeOpacity="0.5" strokeWidth="2" />
       {/* magnifier */}
       <circle cx="225" cy="140" r="56" fill="#fff" fillOpacity="0.1" stroke={GOLD} strokeWidth="9" />
       <line x1="265" y1="180" x2="315" y2="232" stroke={GOLD} strokeWidth="14" strokeLinecap="round" />
       {/* approved */}
       <circle cx="105" cy="92" r="34" fill={GOLD} />
-      <path d="M88 93 l 12 12 l 22 -24" fill="none" stroke="#0f0d0b" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M88 93 l 12 12 l 22 -24" fill="none" stroke="#0b2238" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
       {/* a thickness gauge */}
       {Array.from({ length: 9 }, (_, i) => (
         <line key={i} x1={60 + i * 12} y1="268" x2={60 + i * 12} y2={i % 4 ? 278 : 286} stroke="#fff" strokeOpacity="0.5" strokeWidth="2" />

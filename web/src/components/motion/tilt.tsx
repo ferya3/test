@@ -1,6 +1,7 @@
 'use client';
 
-import { motion, useMotionValue, useReducedMotion, useSpring, useTransform } from 'framer-motion';
+import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
+import { useReducedMotionSafe } from './use-reduced-motion';
 import type { ReactNode, PointerEvent } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -12,7 +13,7 @@ import { cn } from '@/lib/utils';
  * card stays flat and simply reads as a card.
  */
 export function Tilt({ children, className, max = 8 }: { children: ReactNode; className?: string; max?: number }) {
-  const reduce = useReducedMotion();
+  const reduce = useReducedMotionSafe();
   const px = useMotionValue(0.5);
   const py = useMotionValue(0.5);
   const spring = { stiffness: 220, damping: 22, mass: 0.6 };

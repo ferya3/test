@@ -81,7 +81,7 @@ export function Process({ steps, overline, title }: { steps: ProcessCard[]; over
 
   return (
     <section ref={section} className="relative overflow-hidden bg-ink-950 py-14 text-paper sm:py-20 lg:flex lg:h-dvh lg:flex-col lg:justify-center lg:pt-20 lg:pb-0">
-      <div aria-hidden className="absolute bottom-0 start-1/3 size-[36rem] translate-y-1/2 rounded-full bg-gold-500/10 blur-[120px]" />
+      <div aria-hidden className="absolute bottom-0 start-1/3 size-[36rem] translate-y-1/2 rounded-full bg-[rgb(58_108_156/0.3)] blur-[120px]" />
 
       <div className="relative mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <p className="mb-3 text-sm font-bold tracking-wide text-gold-300">{overline}</p>
