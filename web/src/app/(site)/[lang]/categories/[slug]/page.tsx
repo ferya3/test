@@ -45,6 +45,15 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   const categories = getCategories(lang);
   const photo = category.image;
 
+  // The one-line summary on a phone, so the products start on the first
+  // screen; the full description from `sm` up.
+  const description = (
+    <>
+      <p className="mt-3 text-ink-600 sm:hidden">{category.short}</p>
+      <p className="mt-4 hidden max-w-3xl text-lead text-ink-600 sm:block">{category.description}</p>
+    </>
+  );
+
   const groups: FilterGroup[] = catalog.filterGroups.map((g) => ({
     param: g.param,
     label: t.filters[g.key],
@@ -58,22 +67,30 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   return (
     <>
       {/* The group's header. With a photo (set in the admin) the photo fills
-          it and the text sits on a dark wash; without, the plain light band. */}
+          it, the heading sits low on a dark wash and the description moves
+          below, onto the page; without, the plain light band holds it all. */}
       <section
         className={cn(
           'relative isolate overflow-hidden',
-          photo ? 'bg-ink-950 text-paper' : 'bg-ink-50 bg-[radial-gradient(ellipse_60%_80%_at_0%_0%,rgb(230_196_126/0.35),transparent_70%)]',
+          photo
+            ? 'flex min-h-[16rem] flex-col justify-end bg-ink-950 text-paper sm:min-h-[22rem] lg:min-h-[28rem]'
+            : 'bg-ink-50 bg-[radial-gradient(ellipse_60%_80%_at_0%_0%,rgb(230_196_126/0.35),transparent_70%)]',
         )}
       >
         {photo && (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element -- already a sized WebP from sharp */}
             <img src={mediaUrl(photo)} alt="" fetchPriority="high" className="absolute inset-0 -z-10 size-full object-cover" />
-            <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-t from-ink-950 via-ink-950/75 to-ink-950/35" />
+            <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-t from-ink-950/90 via-ink-950/40 to-transparent" />
           </>
         )}
 
-        <div className={cn('relative mx-auto max-w-7xl px-4 pt-5 pb-6 sm:px-6 sm:pt-14 sm:pb-8 lg:px-8 lg:pt-16', photo && 'pt-10 sm:pt-24 lg:pt-32')}>
+        <div
+          className={cn(
+            'relative mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8',
+            photo ? 'pt-10 pb-6 sm:pb-8 lg:pb-10' : 'pt-5 pb-6 sm:pt-14 sm:pb-8 lg:pt-16',
+          )}
+        >
           <nav aria-label={t.breadcrumb} className={cn('mb-6 hidden text-sm sm:block', photo ? 'text-ink-300' : 'text-ink-500')}>
             <Link href={href('/')} className={photo ? 'hover:text-paper' : 'hover:text-ink-950'}>
               {getDictionary(lang).home}
@@ -104,12 +121,11 @@ export default async function CategoryPage({ params, searchParams }: Props) {
           )}
 
           <h1 className={cn('text-h1 font-black text-balance', photo ? 'text-paper' : 'text-ink-950')}>{category.name}</h1>
-          {/* The one-line summary on a phone, so the products start on the first
-              screen; the full description from `sm` up. */}
-          <p className={cn('mt-3 sm:hidden', photo ? 'text-ink-200' : 'text-ink-600')}>{category.short}</p>
-          <p className={cn('mt-4 hidden max-w-3xl text-lead sm:block', photo ? 'text-ink-200' : 'text-ink-600')}>{category.description}</p>
+          {!photo && description}
         </div>
       </section>
+
+      {photo && <div className="mx-auto max-w-7xl px-4 pt-1 sm:px-6 sm:pt-3 lg:px-8">{description}</div>}
 
       <section className="mx-auto max-w-7xl px-4 pb-14 sm:px-6 sm:pb-20 lg:px-8">
         <FilterBar groups={groups} total={products.length} />

@@ -43,7 +43,7 @@ export function Intro({
                   : 'rounded-2xl border border-ink-100 bg-white p-3 shadow-[var(--shadow-soft)] sm:p-6'
               }
             >
-              <p className={i === 0 ? 'gold-text text-3xl font-black sm:text-6xl' : 'text-3xl font-black text-ink-950 sm:text-4xl'}>
+              <p className={i === 0 ? 'gold-text text-2xl font-black sm:text-5xl' : 'text-2xl font-black text-ink-950 sm:text-3xl'}>
                 <Counter value={stat.value} suffix={stat.suffix} />
               </p>
               <p className={i === 0 ? 'mt-1 text-xs leading-5 text-ink-300 sm:mt-2 sm:text-base' : 'mt-1 text-xs leading-5 text-ink-600 sm:text-sm'}>

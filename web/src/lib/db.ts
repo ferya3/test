@@ -247,17 +247,28 @@ const MIGRATIONS: Migration[] = [
   },
 ];
 
+/**
+ * Apply pending migrations, one transaction each.
+ *
+ * Several processes can open the database at once — the build's parallel
+ * workers, or the site starting while a seed runs. Each migration takes the
+ * write lock first (BEGIN IMMEDIATE) and only then reads the version, so a
+ * process that waited for the lock sees the migration another one just
+ * applied and skips it, instead of running it twice.
+ */
 function migrate(db: DatabaseSync): void {
-  const row = db.prepare('PRAGMA user_version').get() as { user_version: number };
-  const current = row.user_version;
+  const version = () => (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
 
-  for (let version = current; version < MIGRATIONS.length; version++) {
-    db.exec('BEGIN');
+  while (version() < MIGRATIONS.length) {
+    db.exec('BEGIN IMMEDIATE');
     try {
-      const migration = MIGRATIONS[version]!;
-      if (typeof migration === 'string') db.exec(migration);
-      else migration(db);
-      db.exec(`PRAGMA user_version = ${version + 1}`);
+      const current = version();
+      if (current < MIGRATIONS.length) {
+        const migration = MIGRATIONS[current]!;
+        if (typeof migration === 'string') db.exec(migration);
+        else migration(db);
+        db.exec(`PRAGMA user_version = ${current + 1}`);
+      }
       db.exec('COMMIT');
     } catch (error) {
       db.exec('ROLLBACK');
@@ -274,8 +285,11 @@ function open(): DatabaseSync {
   // WAL lets the dev server's workers and a running seed read while one
   // writes; busy_timeout turns a momentary lock into a short wait rather than
   // an immediate SQLITE_BUSY.
-  db.exec('PRAGMA journal_mode = WAL');
+  // busy_timeout first: until it is set, any statement that meets a lock
+  // fails at once instead of waiting — including the journal_mode switch
+  // below, which the build's parallel workers all run at the same moment.
   db.exec('PRAGMA busy_timeout = 5000');
+  db.exec('PRAGMA journal_mode = WAL');
   db.exec('PRAGMA foreign_keys = ON');
   db.exec('PRAGMA synchronous = NORMAL');
 
