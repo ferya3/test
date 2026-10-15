@@ -12,7 +12,8 @@
     "start": "NODE_OPTIONS=--disable-warning=ExperimentalWarning next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "db:seed": "node --experimental-strip-types --no-warnings scripts/seed.ts"
+    "db:seed": "node --experimental-strip-types --no-warnings scripts/seed.ts",
+    "admin:reset": "node --experimental-strip-types --no-warnings scripts/reset-admin.ts"
   },
   "dependencies": {
     "@fontsource-variable/vazirmatn": "5.3.0",
