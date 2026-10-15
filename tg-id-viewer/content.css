@@ -1,0 +1,20 @@
+.tg-id-badge {
+  display: inline-block;
+  margin-inline-start: 6px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 16px;
+  font-family: monospace;
+  color: #fff;
+  background: rgba(51, 144, 236, 0.85);
+  cursor: pointer;
+  user-select: none;
+  vertical-align: middle;
+  white-space: nowrap;
+  z-index: 5;
+}
+
+.tg-id-badge:hover {
+  background: rgba(51, 144, 236, 1);
+}
