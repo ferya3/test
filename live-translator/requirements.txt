@@ -1,0 +1,9 @@
+faster-whisper>=1.1
+soundcard>=0.4.3
+numpy
+PyQt6>=6.5
+deep-translator>=1.11
+
+# CUDA 12 runtime for faster-whisper on an NVIDIA GPU (DLLs are found automatically).
+nvidia-cublas-cu12; sys_platform == "win32"
+nvidia-cudnn-cu12==9.*; sys_platform == "win32"
