@@ -20,6 +20,10 @@ function doGet() {
 
 // Run this once from the editor so Google asks for permission to access Gmail.
 function authorize() {
+  if (typeof Gmail === 'undefined') {
+    throw new Error('سرویس Gmail API اضافه نشده است: در ستون چپ، کنار Services روی + بزنید، ' +
+      'Gmail API را انتخاب کنید و Add بزنید. بعد دوباره authorize را Run کنید.');
+  }
   var profile = Gmail.Users.getProfile('me');
   Logger.log('دسترسی داده شد: ' + profile.emailAddress + ' — ' + profile.messagesTotal + ' ایمیل.');
   UrlFetchApp.fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
