@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Gmail Subject Cleaner",
+  "version": "1.0.0",
+  "description": "جستجوی ایمیل‌های جیمیل بر اساس عنوان و حذف دسته‌جمعی آن‌ها",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtCWfKCPuSQPqDWMIJwC7daOoJCPmPTI47t9B9dwXVp7Qek+kPgdqUihMbSGEXoHSoSEF2cdY7QDoPyaPIzu4dcfwr6svJ+j5fcR35c8pS8sCXEwu8LjZhaiycf6AQO5jyNzREguY30c41H/GRd1qfGrYeyuVFoXCsY3yBcmLZ62nZLj4hyyHPh8lQNpKO9IfhY5QRNH+0bJLFS059GmbmoMsJy1hNpRSM1cAxQbLJLEU9xYuUcv1jp+VpjkgY+ykPqV4JmiJxaVVj39lJOOf/7mVEaSsp+JKkPkahNffkdW1JxzVrYa+Has5eUQ80ct7Xmi08Y+7uz/vbtf8KvQgAQIDAQAB",
+  "permissions": ["identity"],
+  "host_permissions": [
+    "https://gmail.googleapis.com/*",
+    "https://oauth2.googleapis.com/*"
+  ],
+  "oauth2": {
+    "client_id": "YOUR_CLIENT_ID.apps.googleusercontent.com",
+    "scopes": ["https://mail.google.com/"]
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Gmail Subject Cleaner"
+  }
+}
