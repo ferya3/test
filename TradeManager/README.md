@@ -60,6 +60,17 @@ rules, stop distance and side-of-market, refused while a protection is active, a
 retried. `InpMaxOrderLot` caps the lot. New positions are then managed like any other
 (e.g. `InpDefaultSLPoints` gives them an SL). Pending orders are not listed or managed.
 
+## Price alarms (panel)
+
+Type a price in the ALARM field and press SET ALARM. A dashed horizontal line is drawn at that
+price; when the Bid crosses it (from either side) the EA raises a pop-up alert, plays
+`InpAlarmSound` and, if `InpAlarmPush` is on, sends a push notification to the MT5 mobile app.
+Each line fires once and is then removed. Drag a line to move its alarm, delete it to cancel,
+or press CLEAR ALARMS to remove them all; the button shows how many are waiting. Only the price
+moving through a line fires it, so dragging a line across the price does not. Alarms are plain
+chart objects (`TMA_*`): they survive a timeframe change or a terminal restart with the chart,
+and are deleted when the EA is removed from the chart.
+
 ## Extending trailing
 
 The core only knows `CTrailingDistance::Distance()`. Fixed and percentage-of-profit are built in;

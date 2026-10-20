@@ -8,12 +8,12 @@
 #define TM_PANEL_PREFIX "TMP_"
 #define TM_PANEL_ROWS   6
 #define TM_PANEL_W      440
-#define TM_PANEL_H      468
+#define TM_PANEL_H      494
 #define TM_PANEL_H_MIN  30
 #define TM_PANEL_PRICE_H 106         // big price, open P/L and candle timer under the title bar
 #define TM_PANEL_TITLE_H 28
-#define TM_PANEL_ROW_Y  282
-#define TM_PANEL_ACT_Y  410
+#define TM_PANEL_ROW_Y  308
+#define TM_PANEL_ACT_Y  436
 #define TM_PANEL_ROW_H  20
 
 enum ENUM_PANEL_ACTION
@@ -29,7 +29,9 @@ enum ENUM_PANEL_ACTION
    PANEL_CLOSE_BUY,
    PANEL_CLOSE_SELL,
    PANEL_ORDER,          // a BUY/SELL/pending button; read the fields with TakeOrder()
-   PANEL_SET_LEVELS      // Enter pressed in a SL/TP field; read the row with TakeLevels()
+   PANEL_SET_LEVELS,     // Enter pressed in a SL/TP field; read the row with TakeLevels()
+   PANEL_ALARM_ADD,      // SET ALARM pressed; read the price with TakeAlarm()
+   PANEL_ALARM_CLEAR
 };
 
 // Drawing and click handling only. It knows nothing about trading: the engine feeds it
@@ -56,7 +58,7 @@ private:
    color  m_bidColor;
    color  m_askColor;
    ulong  m_lastRedraw;
-   bool   m_editing;                   // a LOT / PRICE / SL / TP entry field has focus
+   bool   m_editing;                   // a LOT / PRICE / SL / TP / ALARM entry field has focus
    string m_content[];                 // hidden when the panel is minimized
 
    string m_rowText[TM_PANEL_ROWS];
@@ -296,7 +298,7 @@ public:
       m_dy = 0;
       Rect("bg", 0, 0, TM_PANEL_W, TM_PANEL_H + TM_PANEL_PRICE_H, C'24,26,32', C'70,74,84');
       Rect("bar", 0, 0, TM_PANEL_W, TM_PANEL_TITLE_H, C'40,44,54', C'70,74,84');
-      Label("title", 8, 7, "TRADE MANAGER  v2.3   (drag this bar to move)", clrWhite, 9);
+      Label("title", 8, 7, "TRADE MANAGER  v2.4   (drag this bar to move)", clrWhite, 9);
       Button("min", TM_PANEL_W - 30, 4, 22, 20, "_");
       SetButton("min", "_", C'55,58,66');
 
@@ -364,11 +366,20 @@ public:
       SetButton("selllimit", "SELL LIMIT", C'130,48,48');
       SetButton("sellstop",  "SELL STOP",  C'130,48,48');
 
-      Label("ostat", 8, 250, "", clrSilver, 8);  Track("ostat");
+      // ---- price alarm: a line on the chart that alerts when the Bid crosses it
+      Label("c_al", 8, 254, "ALARM", C'150,155,165', 8);  Track("c_al");
+      Edit("aprice", 52, 250, 140, 20);  Track("aprice");
+      ObjectSetString(0, Name("aprice"), OBJPROP_TEXT, "");
+      Button("alarmadd", 198, 249, 112, 22, "SET ALARM");     Track("alarmadd");
+      Button("alarmclr", 316, 249, 112, 22, "CLEAR ALARMS");  Track("alarmclr");
+      SetButton("alarmadd", "SET ALARM", C'150,110,20');
+      SetButton("alarmclr", "CLEAR ALARMS", C'55,58,66');
 
-      Label("hdr",  8,   264, "POSITION", C'150,155,165', 8);   Track("hdr");
-      Label("hsl", 222,  264, "SL", C'150,155,165', 8);   Track("hsl");
-      Label("htp", 328,  264, "TP   (Enter = apply, 0 = none)", C'150,155,165', 8);   Track("htp");
+      Label("ostat", 8, 276, "", clrSilver, 8);  Track("ostat");
+
+      Label("hdr",  8,   290, "POSITION", C'150,155,165', 8);   Track("hdr");
+      Label("hsl", 222,  290, "SL", C'150,155,165', 8);   Track("hsl");
+      Label("htp", 328,  290, "TP   (Enter = apply, 0 = none)", C'150,155,165', 8);   Track("htp");
 
       for(int i = 0; i < TM_PANEL_ROWS; i++)
       {
@@ -409,6 +420,7 @@ public:
       const string px     = ObjectGetString(0, Name("opx"),  OBJPROP_TEXT);
       const string sl     = ObjectGetString(0, Name("osl"),  OBJPROP_TEXT);
       const string tp     = ObjectGetString(0, Name("otp"),  OBJPROP_TEXT);
+      const string alarm  = ObjectGetString(0, Name("aprice"), OBJPROP_TEXT);
       const string status = ObjectGetString(0, Name("ostat"), OBJPROP_TEXT);
       const color  statusColor = (color)ObjectGetInteger(0, Name("ostat"), OBJPROP_COLOR);
 
@@ -418,6 +430,7 @@ public:
       ObjectSetString(0, Name("opx"),  OBJPROP_TEXT, px);
       ObjectSetString(0, Name("osl"),  OBJPROP_TEXT, sl);
       ObjectSetString(0, Name("otp"),  OBJPROP_TEXT, tp);
+      ObjectSetString(0, Name("aprice"), OBJPROP_TEXT, alarm);
       SetText("ostat", status, statusColor);
       return true;
    }
@@ -446,6 +459,27 @@ public:
       type = m_orderType;
       lot = l; price = p; sl = s; tp = t;
       return true;
+   }
+
+   // After PANEL_ALARM_ADD: the typed alarm price. False if it is not a plain number above 0.
+   // The field is emptied once read, ready for the next alarm.
+   bool TakeAlarm(double &price)
+   {
+      double p = 0.0;
+      if(!ParsePrice(ObjectGetString(0, Name("aprice"), OBJPROP_TEXT), p) || p <= 0.0)
+         return false;
+      ObjectSetString(0, Name("aprice"), OBJPROP_TEXT, "");
+      price = p;
+      return true;
+   }
+
+   // Shows how many alarm lines are waiting on the chart.
+   void SetAlarmCount(const int n)
+   {
+      if(!m_created)
+         return;
+      SetButton("alarmclr", n > 0 ? StringFormat("CLEAR ALARMS (%d)", n) : "CLEAR ALARMS",
+                n > 0 ? C'110,70,40' : C'55,58,66');
    }
 
    void SetPriceFont(const int size) { m_priceFont = MathMax(10, MathMin(size, 28)); }
@@ -622,7 +656,7 @@ public:
          return PANEL_NONE;
       const string key = StringSubstr(sparam, StringLen(TM_PANEL_PREFIX));
 
-      if(key == "olot" || key == "opx" || key == "osl" || key == "otp")
+      if(key == "olot" || key == "opx" || key == "osl" || key == "otp" || key == "aprice")
       {
          if(id == CHARTEVENT_OBJECT_CLICK)
             m_editing = true;
@@ -671,6 +705,8 @@ public:
       if(key == "closeall") return PANEL_CLOSE_ALL;
       if(key == "closebuy")  return PANEL_CLOSE_BUY;
       if(key == "closesell") return PANEL_CLOSE_SELL;
+      if(key == "alarmadd")  return PANEL_ALARM_ADD;
+      if(key == "alarmclr")  return PANEL_ALARM_CLEAR;
 
       if(key == "buy")       { m_orderType = ORDER_TYPE_BUY;        return PANEL_ORDER; }
       if(key == "sell")      { m_orderType = ORDER_TYPE_SELL;       return PANEL_ORDER; }

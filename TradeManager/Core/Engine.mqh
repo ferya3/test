@@ -6,6 +6,7 @@
 #include "StateManager.mqh"
 #include "EventDispatcher.mqh"
 #include "../UI/ChartPanel.mqh"
+#include "../UI/PriceAlarms.mqh"
 #include "../Utils/SessionClock.mqh"
 
 // Owns and wires the modules. Holds no trading logic of its own.
@@ -25,6 +26,7 @@ private:
    CLifecycle        m_life;
    CChartPanel       m_panel;
    CSessionClock     m_sessions;
+   CPriceAlarms      m_alarms;
    ulong             m_raiseAt;         // when to rebuild the panel above new chart objects (0 = not pending)
    int               m_lastObjTotal;
 
@@ -94,6 +96,7 @@ private:
       m_dispatch.SetOrderMagic(InpMagicFilter >= 0 ? InpMagicFilter : 0);
       m_sessions.Configure(InpSydneyStart, InpSydneyEnd, InpTokyoStart, InpTokyoEnd,
                            InpLondonStart, InpLondonEnd, InpNewYorkStart, InpNewYorkEnd);
+      m_alarms.Configure(InpAlarmPopup, InpAlarmSound, InpAlarmPush, InpAlarmColor);
    }
 
    // Trade arrows are created by the terminal after the panel, so they draw over it.
@@ -147,6 +150,20 @@ private:
       m_panel.SetCandle(StringFormat("%s candle  %s", tf, h > 0 ? StringFormat("%d:%02d:%02d", h, m, s)
                                                                 : StringFormat("%02d:%02d", m, s)),
                         left <= 10 ? C'240,190,80' : C'200,205,215');
+   }
+
+   // Runs whether or not the panel is shown, so alarm lines already on the chart keep working.
+   void CheckAlarms()
+   {
+      MqlTick t;
+      if(!SymbolInfoTick(_Symbol, t))
+         return;
+      string text;
+      if(m_alarms.Check(_Symbol, t.bid, (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS), text) > 0 && InpShowPanel)
+      {
+         m_panel.SetStatus(text, C'240,190,80');
+         m_panel.SetAlarmCount(m_alarms.Count());
+      }
    }
 
    // Cheap enough to run on every tick: two labels, redraw throttled inside the panel.
@@ -205,6 +222,7 @@ private:
          else                  sells++;
       }
       m_panel.SetSideCounts(buys, sells);
+      m_panel.SetAlarmCount(m_alarms.Count());   // also picks up lines deleted by hand
 
       m_panel.Render(n, m_risk.exposure.openRiskMoney, m_risk.exposure.openRiskPct,
                      m_risk.account.balance, m_risk.account.dailyPL, m_risk.account.dailyPLPct, m_risk.drawdownPct,
@@ -256,12 +274,14 @@ public:
    void OnTick()
    {
       m_dispatch.HandleTick();
+      CheckAlarms();
       UpdatePrice();
    }
 
    void OnTimer()
    {
       m_dispatch.HandleTimer();
+      CheckAlarms();
       UpdatePanel();
       KeepPanelOnTop();
    }
@@ -344,6 +364,28 @@ public:
                m_dispatch.ManualSetLevels(ticket, sl, tp);
             break;
          }
+         case PANEL_ALARM_ADD:
+         {
+            double price = 0.0;
+            const int digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
+            if(!m_panel.TakeAlarm(price))
+               m_panel.SetStatus("Alarm price must be a plain number above 0", C'240,190,80');
+            else if(m_alarms.Add(price, digits))
+            {
+               Logger.Info("Alarm", "set at " + DoubleToString(price, digits));
+               m_panel.SetStatus("Alarm set at " + DoubleToString(price, digits) + "  (drag the line to move it)", C'110,210,130');
+            }
+            else
+               m_panel.SetStatus("Could not draw the alarm line", C'235,110,110');
+            break;
+         }
+         case PANEL_ALARM_CLEAR:
+         {
+            const int n = m_alarms.Clear();
+            Logger.Info("Alarm", StringFormat("cleared %d alarm(s)", n));
+            m_panel.SetStatus(StringFormat("%d alarm(s) cleared", n), clrSilver);
+            break;
+         }
          default:
             break;
       }
@@ -355,6 +397,8 @@ public:
       m_life.StopTimer();
       m_state.Flush();
       m_panel.Destroy();
+      if(reason == REASON_REMOVE)           // without the EA the lines would never fire
+         m_alarms.Clear();
       Logger.Info("Engine", StringFormat("stopped (reason %d)", reason));
    }
 };
