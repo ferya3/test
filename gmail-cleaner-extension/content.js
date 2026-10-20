@@ -35,8 +35,9 @@
   // Default: every word must be somewhere in the subject, in any order. "Exact"
   // requires the words side by side in this order, which misses subjects whose
   // spacing or half-spaces differ.
-  const buildQuery = (subject, exact) =>
-    exact ? `subject:"${cleanSubject(subject)}"` : `subject:(${cleanSubject(subject)})`;
+  const buildQuery = (subject, exact) => exact
+    ? `subject:"${cleanSubject(subject)}"`
+    : cleanSubject(subject).split(' ').map((word) => `subject:${word}`).join(' ');
   // Arabic ي/ك vs Persian ی/ک and half-spaces must not decide whether a row matches.
   const normalize = (s) => s.toLowerCase()
     .replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/[ً-ٰٟ]/g, '')
@@ -47,8 +48,8 @@
   const mainArea = () => findVisible('div[role="main"]');
   const toolbar = () => findVisible('div[gh="tm"]');
   const rows = () => {
-    const main = mainArea();
-    return main ? [...main.querySelectorAll('tr.zA')].filter(visible) : [];
+    const inMain = [...document.querySelectorAll('div[role="main"] tr.zA')].filter(visible);
+    return inMain.length ? inMain : [...document.querySelectorAll('tr.zA')].filter(visible);
   };
 
   // Safety net: never press delete unless most visible rows really contain the
@@ -65,14 +66,20 @@
     return list.length > 0 && matching.length >= list.length / 2;
   }
 
+  // Searching a big mailbox can take Gmail several seconds, and the list is
+  // empty while it loads, so only give up after SEARCH_TIMEOUT without results.
+  const SEARCH_TIMEOUT = 20000;
+
   async function openSearch(query) {
+    const alreadyThere = isOnSearch(query);
     const oldRows = new Set(rows());
-    if (!isOnSearch(query)) {
-      location.hash = '#search/' + encodeURIComponent(query);
-      // Wait until Gmail has replaced the previous list with the results.
-      await waitFor(() => isOnSearch(query) && mainArea() && rows().every((r) => !oldRows.has(r)), 8000);
-    }
-    await sleep(1500); // let Gmail finish rendering the result list
+    if (!alreadyThere) location.hash = '#search/' + encodeURIComponent(query);
+    await waitFor(() => {
+      const list = rows();
+      // Rows still on screen from the previous page are not results yet.
+      return list.length > 0 && (alreadyThere || list.every((r) => !oldRows.has(r)));
+    }, SEARCH_TIMEOUT);
+    await sleep(1000); // let Gmail finish rendering the result list
   }
 
   // Gmail's own counter, e.g. "1–50 of 2,345" (it says "of many" for big searches).
@@ -237,7 +244,7 @@
   $('search').addEventListener('click', async () => {
     const subject = readSubject();
     if (!subject) return;
-    setStatus('در حال جستجو...');
+    setStatus('در حال جستجو... (ممکن است چند ثانیه طول بکشد)');
     await openSearch(buildQuery(subject, exact.checked));
     if (!rows().length) {
       setStatus(exact.checked
