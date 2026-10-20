@@ -30,9 +30,17 @@
 
   // ------------------------------------------------------------------ Gmail
 
-  const cleanSubject = (s) => s.replace(/"/g, ' ').replace(/\s+/g, ' ').trim();
-  const buildQuery = (subject) => `subject:"${cleanSubject(subject)}"`;
-  const normalize = (s) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  // Quotes and brackets would break the query; a leading "-" would negate a word.
+  const cleanSubject = (s) => s.replace(/["()]/g, ' ').replace(/(^|\s)-+/g, '$1').replace(/\s+/g, ' ').trim();
+  // Default: every word must be somewhere in the subject, in any order. "Exact"
+  // requires the words side by side in this order, which misses subjects whose
+  // spacing or half-spaces differ.
+  const buildQuery = (subject, exact) =>
+    exact ? `subject:"${cleanSubject(subject)}"` : `subject:(${cleanSubject(subject)})`;
+  // Arabic ي/ك vs Persian ی/ک and half-spaces must not decide whether a row matches.
+  const normalize = (s) => s.toLowerCase()
+    .replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/[ً-ٰٟ]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 
   const isOnSearch = (query) =>
     decodeURIComponent(location.hash.replace(/\+/g, ' ')) === '#search/' + query;
@@ -43,29 +51,42 @@
     return main ? [...main.querySelectorAll('tr.zA')].filter(visible) : [];
   };
 
-  // Safety net: never press delete unless every visible row really contains the
-  // subject. This catches the case where Gmail still shows the inbox (or any
-  // other list) instead of our search results.
+  // Safety net: never press delete unless most visible rows really contain the
+  // subject. This catches Gmail still showing the inbox (or any other list)
+  // instead of our results. Not every row has to match: a conversation can be
+  // listed under the subject of a different message in the same thread.
   function rowsMatch(subject) {
     const words = normalize(subject).split(' ').filter(Boolean);
     const list = rows();
-    return list.length > 0 && list.every((row) => {
+    const matching = list.filter((row) => {
       const text = normalize(row.textContent);
       return words.every((word) => text.includes(word));
     });
+    return list.length > 0 && matching.length >= list.length / 2;
   }
 
   async function openSearch(query) {
-    if (!isOnSearch(query)) location.hash = '#search/' + encodeURIComponent(query);
-    await sleep(1500);
-    await waitFor(() => isOnSearch(query) && mainArea(), 15000);
-    await sleep(800); // let Gmail finish swapping in the result list
+    const oldRows = new Set(rows());
+    if (!isOnSearch(query)) {
+      location.hash = '#search/' + encodeURIComponent(query);
+      // Wait until Gmail has replaced the previous list with the results.
+      await waitFor(() => isOnSearch(query) && mainArea() && rows().every((r) => !oldRows.has(r)), 8000);
+    }
+    await sleep(1500); // let Gmail finish rendering the result list
+  }
+
+  // Gmail's own counter, e.g. "1–50 of 2,345" (it says "of many" for big searches).
+  function gmailCount() {
+    const tb = toolbar();
+    const number = findVisible('.ts', tb);
+    const box = number?.closest('.Dj') || number?.parentElement?.parentElement;
+    return box && tb.contains(box) ? box.textContent.replace(/\s+/g, ' ').trim() : '';
   }
 
   class StepError extends Error {}
 
-  async function deleteAll(subject) {
-    const query = buildQuery(subject);
+  async function deleteAll(subject, exact) {
+    const query = buildQuery(subject, exact);
     let pages = 0;
 
     for (let round = 1; round <= MAX_ROUNDS; round++) {
@@ -86,14 +107,17 @@
       const checkbox = findVisible('[role="checkbox"]', toolbar());
       if (!checkbox) throw new StepError('دکمه‌ی «انتخاب همه» پیدا نشد.');
 
-      // The "select all N conversations" link only appears after ticking the
-      // checkbox, so whatever link is new afterwards is that one.
+      // The "select all conversations that match this search" link only shows
+      // after ticking the checkbox (Gmail may keep it in the page, hidden), so
+      // the link that becomes visible afterwards is that one.
       const linkSelector = '[role="link"], span[tabindex="0"]';
-      const before = new Set(document.querySelectorAll(linkSelector));
+      const shownLinks = (root) => (root ? [...root.querySelectorAll(linkSelector)].filter(visible) : []);
+      const before = new Set(shownLinks(document));
       if (checkbox.getAttribute('aria-checked') !== 'true') click(checkbox);
       await waitFor(() => checkbox.getAttribute('aria-checked') === 'true', 2000);
       const selectAllLink = await waitFor(
-        () => [...document.querySelectorAll(linkSelector)].find((el) => !before.has(el) && visible(el)),
+        () => shownLinks(mainArea()).find((el) => !before.has(el)) ||
+          shownLinks(document).find((el) => !before.has(el)),
         2500,
       );
       if (selectAllLink) {
@@ -141,8 +165,11 @@
       .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
       .head b { font-size: 15px; }
       .close { border: 0; background: none; font-size: 20px; line-height: 1; cursor: pointer; color: #656d76; padding: 0 4px; }
-      input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #d8dee4;
-        border-radius: 8px; font: inherit; margin-bottom: 10px; }
+      input[type="text"] { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #d8dee4;
+        border-radius: 8px; font: inherit; margin-bottom: 6px; }
+      .check { display: flex; gap: 6px; align-items: center; font-size: 12px; cursor: pointer; }
+      .query { font: 12px ui-monospace, Consolas, monospace; color: #656d76; margin: 4px 0 10px;
+        overflow-wrap: anywhere; text-align: right; }
       .buttons { display: flex; gap: 8px; }
       button.act { flex: 1; padding: 8px; border-radius: 8px; border: 1px solid #1a73e8;
         background: #fff; color: #1a73e8; font: inherit; cursor: pointer; }
@@ -154,7 +181,8 @@
       .note { margin-top: 6px; color: #656d76; font-size: 12px; }
       @media (prefers-color-scheme: dark) {
         .panel { background: #1f2227; color: #e6e8eb; border-color: #353a42; }
-        input { background: #16181c; color: #e6e8eb; border-color: #353a42; }
+        input[type="text"] { background: #16181c; color: #e6e8eb; border-color: #353a42; }
+        .query { color: #9aa1a9; }
         button.act { background: transparent; color: #8ab4f8; border-color: #8ab4f8; }
         button.danger { background: #d93025; border-color: #d93025; color: #fff; }
         .note, .close { color: #9aa1a9; }
@@ -163,6 +191,8 @@
     <div class="panel">
       <div class="head"><b>پاک‌کن ایمیل با عنوان</b><button class="close" title="بستن">×</button></div>
       <input id="subject" type="text" placeholder="عنوان ایمیل را بنویسید">
+      <label class="check"><input id="exact" type="checkbox"> فقط عبارت دقیق (کلمه‌ها پشت سر هم و به همین ترتیب)</label>
+      <div class="query" id="query" dir="ltr"></div>
       <div class="buttons">
         <button class="act" id="search">نمایش ایمیل‌ها</button>
         <button class="act danger" id="delete">حذف همه</button>
@@ -174,8 +204,15 @@
 
   const $ = (id) => shadow.getElementById(id);
   const input = $('subject');
+  const exact = $('exact');
   // Keep Gmail's keyboard shortcuts from firing while typing in the panel.
   for (const type of ['keydown', 'keypress', 'keyup']) input.addEventListener(type, (e) => e.stopPropagation());
+
+  const showQuery = () => {
+    $('query').textContent = cleanSubject(input.value) ? buildQuery(input.value, exact.checked) : '';
+  };
+  input.addEventListener('input', showQuery);
+  exact.addEventListener('change', showQuery);
 
   function setStatus(text, kind = '') {
     $('status').textContent = text;
@@ -187,6 +224,7 @@
     stopRequested = false;
     $('search').disabled = value;
     input.disabled = value;
+    exact.disabled = value;
     $('delete').textContent = value ? 'توقف' : 'حذف همه';
   }
 
@@ -200,11 +238,18 @@
     const subject = readSubject();
     if (!subject) return;
     setStatus('در حال جستجو...');
-    await openSearch(buildQuery(subject));
-    const count = rows().length;
-    setStatus(count
-      ? 'نتایج در لیست جیمیل نمایش داده شد. اگر درست است «حذف همه» را بزنید.'
-      : 'ایمیلی با این عنوان پیدا نشد.');
+    await openSearch(buildQuery(subject, exact.checked));
+    if (!rows().length) {
+      setStatus(exact.checked
+        ? 'ایمیلی پیدا نشد. تیک «عبارت دقیق» را بردارید و دوباره امتحان کنید.'
+        : 'ایمیلی با این عنوان پیدا نشد.');
+      return;
+    }
+    const count = gmailCount();
+    setStatus(
+      (count ? `جیمیل: ${count}. ` : '') +
+      'جیمیل در هر صفحه فقط ۵۰ تا نشان می‌دهد، ولی «حذف همه» همه‌ی صفحه‌ها را پاک می‌کند.',
+    );
   });
 
   $('delete').addEventListener('click', async () => {
@@ -215,11 +260,11 @@
     }
     const subject = readSubject();
     if (!subject) return;
-    if (!confirm(`همه‌ی ایمیل‌هایی که عنوانشان شامل «${subject}» است به سطل زباله منتقل شوند؟`)) return;
+    if (!confirm(`همه‌ی ایمیل‌هایی که عنوانشان شامل «${subject}» است (در همه‌ی صفحه‌ها) به سطل زباله منتقل شوند؟`)) return;
 
     setRunning(true);
     try {
-      await deleteAll(subject);
+      await deleteAll(subject, exact.checked);
     } catch (err) {
       const manual = 'جستجو در جیمیل باز است؛ می‌توانید دستی ادامه دهید: تیک بالای لیست ← «Select all conversations» ← سطل زباله.';
       setStatus(err instanceof StepError ? `${err.message} ${manual}` : `خطا: ${err.message}`, 'error');

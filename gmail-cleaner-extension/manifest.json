@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Gmail Subject Cleaner",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "جستجوی ایمیل‌های جیمیل بر اساس عنوان و حذف دسته‌جمعی آن‌ها — بدون نیاز به تنظیمات",
   "permissions": ["scripting"],
   "host_permissions": ["https://mail.google.com/*"],
