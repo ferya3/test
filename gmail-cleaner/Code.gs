@@ -9,8 +9,10 @@
 
 var LIST_PAGE = 500;        // messages.list returns at most 500 ids per call
 var HEADER_BATCH = 50;      // metadata requests per HTTP batch call (Gmail suggests at most 50)
+var MODIFY_BATCH = 1000;    // messages.batchModify takes at most 1000 ids
 var TIME_BUDGET_MS = 25000; // keep each call well under Apps Script's 6-minute limit
-var SCAN_QUERY = '-in:sent -in:drafts -in:chats';
+var LIST_PAUSE_MS = 300;    // between list calls, to stay under Gmail's per-minute limit
+var RETRY_WAITS_S = [2, 5, 10, 20, 40, 60];
 
 function doGet() {
   return HtmlService.createHtmlOutput(PAGE_HTML)
@@ -47,14 +49,21 @@ function buildQuery_(text, mode) {
   return clean.split(' ').map(function (word) { return 'subject:' + word; }).join(' ');
 }
 
-// Retries Gmail's short-lived "slow down" and server errors.
+// Gmail's "slow down" answers (per-second and per-minute limits) and its
+// passing server errors go away if we wait; a per-day limit does not.
+function isRetryable_(err) {
+  var text = String(err);
+  if (/per day/i.test(text)) return false;
+  return /rate ?limit|quota exceeded|per minute|per second|too many concurrent|429|500|502|503|backend error|try again/i.test(text);
+}
+
 function withRetry_(fn) {
   for (var attempt = 0; ; attempt++) {
     try {
       return fn();
     } catch (err) {
-      if (attempt >= 5 || !/rate limit|429|500|502|503|backend error|try again/i.test(String(err))) throw err;
-      Utilities.sleep(1000 * Math.pow(2, attempt));
+      if (attempt >= RETRY_WAITS_S.length || !isRetryable_(err)) throw err;
+      Utilities.sleep(1000 * RETRY_WAITS_S[attempt]);
     }
   }
 }
@@ -72,8 +81,8 @@ function listIds_(query, pageToken, max) {
 function fetchHeaders_(ids) {
   var found = {};
   var pending = ids.slice();
-  for (var attempt = 0; pending.length && attempt < 6; attempt++) {
-    if (attempt) Utilities.sleep(1000 * Math.pow(2, attempt - 1));
+  for (var attempt = 0; pending.length && attempt <= RETRY_WAITS_S.length; attempt++) {
+    if (attempt) Utilities.sleep(1000 * RETRY_WAITS_S[attempt - 1]);
     var boundary = 'batch_' + Utilities.getUuid();
     var body = pending.map(function (id, i) {
       return '--' + boundary + '\r\n' +
@@ -90,7 +99,7 @@ function fetchHeaders_(ids) {
       muteHttpExceptions: true,
     });
     var code = response.getResponseCode();
-    if (code === 429 || code >= 500) continue;
+    if (code === 429 || code >= 500 || (code === 403 && isRetryable_(response.getContentText()))) continue;
     if (code !== 200) throw new Error('Gmail ' + code + ': ' + response.getContentText().slice(0, 300));
 
     var parts = parseBatch_(response);
@@ -156,34 +165,43 @@ function search(text, mode) {
   };
 }
 
-// Counts matches page by page, as far as the time budget allows; the page
-// keeps calling with the returned token until done.
+// Lists matches page by page, as far as the time budget allows; the page keeps
+// calling with the returned token until done. The ids come back too, so the
+// trash step doesn't have to search all over again.
 function countChunk(text, mode, pageToken) {
   var query = buildQuery_(text, mode);
   var began = Date.now();
-  var counted = 0;
+  var ids = [];
   var token = pageToken || null;
   while (Date.now() - began < TIME_BUDGET_MS) {
     var page = listIds_(query, token);
-    counted += page.ids.length;
+    ids = ids.concat(page.ids);
     token = page.next;
-    if (!token) return { counted: counted, done: true, next: null };
+    if (!token) return { ids: ids, done: true, next: null };
+    Utilities.sleep(LIST_PAUSE_MS);
   }
-  return { counted: counted, done: false, next: token };
+  return { ids: ids, done: false, next: token };
+}
+
+// Trashes the given ids (found by countChunk), 1000 per Gmail call.
+function trashByIds(ids) {
+  for (var i = 0; i < ids.length; i += MODIFY_BATCH) trashIds_(ids.slice(i, i + MODIFY_BATCH));
+  return { trashed: ids.length };
 }
 
 function trashIds_(ids) {
   try {
     withRetry_(function () { Gmail.Users.Messages.batchModify({ ids: ids, addLabelIds: ['TRASH'] }, 'me'); });
   } catch (err) {
-    if (/rate limit|429/i.test(String(err))) throw err;
+    if (isRetryable_(err) || /per day/i.test(String(err))) throw err;
     // If the bulk call is refused, trash them one by one instead.
     ids.forEach(function (id) { withRetry_(function () { Gmail.Users.Messages.trash('me', id); }); });
   }
 }
 
-// Moves matches to the trash, 500 at a time, as far as the time budget allows.
-// Trashed emails drop out of the search, so it always takes the first page.
+// Moves whatever still matches to the trash, 500 at a time, as far as the time
+// budget allows: the sweep after trashByIds, for anything the count didn't
+// reach. Trashed emails drop out of the search, so it always takes the first page.
 function trashChunk(text, mode) {
   var query = buildQuery_(text, mode);
   var began = Date.now();
@@ -204,6 +222,7 @@ function trashChunk(text, mode) {
     trashIds_(fresh);
     fresh.forEach(function (id) { seen[id] = true; });
     trashed += fresh.length;
+    Utilities.sleep(LIST_PAUSE_MS);
   }
   return { trashed: trashed, done: false };
 }
@@ -231,8 +250,10 @@ function tally_(map, key, label) {
 }
 
 // Reads received emails page by page (newest first, at most `remaining`) and
-// counts them per subject and per sender; the page merges the chunks.
+// counts them per subject and per sender; the page merges the chunks. It lists
+// without a search query (cheaper for Gmail's limits) and skips mail you sent.
 function scanChunk(pageToken, remaining) {
+  var me = withRetry_(function () { return Gmail.Users.getProfile('me'); }).emailAddress.toLowerCase();
   var began = Date.now();
   var scanned = 0;
   var subjects = {};
@@ -242,17 +263,18 @@ function scanChunk(pageToken, remaining) {
   while (scanned === 0 || Date.now() - began < TIME_BUDGET_MS - 12000) {
     var size = Math.min(LIST_PAGE, remaining - scanned);
     if (size <= 0) return { scanned: scanned, done: true, next: null, subjects: subjects, senders: senders };
-    var page = listIds_(SCAN_QUERY, token, size);
+    var page = listIds_(null, token, size);
     for (var i = 0; i < page.ids.length; i += HEADER_BATCH) {
       var found = fetchHeaders_(page.ids.slice(i, i + HEADER_BATCH));
       Object.keys(found).forEach(function (id) {
+        var from = header_(found[id], 'From');
+        if (!from || senderKey_(from) === me) return;
         var subject = header_(found[id], 'Subject');
         var key = subjectKey_(subject);
         if (key) tally_(subjects, key, subject);
-        var from = header_(found[id], 'From');
-        if (from) tally_(senders, senderKey_(from), from);
+        tally_(senders, senderKey_(from), from);
       });
-      Utilities.sleep(600); // stay under Gmail's per-second limit
+      Utilities.sleep(1000); // 50 headers cost 250 units: about Gmail's per-second limit
     }
     scanned += page.ids.length;
     token = page.next;
@@ -342,7 +364,7 @@ var PAGE_HTML = `<!doctype html>
       <button type="button" class="danger" id="trashBtn">انتقال همه به سطل زباله</button>
       <button type="button" class="secondary" id="stopBtn" hidden>توقف</button>
     </div>
-    <p class="muted">ایمیل‌ها به سطل زباله می‌روند و تا ۳۰ روز قابل بازگشت‌اند. تا تمام شدن کار، این صفحه را نبندید.</p>
+    <p class="muted">ایمیل‌ها به سطل زباله می‌روند و تا ۳۰ روز قابل بازگشت‌اند. تا تمام شدن کار، این صفحه را نبندید. اگر گوگل بگوید «آهسته‌تر»، برنامه خودش تا یک دقیقه صبر می‌کند و ادامه می‌دهد.</p>
     <table class="preview">
       <thead><tr><th>عنوان</th><th>فرستنده</th><th>تاریخ</th></tr></thead>
       <tbody id="preview"></tbody>
@@ -377,7 +399,7 @@ var PAGE_HTML = `<!doctype html>
 <script>
   var $ = function (id) { return document.getElementById(id); };
   var fa = function (n) { return Number(n).toLocaleString('fa-IR'); };
-  var state = { text: '', mode: 'words', total: 0, counting: false, busy: false, stop: false, armed: null, picked: null };
+  var state = { text: '', mode: 'words', total: 0, ids: [], counting: false, busy: false, stop: false, armed: null, picked: null };
   var repeats = { subjects: {}, senders: {}, scanned: 0, scanning: false, stop: false };
   var REPEAT_ROWS = 50;
 
@@ -405,7 +427,10 @@ var PAGE_HTML = `<!doctype html>
     if (/urlfetch/i.test(text) && /too many times/i.test(text)) {
       return 'سهمیه‌ی روزانه‌ی گوگل برای بررسی پرتکرارها تمام شد (جستجو و حذف همچنان کار می‌کند). فردا دوباره بررسی کنید.';
     }
-    if (/too many times/i.test(text)) {
+    if (/per minute|quota exceeded|rate ?limit/i.test(text) && !/per day/i.test(text)) {
+      return 'گوگل گفت «آهسته‌تر». یک دقیقه صبر کنید و دوباره بزنید؛ از همان‌جا ادامه می‌دهد.';
+    }
+    if (/too many times|per day/i.test(text)) {
       return 'سهمیه‌ی روزانه‌ی گوگل تمام شد. فردا دوباره «جستجو» و «انتقال همه» را بزنید تا از همان‌جا ادامه دهد.';
     }
     if (/insufficient|scope|permission/i.test(text)) {
@@ -462,6 +487,7 @@ var PAGE_HTML = `<!doctype html>
     state.text = text;
     state.mode = mode();
     state.total = 0;
+    state.ids = [];
     showMsg('');
     $('results').hidden = true;
     setBusy(true);
@@ -482,15 +508,17 @@ var PAGE_HTML = `<!doctype html>
       $('results').hidden = false;
 
       state.counting = true;
-      var total = 0;
+      var ids = [];
       var token = null;
       for (;;) {
-        $('count').textContent = 'در حال شمارش... ' + fa(total);
+        $('count').textContent = 'در حال شمارش... ' + fa(ids.length);
         var chunk = await call('countChunk', state.text, state.mode, token);
-        total += chunk.counted;
+        ids = ids.concat(chunk.ids);
         token = chunk.next;
         if (chunk.done || state.stop) break;
       }
+      var total = ids.length;
+      state.ids = ids;
       state.total = total;
       state.counting = false;
       $('count').textContent = fa(total) + ' ایمیل' + (state.stop ? ' (شمارش متوقف شد)' : '') + ' پیدا شد';
@@ -523,12 +551,30 @@ var PAGE_HTML = `<!doctype html>
     var emptyRounds = 0;
     $('progress').max = state.total;
     $('progress').value = 0;
+    var progress = function () {
+      $('count').textContent = 'در حال انتقال به سطل زباله... ' + fa(Math.min(done, state.total)) + ' از ' + fa(state.total);
+      $('progress').value = Math.min(done, state.total);
+    };
     try {
+      // First the emails the count already found, 5000 per call, with no new searching.
+      var ids = state.ids;
+      state.ids = [];
+      for (var i = 0; i < ids.length && !state.stop; i += 5000) {
+        progress();
+        done += (await call('trashByIds', ids.slice(i, i + 5000))).trashed;
+      }
+      if (state.stop) {
+        state.ids = ids.slice(done);
+        showMsg('متوقف شد. ' + fa(done) + ' ایمیل به سطل زباله رفت.');
+        state.total = Math.max(state.total - done, 0);
+        $('count').textContent = 'حدود ' + fa(state.total) + ' ایمیل باقی مانده';
+        return;
+      }
+      // Then a sweep for anything the count didn't reach (or that just arrived).
       for (;;) {
-        $('count').textContent = 'در حال انتقال به سطل زباله... ' + fa(Math.min(done, state.total)) + ' از ' + fa(state.total);
+        progress();
         var chunk = await call('trashChunk', state.text, state.mode);
         done += chunk.trashed;
-        $('progress').value = Math.min(done, state.total);
         if (chunk.done) {
           $('count').textContent = 'تمام شد ✓';
           // A lagging search index can hand back a conversation twice; never report more than were found.
