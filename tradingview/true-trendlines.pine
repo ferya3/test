@@ -85,6 +85,10 @@ type TL
     int   brokenBar = na
     bool  done      = false
 
+type Level
+    line  ln
+    label lb
+
 method valueAt(TL this, int x) =>
     this.y1 + this.slope * (x - this.x1)
 
@@ -120,7 +124,7 @@ f_touches(array<Pivot> pivs, int x1, float y1, float s) =>
     int n = 0
     for p in pivs
         if p.idx >= x1 and math.abs(p.price - (y1 + s * (p.idx - x1))) <= tol
-            n += 1
+            n := n + 1
     n
 
 // Pair the newest pivot with an older one: lower highs for resistance, higher
@@ -161,7 +165,7 @@ f_onPivot(array<Pivot> pivs, array<TL> act, float price, bool isRes) =>
     bool touched = false
     for t in act
         if math.abs(price - t.valueAt(pIdx)) <= tol
-            t.touches   += 1
+            t.touches   := t.touches + 1
             t.lastTouch := pIdx
             touched     := true
             if not na(t.lb)
@@ -178,7 +182,8 @@ f_onPivot(array<Pivot> pivs, array<TL> act, float price, bool isRes) =>
             nt.restyle()
             act.push(nt)
             while act.size() > maxPerSide
-                act.shift().kill()
+                TL gone = act.shift()
+                gone.kill()
 
 // Breaks active lines on a close beyond them, then watches broken lines for a
 // retest from the other side. Returns [breakout, retest].
@@ -215,7 +220,8 @@ f_process(array<TL> act, array<TL> brk, bool isRes) =>
                 b.ln.set_xy2(bar_index, v)
                 rt := true
     while brk.size() > keepBroken
-        brk.shift().kill()
+        TL gone = brk.shift()
+        gone.kill()
     [bo, rt]
 
 // ─── Main ────────────────────────────────────────────────────────────────────
@@ -235,12 +241,8 @@ if not na(pl)
     f_onPivot(pLo, supLines, pl, false)
 
 // ─── Previous week H / L / C ─────────────────────────────────────────────────
-type Level
-    line  ln
-    label lb
-
 var array<Level> pwLevels = array.new<Level>()
-string           pwStyle  =pwStyleIn == "Solid" ? line.style_solid : pwStyleIn == "Dotted" ? line.style_dotted : line.style_dashed
+string           pwStyle  = pwStyleIn == "Solid" ? line.style_solid : pwStyleIn == "Dotted" ? line.style_dotted : line.style_dashed
 
 f_level(float y, color c, string txt) =>
     line  ln = line.new(bar_index, y, bar_index + 1, y, color = c, style = pwStyle, width = 1)
