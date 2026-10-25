@@ -1,0 +1,240 @@
+//@version=6
+// True Trendlines — pivot-anchored trendlines validated the way discretionary
+// traders draw them: anchored on confirmed swing points (DeMark), no candle
+// closes through the line, more touches = stronger line, and a close beyond
+// the line (optionally on volume) is the breakout. Broken lines are watched
+// for the classic break-and-retest (role reversal).
+indicator("True Trendlines [Pivot · Touch · Breakout]", shorttitle = "True TL", overlay = true, max_lines_count = 500, max_labels_count = 500, max_bars_back = 2000)
+
+// ─── Inputs ──────────────────────────────────────────────────────────────────
+const string G_PIV = "Pivots"
+const string G_TL  = "Trendline rules"
+const string G_SIG = "Breakout & Retest"
+const string G_STY = "Style"
+
+int    pivLen     = input.int(5, "Pivot strength", minval = 2, maxval = 50, group = G_PIV, tooltip = "تعداد کندل در هر طرف برای تایید سقف/کف (روش DeMark). عدد بزرگ‌تر = خطوط بلندمدت‌تر و معتبرتر، ولی با تاخیر بیشتر.")
+string anchorMode = input.string("Wicks", "Anchor on", options = ["Wicks", "Bodies"], group = G_PIV, tooltip = "Wicks: خط روی سایه‌ها (کلاسیک). Bodies: خط روی بدنه کندل‌ها (سبک تریدرهای پرایس‌اکشن که نویز سایه را حذف می‌کنند).")
+int    maxCands   = input.int(15, "Pivots to compare", minval = 2, maxval = 50, group = G_PIV, tooltip = "هر پیوت جدید با چند پیوت قبلی مقایسه شود تا بهترین خط پیدا شود.")
+int    calcBars   = input.int(3000, "Calculate on last N bars", minval = 300, maxval = 20000, group = G_PIV)
+
+int   minTouch   = input.int(2, "Min touches to draw", minval = 2, maxval = 6, group = G_TL)
+int   confTouch  = input.int(3, "Touches for a confirmed line", minval = 2, maxval = 10, group = G_TL, tooltip = "خطی که این تعداد برخورد داشته باشد «تایید‌شده» است و ضخیم‌تر کشیده می‌شود. اکثر تریدرهای حرفه‌ای ۳ برخورد را معیار می‌دانند.")
+int   minSpan    = input.int(10, "Min bars between anchors", minval = 3, group = G_TL)
+int   maxSpan    = input.int(300, "Max bars between anchors", minval = 20, maxval = 1500, group = G_TL)
+float tolMult    = input.float(0.25, "Touch tolerance (× ATR)", minval = 0.0, step = 0.05, group = G_TL, tooltip = "فاصله‌ای که هنوز «برخورد» حساب می‌شود.")
+float maxSlope   = input.float(1.0, "Max steepness (ATR per bar)", minval = 0.05, step = 0.05, group = G_TL, tooltip = "خطوط خیلی تند (حرکت‌های سهمی) پایدار نیستند و حذف می‌شوند.")
+int   maxPerSide = input.int(3, "Active lines per side", minval = 1, maxval = 10, group = G_TL)
+int   staleBars  = input.int(200, "Drop line after N bars without touch", minval = 20, group = G_TL)
+
+float brkMult    = input.float(0.1, "Break buffer (× ATR)", minval = 0.0, step = 0.05, group = G_SIG, tooltip = "شکست فقط وقتی معتبر است که کندل با این فاصله آن طرف خط بسته شود (فیلتر فیک‌اوت).")
+bool  useVol     = input.bool(false, "Require volume above average", group = G_SIG)
+float volMult    = input.float(1.2, "Volume multiplier", minval = 0.5, step = 0.1, group = G_SIG)
+bool  showRetest = input.bool(true, "Show retest signals", group = G_SIG)
+int   retestBars = input.int(20, "Retest window (bars)", minval = 2, group = G_SIG)
+int   keepBroken = input.int(3, "Broken lines kept per side", minval = 0, maxval = 20, group = G_SIG, tooltip = "برای سیگنال ری‌تست حداقل ۱ لازم است.")
+
+color colRes    = input.color(#ef5350, "Resistance", group = G_STY)
+color colSup    = input.color(#26a69a, "Support", group = G_STY)
+color colBroken = input.color(color.gray, "Broken", group = G_STY)
+int   confWidth = input.int(2, "Confirmed line width", minval = 1, maxval = 5, group = G_STY)
+bool  showTouch = input.bool(true, "Show touch count", group = G_STY)
+bool  showSig   = input.bool(true, "Show breakout labels", group = G_STY)
+
+// ─── Series ──────────────────────────────────────────────────────────────────
+bool  bodyMode = anchorMode == "Bodies"
+float hSrc     = bodyMode ? math.max(open, close) : high
+float lSrc     = bodyMode ? math.min(open, close) : low
+float ph       = ta.pivothigh(hSrc, pivLen, pivLen)
+float pl       = ta.pivotlow(lSrc, pivLen, pivLen)
+float atrV     = ta.atr(14)
+float tol      = atrV * tolMult
+float brkBuf   = atrV * brkMult
+float volAvg   = ta.sma(volume, 20)
+bool  volOk    = not useVol or volume > volAvg * volMult
+bool  inWindow = bar_index >= last_bar_index - calcBars
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+type Pivot
+    int   idx
+    float price
+
+type TL
+    line  ln
+    label lb
+    int   x1
+    float y1
+    float slope
+    int   touches
+    bool  isRes
+    int   lastTouch
+    int   brokenBar = na
+    bool  done      = false
+
+method valueAt(TL this, int x) =>
+    this.y1 + this.slope * (x - this.x1)
+
+method restyle(TL this) =>
+    color c    = this.isRes ? colRes : colSup
+    bool  conf = this.touches >= confTouch
+    this.ln.set_color(conf ? c : color.new(c, 40))
+    this.ln.set_width(conf ? confWidth : 1)
+    if not na(this.lb)
+        this.lb.set_text(str.tostring(this.touches) + (conf ? "× ✓" : "×"))
+        this.lb.set_textcolor(c)
+
+method kill(TL this) =>
+    this.ln.delete()
+    if not na(this.lb)
+        this.lb.delete()
+
+// ─── Trendline search ────────────────────────────────────────────────────────
+// A line is valid only if no close, from its first anchor up to now, sits
+// beyond it by more than the break buffer.
+f_holds(int x1, float y1, float s, bool isRes) =>
+    int  span = bar_index - x1
+    bool ok   = true
+    for k = 0 to span
+        float lv = y1 + s * (span - k)
+        if isRes ? close[k] > lv + brkBuf : close[k] < lv - brkBuf
+            ok := false
+            break
+    ok
+
+// Number of swing points (anchors included) that sit on the line.
+f_touches(array<Pivot> pivs, int x1, float y1, float s) =>
+    int n = 0
+    for p in pivs
+        if p.idx >= x1 and math.abs(p.price - (y1 + s * (p.idx - x1))) <= tol
+            n += 1
+    n
+
+// Pair the newest pivot with an older one: lower highs for resistance, higher
+// lows for support. Most touches wins, ties go to the longer line.
+f_findBest(array<Pivot> pivs, bool isRes) =>
+    int   bestI     = -1
+    int   bestT     = 0
+    int   bestSpan  = 0
+    float bestSlope = na
+    int   sz        = pivs.size()
+    if sz >= 2
+        Pivot nw = pivs.get(sz - 1)
+        int   lo = math.max(0, sz - 1 - maxCands)
+        for i = sz - 2 to lo
+            Pivot od   = pivs.get(i)
+            int   span = nw.idx - od.idx
+            if span > maxSpan
+                break
+            bool  dirOk = isRes ? od.price > nw.price : od.price < nw.price
+            float s     = (nw.price - od.price) / span
+            if dirOk and span >= minSpan and math.abs(s) <= maxSlope * atrV
+                if f_holds(od.idx, od.price, s, isRes)
+                    int tc = f_touches(pivs, od.idx, od.price, s)
+                    if tc > bestT or (tc == bestT and span > bestSpan)
+                        bestI     := i
+                        bestT     := tc
+                        bestSpan  := span
+                        bestSlope := s
+    [bestI, bestT, bestSlope]
+
+f_onPivot(array<Pivot> pivs, array<TL> act, float price, bool isRes) =>
+    int pIdx = bar_index - pivLen
+    pivs.push(Pivot.new(pIdx, price))
+    if pivs.size() > 100
+        pivs.shift()
+    // A swing that lands on an existing line strengthens it instead of
+    // spawning a near-duplicate.
+    bool touched = false
+    for t in act
+        if math.abs(price - t.valueAt(pIdx)) <= tol
+            t.touches   += 1
+            t.lastTouch := pIdx
+            touched     := true
+            if not na(t.lb)
+                t.lb.set_xy(pIdx, price)
+            t.restyle()
+    if not touched and inWindow
+        [bi, bt, bs] = f_findBest(pivs, isRes)
+        if bi >= 0 and bt >= minTouch
+            Pivot od = pivs.get(bi)
+            color c  = isRes ? colRes : colSup
+            line  ln = line.new(od.idx, od.price, pIdx, price, extend = extend.right, color = c, width = 1)
+            label lb = showTouch ? label.new(pIdx, price, "", style = isRes ? label.style_label_down : label.style_label_up, color = color(na), textcolor = c, size = size.small) : na
+            TL nt = TL.new(ln = ln, lb = lb, x1 = od.idx, y1 = od.price, slope = bs, touches = bt, isRes = isRes, lastTouch = pIdx)
+            nt.restyle()
+            act.push(nt)
+            while act.size() > maxPerSide
+                act.shift().kill()
+
+// Breaks active lines on a close beyond them, then watches broken lines for a
+// retest from the other side. Returns [breakout, retest].
+f_process(array<TL> act, array<TL> brk, bool isRes) =>
+    bool bo = false
+    bool rt = false
+    int  n  = act.size()
+    if n > 0
+        for i = n - 1 to 0
+            TL    t = act.get(i)
+            float v = t.valueAt(bar_index)
+            if isRes ? close > v + brkBuf : close < v - brkBuf
+                t.brokenBar := bar_index
+                t.ln.set_xy2(bar_index, v)
+                t.ln.set_extend(extend.none)
+                t.ln.set_style(line.style_dashed)
+                t.ln.set_color(colBroken)
+                t.ln.set_width(1)
+                act.remove(i)
+                brk.push(t)
+                bo := bo or volOk
+            else if bar_index - t.lastTouch > staleBars
+                t.kill()
+                act.remove(i)
+    for b in brk
+        if not b.done and bar_index > b.brokenBar
+            float v      = b.valueAt(bar_index)
+            bool  failed = isRes ? close < v - brkBuf : close > v + brkBuf
+            bool  hit    = isRes ? (low <= v + tol and close > v) : (high >= v - tol and close < v)
+            if failed or bar_index - b.brokenBar > retestBars
+                b.done := true
+            else if hit
+                b.done := true
+                b.ln.set_xy2(bar_index, v)
+                rt := true
+    while brk.size() > keepBroken
+        brk.shift().kill()
+    [bo, rt]
+
+// ─── Main ────────────────────────────────────────────────────────────────────
+var array<Pivot> pHi       = array.new<Pivot>()
+var array<Pivot> pLo       = array.new<Pivot>()
+var array<TL>    resLines  = array.new<TL>()
+var array<TL>    supLines  = array.new<TL>()
+var array<TL>    resBroken = array.new<TL>()
+var array<TL>    supBroken = array.new<TL>()
+
+[resBO, resRT] = f_process(resLines, resBroken, true)
+[supBD, supRT] = f_process(supLines, supBroken, false)
+
+if not na(ph)
+    f_onPivot(pHi, resLines, ph, true)
+if not na(pl)
+    f_onPivot(pLo, supLines, pl, false)
+
+// ─── Signals ─────────────────────────────────────────────────────────────────
+plotshape(showSig and resBO, "Bullish breakout", shape.labelup, location.belowbar, colSup, text = "BO", textcolor = color.white, size = size.small)
+plotshape(showSig and supBD, "Bearish breakdown", shape.labeldown, location.abovebar, colRes, text = "BD", textcolor = color.white, size = size.small)
+plotshape(showRetest and resRT, "Bullish retest", shape.triangleup, location.belowbar, colSup, text = "RT", textcolor = colSup, size = size.tiny)
+plotshape(showRetest and supRT, "Bearish retest", shape.triangledown, location.abovebar, colRes, text = "RT", textcolor = colRes, size = size.tiny)
+
+alertcondition(resBO, "Bullish trendline breakout", "{{ticker}}: close above a resistance trendline")
+alertcondition(supBD, "Bearish trendline breakdown", "{{ticker}}: close below a support trendline")
+alertcondition(resRT, "Bullish retest", "{{ticker}}: retest of a broken resistance trendline")
+alertcondition(supRT, "Bearish retest", "{{ticker}}: retest of a broken support trendline")
+
+if resBO
+    alert(syminfo.ticker + ": breakout above resistance trendline", alert.freq_once_per_bar_close)
+if supBD
+    alert(syminfo.ticker + ": breakdown below support trendline", alert.freq_once_per_bar_close)
+if resRT and showRetest
+    alert(syminfo.ticker + ": bullish retest of broken trendline", alert.freq_once_per_bar_close)
+if supRT and showRetest
+    alert(syminfo.ticker + ": bearish retest of broken trendline", alert.freq_once_per_bar_close)
