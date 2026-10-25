@@ -1,19 +1,24 @@
-// Injects the panel into the Rubika Web tab when the toolbar icon is clicked,
-// and relays API requests the page itself could not make (CORS fallback).
+// Injects the panel into the Rubika Web or Eitaa Web tab when the toolbar icon
+// is clicked, and relays Rubika API requests the page itself could not make
+// (CORS fallback).
 
-const RUBIKA_WEB = 'https://web.rubika.ir/';
-const PANEL_FILES = [
-  'lib/xlsx.full.min.js',
-  'src/crypto.js',
-  'src/session.js',
-  'src/api.js',
-  'src/excel.js',
-  'src/panel.js',
-];
+const SITES = {
+  'web.rubika.ir': {
+    files: ['src/crypto.js', 'src/session.js', 'src/api.js'],
+  },
+  'web.eitaa.com': {
+    files: [],
+    // Must run in the page's own world to reach Eitaa Web's managers.
+    mainWorld: ['src/eitaa-bridge.js'],
+  },
+};
+const SHARED_FILES = ['lib/xlsx.full.min.js', 'src/excel.js', 'src/backends.js', 'src/panel.js'];
 
 chrome.action.onClicked.addListener(async (tab) => {
-  if (!tab.url || !tab.url.startsWith(RUBIKA_WEB)) {
-    await chrome.tabs.create({ url: RUBIKA_WEB });
+  const host = tab.url ? new URL(tab.url).hostname : '';
+  const site = SITES[host];
+  if (!site) {
+    await chrome.tabs.create({ url: 'https://web.rubika.ir/' });
     return;
   }
 
@@ -25,9 +30,12 @@ chrome.action.onClicked.addListener(async (tab) => {
 
   if (mounted) {
     await chrome.scripting.executeScript({ target, func: () => globalThis.RXG.togglePanel() });
-  } else {
-    await chrome.scripting.executeScript({ target, files: PANEL_FILES });
+    return;
   }
+  if (site.mainWorld) {
+    await chrome.scripting.executeScript({ target, files: site.mainWorld, world: 'MAIN' });
+  }
+  await chrome.scripting.executeScript({ target, files: [...site.files, ...SHARED_FILES] });
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

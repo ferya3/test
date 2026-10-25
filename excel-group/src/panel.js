@@ -1,5 +1,6 @@
 // The in-page panel: pick an Excel file, review the contacts it found, then
-// add them to the account's address book and create a group with them.
+// add them to the account's contacts and create a group with them. The
+// messenger-specific work lives in backends.js.
 (() => {
   const RXG = (globalThis.RXG = globalThis.RXG || {});
   if (RXG.togglePanel) {
@@ -7,8 +8,10 @@
     return;
   }
 
+  const backend = RXG.backendFor(location.hostname);
+  if (!backend) return;
+
   const state = {
-    client: null,
     me: null,
     contacts: [],
     busy: false,
@@ -91,7 +94,7 @@
   ]);
 
   root.append(
-    el('header', {}, [el('b', { textContent: 'ساخت گروه از اکسل' }), el('button', { className: 'x', textContent: '×', onclick: () => remove() })]),
+    el('header', {}, [el('b', { textContent: `ساخت گروه ${backend.name} از اکسل` }), el('button', { className: 'x', textContent: '×', onclick: () => remove() })]),
     el('div', { className: 'body' }, [loginStep, workStep]),
   );
 
@@ -116,9 +119,32 @@
   };
 
   // --- wiring --------------------------------------------------------------
-  const prefill = RXG.session.readFromLocalStorage();
-  authInput.value = prefill.auth;
-  keyInput.value = prefill.privateKey;
+  const errorText = (err) => err.statusDet || err.type || err.message || String(err);
+
+  function connected(me) {
+    state.me = me;
+    const name = [me.first_name, me.last_name].filter(Boolean).join(' ') || me.username || 'حساب شما';
+    who.textContent = `وارد شدید: ${name}`;
+    show('work');
+  }
+
+  if (backend.needsLogin) {
+    const prefill = backend.prefill();
+    authInput.value = prefill.auth;
+    keyInput.value = prefill.privateKey;
+  } else {
+    show('work');
+    who.textContent = `در حال اتصال به ${backend.name}…`;
+    backend.connect().then(connected, (err) => {
+      who.textContent = '';
+      write(
+        errorText(err) === 'EITAA_INTERNALS_NOT_FOUND'
+          ? 'به داخل ایتا وب دسترسی پیدا نشد. مطمئن شوید وارد حساب شده‌اید و صفحه کامل بارگذاری شده، سپس صفحه را رفرش کنید و دوباره روی آیکون افزونه بزنید.'
+          : `اتصال ناموفق: ${errorText(err)}`,
+        'err',
+      );
+    });
+  }
 
   loginBtn.onclick = async () => {
     if (state.busy) return;
@@ -126,14 +152,9 @@
     loginBtn.disabled = true;
     loginBtn.textContent = 'در حال اتصال…';
     try {
-      const { client, me } = await RXG.session.build({ auth: authInput.value, privateKey: keyInput.value });
-      state.client = client;
-      state.me = me;
-      const name = [me.first_name, me.last_name].filter(Boolean).join(' ') || me.username || 'حساب شما';
-      who.textContent = `وارد شدید: ${name}`;
-      show('work');
+      connected(await backend.connect({ auth: authInput.value, privateKey: keyInput.value }));
     } catch (err) {
-      alert(`ورود ناموفق: ${err.message || err}`);
+      alert(`ورود ناموفق: ${errorText(err)}`);
     } finally {
       state.busy = false;
       loginBtn.disabled = false;
@@ -159,7 +180,7 @@
   };
 
   createBtn.onclick = async () => {
-    if (state.busy || !state.contacts.length) return;
+    if (state.busy || !state.me || !state.contacts.length) return;
     const title = titleInput.value.trim();
     if (!title) {
       alert('نام گروه را وارد کنید');
@@ -168,39 +189,38 @@
     state.busy = true;
     createBtn.disabled = true;
 
-    const guids = [];
+    const ids = [];
+    const phoneOf = new Map();
     try {
-      write(`افزودن ${state.contacts.length} مخاطب به دفترچه…`);
+      write(`افزودن ${state.contacts.length} مخاطب…`);
       for (const c of state.contacts) {
         try {
-          const res = await state.client.call('addAddressBook', {
-            phone: c.phone,
-            first_name: c.firstName,
-            last_name: c.lastName || '',
-          });
-          const guid = (res.user && res.user.user_guid) || res.user_guid;
-          if (guid) {
-            guids.push(guid);
+          const id = await backend.addContact(c, write);
+          if (id) {
+            ids.push(id);
+            phoneOf.set(id, c.phone);
           } else {
-            write(`${c.phone}: کاربر روبیکا نیست، رد شد`, 'err');
+            write(`${c.phone}: کاربر ${backend.name} نیست، رد شد`, 'err');
           }
         } catch (err) {
-          write(`${c.phone}: ${err.statusDet || err.message || err}`, 'err');
+          write(`${c.phone}: ${errorText(err)}`, 'err');
         }
-        await RXG.sleep(400); // stay well under the rate limit
+        await new Promise((r) => setTimeout(r, backend.contactDelay)); // stay under the rate limit
       }
 
-      if (!guids.length) {
-        write('هیچ مخاطب روبیکایی پیدا نشد؛ گروه ساخته نشد.', 'err');
+      if (!ids.length) {
+        write(`هیچ کاربر ${backend.name} پیدا نشد؛ گروه ساخته نشد.`, 'err');
         return;
       }
 
-      write(`ساخت گروه «${title}» با ${guids.length} عضو…`);
-      const group = await state.client.call('addGroup', { title, member_guids: guids });
-      const g = group.group || group;
-      write(`گروه ساخته شد ✓ (${g.group_guid || ''})`, 'ok');
+      write(`ساخت گروه «${title}» با ${ids.length} عضو…`);
+      const { groupId, failed } = await backend.createGroup(title, ids, write);
+      write(`گروه ساخته شد ✓ ${groupId ? `(${groupId})` : ''}`, 'ok');
+      for (const id of failed) {
+        write(`${phoneOf.get(id) || id}: به گروه اضافه نشد (احتمالاً تنظیمات حریم خصوصی)`, 'err');
+      }
     } catch (err) {
-      write(`ساخت گروه ناموفق: ${err.statusDet || err.message || err}`, 'err');
+      write(`ساخت گروه ناموفق: ${errorText(err)}`, 'err');
     } finally {
       state.busy = false;
       createBtn.disabled = false;

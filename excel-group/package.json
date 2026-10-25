@@ -1,0 +1,10 @@
+{
+  "name": "excel-group",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Chrome/Edge extension: build a Rubika Web or Eitaa Web group from contacts in an Excel file",
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}
