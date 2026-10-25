@@ -46,7 +46,7 @@ color  colPWH    = input.color(#2962ff, "High", group = G_PW, inline = "pwc")
 color  colPWL    = input.color(#ff9800, "Low", group = G_PW, inline = "pwc")
 color  colPWC    = input.color(color.silver, "Close", group = G_PW, inline = "pwc")
 string pwStyleIn = input.string("Dashed", "Line style", options = ["Solid", "Dashed", "Dotted"], group = G_PW)
-int    pwKeep    = input.int(1, "Weeks kept on chart", minval = 1, maxval = 52, group = G_PW)
+bool   pwHist    = input.bool(false, "Show past weeks too", group = G_PW)
 bool   pwLabels  = input.bool(true, "Show labels with price", group = G_PW)
 
 // ─── Series ──────────────────────────────────────────────────────────────────
@@ -84,10 +84,6 @@ type TL
     int   lastTouch
     int   brokenBar = na
     bool  done      = false
-
-type Level
-    line  ln
-    label lb
 
 method valueAt(TL this, int x) =>
     this.y1 + this.slope * (x - this.x1)
@@ -241,32 +237,39 @@ if not na(pl)
     f_onPivot(pLo, supLines, pl, false)
 
 // ─── Previous week H / L / C ─────────────────────────────────────────────────
-var array<Level> pwLevels = array.new<Level>()
-string           pwStyle  = pwStyleIn == "Solid" ? line.style_solid : pwStyleIn == "Dotted" ? line.style_dotted : line.style_dashed
+// This week's levels are redrawn on the last bar only, so they are always the
+// newest drawings on the chart. Past weeks, when wanted, are plots.
+var int weekStart = na
+if newWeek
+    weekStart := bar_index
 
-f_level(float y, color c, string txt) =>
-    line  ln = line.new(bar_index, y, bar_index + 1, y, color = c, style = pwStyle, width = 1)
-    label lb = pwLabels ? label.new(bar_index + 1, y, txt + " " + str.tostring(y, format.mintick), style = label.style_label_left, color = color(na), textcolor = c, size = size.small) : na
-    Level.new(ln, lb)
+var array<line>  pwLines = array.new<line>()
+var array<label> pwLbls  = array.new<label>()
+string           pwStyle = pwStyleIn == "Solid" ? line.style_solid : pwStyleIn == "Dotted" ? line.style_dotted : line.style_dashed
 
-if pwOn and newWeek and not na(pwH)
-    pwLevels.push(f_level(pwH, colPWH, "PWH"))
-    pwLevels.push(f_level(pwL, colPWL, "PWL"))
-    pwLevels.push(f_level(pwC, colPWC, "PWC"))
-    while pwLevels.size() > pwKeep * 3
-        Level old = pwLevels.shift()
-        old.ln.delete()
-        if not na(old.lb)
-            old.lb.delete()
+f_level(int x1, int x2, float y, color c, string txt) =>
+    pwLines.push(line.new(x1, y, x2, y, color = c, style = pwStyle, width = 2))
+    if pwLabels
+        pwLbls.push(label.new(x2, y, txt + " " + str.tostring(y, format.mintick), style = label.style_label_left, color = color(na), textcolor = c, size = size.small))
 
-// Stretch this week's levels to the current bar, a little past it on the last.
-if pwOn and pwLevels.size() >= 3
-    int x2 = bar_index + (barstate.islast ? 10 : 0)
-    for i = pwLevels.size() - 3 to pwLevels.size() - 1
-        Level lv = pwLevels.get(i)
-        lv.ln.set_x2(x2)
-        if not na(lv.lb)
-            lv.lb.set_x(x2)
+if barstate.islast
+    for l in pwLines
+        l.delete()
+    for lb in pwLbls
+        lb.delete()
+    pwLines.clear()
+    pwLbls.clear()
+    if pwOn and not na(pwH)
+        int x1 = nz(weekStart, math.max(0, bar_index - 20))
+        int x2 = bar_index + 10
+        f_level(x1, x2, pwH, colPWH, "PWH")
+        f_level(x1, x2, pwL, colPWL, "PWL")
+        f_level(x1, x2, pwC, colPWC, "PWC")
+
+bool pwPast = pwOn and pwHist and not newWeek
+plot(pwPast ? pwH : na, "Prev week high", colPWH, 1, plot.style_linebr)
+plot(pwPast ? pwL : na, "Prev week low", colPWL, 1, plot.style_linebr)
+plot(pwPast ? pwC : na, "Prev week close", colPWC, 1, plot.style_linebr)
 
 bool upPWH = pwOn and close > pwH and close[1] <= pwH
 bool dnPWL = pwOn and close < pwL and close[1] >= pwL
