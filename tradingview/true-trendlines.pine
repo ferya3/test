@@ -86,6 +86,13 @@ bool   ppClose   = input.bool(true, "Show close", group = G_PP)
 string ppStyleIn = input.string("Dashed", "Line style", options = ["Solid", "Dashed", "Dotted"], group = G_PP)
 bool   ppHist    = input.bool(false, "Show past periods too", group = G_PP)
 bool   ppLabels  = input.bool(true, "Show labels with price", group = G_PP)
+bool   ppPoc     = input.bool(true, "Show POC (point of control)", group = G_PP, tooltip = "سطحی که بیشترین حجم معامله در دوره قبل آنجا انجام شده (Volume Profile). اگر نماد حجم نداشته باشد، تعداد کندل‌ها در هر سطح شمرده می‌شود.")
+int    ppBins    = input.int(40, "POC resolution (rows)", minval = 10, maxval = 200, group = G_PP)
+
+const string G_MS = "Market structure (BOS / CHoCH)"
+bool   msOn      = input.bool(true, "Show BOS / CHoCH", group = G_MS, tooltip = "CHoCH (تغییر کاراکتر): اولین شکست ساختار خلاف روند، با کلوز. BOS: شکست ساختار در جهت روند. سقف/کف‌ها همان سوئینگ‌های اوردر بلاک (Structure pivot strength) هستند.")
+bool   msShowBos = input.bool(true, "Show BOS too", group = G_MS)
+int    msMax     = input.int(10, "Structure breaks kept", minval = 1, maxval = 50, group = G_MS)
 
 // ─── Series ──────────────────────────────────────────────────────────────────
 bool  bodyMode = anchorMode == "Bodies"
@@ -143,6 +150,12 @@ type Period
     int    pHBar   = na
     int    pLBar   = na
     int    pCBar   = na
+    int    curStart = na
+    int    pStart   = na
+    float  pPoc     = na
+    array<float> bh
+    array<float> bl
+    array<float> bv
 
 method valueAt(TL this, int x) =>
     this.y1 + this.slope * (x - this.x1)
@@ -158,8 +171,36 @@ method restyle(TL this) =>
 
 // Taken from the chart's own candles, so a level sits exactly on the wick
 // that made it.
+// Volume profile of a finished period: each bar's volume is spread evenly
+// over the rows its range covers; the POC is the centre of the fullest row.
+f_poc(array<float> hs, array<float> ls, array<float> vs, float hi, float lo) =>
+    float poc = na
+    int   n   = hs.size()
+    if n > 0 and not na(hi) and not na(lo) and hi > lo
+        float        step = (hi - lo) / ppBins
+        array<float> prof = array.new<float>(ppBins, 0.0)
+        for i = 0 to n - 1
+            int   b1    = math.max(0, math.min(ppBins - 1, int(math.floor((ls.get(i) - lo) / step))))
+            int   b2    = math.max(0, math.min(ppBins - 1, int(math.floor((hs.get(i) - lo) / step))))
+            float share = vs.get(i) / (b2 - b1 + 1)
+            for b = b1 to b2
+                prof.set(b, prof.get(b) + share)
+        int best = 0
+        for b = 1 to ppBins - 1
+            if prof.get(b) > prof.get(best)
+                best := b
+        poc := lo + step * (best + 0.5)
+    poc
+
 method track(Period this, bool chg) =>
     if chg
+        if ppPoc and this.enabled
+            this.pPoc := f_poc(this.bh, this.bl, this.bv, this.curH, this.curL)
+        this.pStart   := this.curStart
+        this.curStart := bar_index
+        this.bh.clear()
+        this.bl.clear()
+        this.bv.clear()
         this.pH    := this.curH
         this.pHBar := this.curHBar
         this.pL    := this.curL
@@ -174,6 +215,14 @@ method track(Period this, bool chg) =>
     if na(this.curL) or low < this.curL
         this.curL    := low
         this.curLBar := bar_index
+    if ppPoc and this.enabled
+        this.bh.push(high)
+        this.bl.push(low)
+        this.bv.push(na(volume) or volume <= 0 ? 1.0 : volume)
+        if this.bh.size() > 20000
+            this.bh.shift()
+            this.bl.shift()
+            this.bv.shift()
 
 method kill(TL this) =>
     this.ln.delete()
@@ -622,14 +671,50 @@ bool obBearTap = f_obUpdate(bearOBs)
 bool obBullNew = false
 bool obBearNew = false
 
-if obOn and inWindow and not shBroken and close > shP
+bool bullBreak = not shBroken and close > shP
+bool bearBreak = not slBroken and close < slP
+int  brkHiI    = shI
+float brkHiP   = shP
+int  brkLoI    = slI
+float brkLoP   = slP
+
+if bullBreak
     shBroken := true
-    if bar_index - shI <= obMaxLeg
+    if obOn and inWindow and bar_index - shI <= obMaxLeg
         obBullNew := f_newOB(true, shI)
-if obOn and inWindow and not slBroken and close < slP
+if bearBreak
     slBroken := true
-    if bar_index - slI <= obMaxLeg
+    if obOn and inWindow and bar_index - slI <= obMaxLeg
         obBearNew := f_newOB(false, slI)
+
+// ─── Market structure: BOS / CHoCH ───────────────────────────────────────────
+// A close through the latest swing in the direction of the trend is a BOS;
+// the first one against it is a CHoCH (change of character) and flips it.
+var int          msTrend = 0
+var array<line>  msLines = array.new<line>()
+var array<label> msLbls  = array.new<label>()
+
+f_msDraw(int x1, float y, bool bull, bool choch) =>
+    color c  = bull ? obBullCol : obBearCol
+    int   xm = int(math.round((x1 + bar_index) / 2))
+    msLines.push(line.new(x1, y, bar_index, y, color = c, style = choch ? line.style_solid : line.style_dashed, width = choch ? 2 : 1))
+    msLbls.push(label.new(xm, y, choch ? "CHoCH" : "BOS", style = bull ? label.style_label_down : label.style_label_up, color = color(na), textcolor = c, size = choch ? size.small : size.tiny))
+    while msLines.size() > msMax
+        line  oldL = msLines.shift()
+        label oldB = msLbls.shift()
+        oldL.delete()
+        oldB.delete()
+
+bool chochUp = bullBreak and msTrend == -1
+bool chochDn = bearBreak and msTrend == 1
+if bullBreak
+    if msOn and inWindow and (chochUp or msShowBos)
+        f_msDraw(brkHiI, brkHiP, true, chochUp)
+    msTrend := 1
+if bearBreak
+    if msOn and inWindow and (chochDn or msShowBos)
+        f_msDraw(brkLoI, brkLoP, false, chochDn)
+    msTrend := -1
 
 // ─── Higher-timeframe order blocks ───────────────────────────────────────────
 // The same strict OB rules, run on the higher timeframe's own candles inside
@@ -817,9 +902,9 @@ bool chg1     = timeframe.change(pp1Tf)
 bool chg2     = timeframe.change(pp2Tf)
 bool chg3     = timeframe.change(pp3Tf)
 
-var Period per1 = Period.new(f_prefix(pp1Tf), pp1Col, pp1On and chartSec < timeframe.in_seconds(pp1Tf))
-var Period per2 = Period.new(f_prefix(pp2Tf), pp2Col, pp2On and chartSec < timeframe.in_seconds(pp2Tf))
-var Period per3 = Period.new(f_prefix(pp3Tf), pp3Col, pp3On and chartSec < timeframe.in_seconds(pp3Tf))
+var Period per1 = Period.new(f_prefix(pp1Tf), pp1Col, pp1On and chartSec < timeframe.in_seconds(pp1Tf), bh = array.new<float>(), bl = array.new<float>(), bv = array.new<float>())
+var Period per2 = Period.new(f_prefix(pp2Tf), pp2Col, pp2On and chartSec < timeframe.in_seconds(pp2Tf), bh = array.new<float>(), bl = array.new<float>(), bv = array.new<float>())
+var Period per3 = Period.new(f_prefix(pp3Tf), pp3Col, pp3On and chartSec < timeframe.in_seconds(pp3Tf), bh = array.new<float>(), bl = array.new<float>(), bv = array.new<float>())
 per1.track(chg1)
 per2.track(chg2)
 per3.track(chg3)
@@ -830,8 +915,8 @@ var array<line>  ppLines = array.new<line>()
 var array<label> ppLbls  = array.new<label>()
 string           ppStyle = ppStyleIn == "Solid" ? line.style_solid : ppStyleIn == "Dotted" ? line.style_dotted : line.style_dashed
 
-f_level(int x1, int x2, float y, color c, string txt, string st) =>
-    ppLines.push(line.new(x1, y, x2, y, color = c, style = st, width = 1))
+f_level(int x1, int x2, float y, color c, string txt, string st, int w = 1) =>
+    ppLines.push(line.new(x1, y, x2, y, color = c, style = st, width = w))
     if ppLabels
         ppLbls.push(label.new(x2, y, txt + " " + str.tostring(y, format.mintick), style = label.style_label_left, color = color(na), textcolor = c, size = size.small))
 
@@ -841,6 +926,8 @@ f_draw(Period p, int x2) =>
         f_level(p.pLBar, x2, p.pL, p.col, p.pfx + "L", ppStyle)
         if ppClose
             f_level(p.pCBar, x2, p.pC, color.new(p.col, 40), p.pfx + "C", line.style_dotted)
+        if ppPoc and not na(p.pPoc) and not na(p.pStart)
+            f_level(p.pStart, x2, p.pPoc, p.col, str.trim(p.pfx) + " POC", line.style_solid, 2)
 
 if barstate.islast
     for l in ppLines
@@ -863,6 +950,9 @@ plot(past2 ? per2.pH : na, "Period 2 high", pp2Col, 1, plot.style_linebr)
 plot(past2 ? per2.pL : na, "Period 2 low", pp2Col, 1, plot.style_linebr)
 plot(past3 ? per3.pH : na, "Period 3 high", pp3Col, 1, plot.style_linebr)
 plot(past3 ? per3.pL : na, "Period 3 low", pp3Col, 1, plot.style_linebr)
+plot(past1 and ppPoc ? per1.pPoc : na, "Period 1 POC", pp1Col, 2, plot.style_linebr)
+plot(past2 and ppPoc ? per2.pPoc : na, "Period 2 POC", pp2Col, 2, plot.style_linebr)
+plot(past3 and ppPoc ? per3.pPoc : na, "Period 3 POC", pp3Col, 2, plot.style_linebr)
 
 f_up(Period p) =>
     p.enabled and close > p.pH and close[1] <= p.pH
@@ -910,6 +1000,8 @@ alertcondition(obBullNew, "New bullish order block", "{{ticker}}: new bullish or
 alertcondition(obBearNew, "New bearish order block", "{{ticker}}: new bearish order block")
 alertcondition(obBullTap, "Bullish order block tapped", "{{ticker}}: price tapped a bullish order block")
 alertcondition(obBearTap, "Bearish order block tapped", "{{ticker}}: price tapped a bearish order block")
+alertcondition(chochUp, "Bullish CHoCH", "{{ticker}}: bullish change of character")
+alertcondition(chochDn, "Bearish CHoCH", "{{ticker}}: bearish change of character")
 alertcondition(htfObBullTap, "HTF bullish order block tapped", "{{ticker}}: price tapped a higher-timeframe bullish order block")
 alertcondition(htfObBearTap, "HTF bearish order block tapped", "{{ticker}}: price tapped a higher-timeframe bearish order block")
 
@@ -933,3 +1025,7 @@ if htfObBullTap
     alert(syminfo.ticker + ": price tapped a higher-timeframe bullish order block", alert.freq_once_per_bar_close)
 if htfObBearTap
     alert(syminfo.ticker + ": price tapped a higher-timeframe bearish order block", alert.freq_once_per_bar_close)
+if msOn and chochUp
+    alert(syminfo.ticker + ": bullish change of character (CHoCH)", alert.freq_once_per_bar_close)
+if msOn and chochDn
+    alert(syminfo.ticker + ": bearish change of character (CHoCH)", alert.freq_once_per_bar_close)
