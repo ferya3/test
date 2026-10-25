@@ -40,14 +40,20 @@ int   confWidth = input.int(2, "Confirmed line width", minval = 1, maxval = 5, g
 bool  showTouch = input.bool(true, "Show touch count", group = G_STY)
 bool  showSig   = input.bool(true, "Show breakout labels", group = G_STY)
 
-const string G_PW = "Previous week H / L / C"
-bool   showPW    = input.bool(true, "Show previous week levels", group = G_PW, tooltip = "سقف، کف و کلوز هفته قبل از اولین کندل هفته جاری (دوشنبه) کشیده می‌شود. فقط در تایم‌فریم‌های کمتر از هفتگی.")
-color  colPWH    = input.color(#2962ff, "High", group = G_PW, inline = "pwc")
-color  colPWL    = input.color(#ff9800, "Low", group = G_PW, inline = "pwc")
-color  colPWC    = input.color(color.silver, "Close", group = G_PW, inline = "pwc")
-string pwStyleIn = input.string("Dashed", "Line style", options = ["Solid", "Dashed", "Dotted"], group = G_PW)
-bool   pwHist    = input.bool(false, "Show past weeks too", group = G_PW)
-bool   pwLabels  = input.bool(true, "Show labels with price", group = G_PW)
+const string G_PP = "Previous period H / L / C (multi-timeframe)"
+bool   pp1On     = input.bool(true, "", group = G_PP, inline = "p1", tooltip = "سقف، کف و کلوز دوره قبل در هر تایم‌فریم، دقیقاً از نوک کندلی که آن را ساخته. هر دوره فقط در چارت‌هایی با تایم‌فریم کوچک‌تر نمایش داده می‌شود.")
+string pp1Tf     = input.timeframe("D", "", group = G_PP, inline = "p1")
+color  pp1Col    = input.color(#9c27b0, "", group = G_PP, inline = "p1")
+bool   pp2On     = input.bool(true, "", group = G_PP, inline = "p2")
+string pp2Tf     = input.timeframe("W", "", group = G_PP, inline = "p2")
+color  pp2Col    = input.color(#2962ff, "", group = G_PP, inline = "p2")
+bool   pp3On     = input.bool(false, "", group = G_PP, inline = "p3")
+string pp3Tf     = input.timeframe("M", "", group = G_PP, inline = "p3")
+color  pp3Col    = input.color(#ff9800, "", group = G_PP, inline = "p3")
+bool   ppClose   = input.bool(true, "Show close", group = G_PP)
+string ppStyleIn = input.string("Dashed", "Line style", options = ["Solid", "Dashed", "Dotted"], group = G_PP)
+bool   ppHist    = input.bool(false, "Show past periods too", group = G_PP)
+bool   ppLabels  = input.bool(true, "Show labels with price", group = G_PP)
 
 // ─── Series ──────────────────────────────────────────────────────────────────
 bool  bodyMode = anchorMode == "Bodies"
@@ -62,36 +68,6 @@ float volAvg   = ta.sma(volume, 20)
 bool  volOk    = not useVol or volume > volAvg * volMult
 bool  inWindow = bar_index >= last_bar_index - calcBars
 
-bool pwOn    = showPW and timeframe.in_seconds() < timeframe.in_seconds("W")
-bool newWeek = timeframe.change("W")
-
-// Last completed week's H/L/C, taken from the chart's own candles so each
-// level sits exactly on the wick that made it, together with that candle.
-var float wkH    = na
-var float wkL    = na
-var int   wkHBar = na
-var int   wkLBar = na
-var float pwH    = na
-var float pwL    = na
-var float pwC    = na
-var int   pwHBar = na
-var int   pwLBar = na
-var int   pwCBar = na
-if newWeek
-    pwH    := wkH
-    pwHBar := wkHBar
-    pwL    := wkL
-    pwLBar := wkLBar
-    pwC    := close[1]
-    pwCBar := bar_index - 1
-    wkH    := na
-    wkL    := na
-if na(wkH) or high > wkH
-    wkH    := high
-    wkHBar := bar_index
-if na(wkL) or low < wkL
-    wkL    := low
-    wkLBar := bar_index
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type Pivot
@@ -110,6 +86,23 @@ type TL
     int   brokenBar = na
     bool  done      = false
 
+// One higher-timeframe period: the running H/L of the period in progress and
+// the H/L/C of the last completed one, each with the bar that set it.
+type Period
+    string pfx
+    color  col
+    bool   enabled
+    float  curH    = na
+    float  curL    = na
+    int    curHBar = na
+    int    curLBar = na
+    float  pH      = na
+    float  pL      = na
+    float  pC      = na
+    int    pHBar   = na
+    int    pLBar   = na
+    int    pCBar   = na
+
 method valueAt(TL this, int x) =>
     this.y1 + this.slope * (x - this.x1)
 
@@ -121,6 +114,25 @@ method restyle(TL this) =>
     if not na(this.lb)
         this.lb.set_text(str.tostring(this.touches) + (conf ? "× ✓" : "×"))
         this.lb.set_textcolor(c)
+
+// Taken from the chart's own candles, so a level sits exactly on the wick
+// that made it.
+method track(Period this, bool chg) =>
+    if chg
+        this.pH    := this.curH
+        this.pHBar := this.curHBar
+        this.pL    := this.curL
+        this.pLBar := this.curLBar
+        this.pC    := close[1]
+        this.pCBar := bar_index - 1
+        this.curH  := na
+        this.curL  := na
+    if na(this.curH) or high > this.curH
+        this.curH    := high
+        this.curHBar := bar_index
+    if na(this.curL) or low < this.curL
+        this.curL    := low
+        this.curLBar := bar_index
 
 method kill(TL this) =>
     this.ln.delete()
@@ -261,39 +273,87 @@ if not na(ph)
 if not na(pl)
     f_onPivot(pLo, supLines, pl, false)
 
-// ─── Previous week H / L / C ─────────────────────────────────────────────────
-// This week's levels are redrawn on the last bar only, so they are always the
-// newest drawings on the chart. Each starts at the candle that set it. Past
-// weeks, when wanted, are plots.
-var array<line>  pwLines = array.new<line>()
-var array<label> pwLbls  = array.new<label>()
-string           pwStyle = pwStyleIn == "Solid" ? line.style_solid : pwStyleIn == "Dotted" ? line.style_dotted : line.style_dashed
+// ─── Previous period H / L / C (multi-timeframe) ─────────────────────────────
+// "1D" → "PD", "1W" → "PW", "1M" → "PM", "240" → "4H "
+f_prefix(string tf) =>
+    string n   = tf == "1D" ? "D" : tf == "1W" ? "W" : tf == "1M" ? "M" : tf
+    bool   dwm = str.contains(n, "D") or str.contains(n, "W") or str.contains(n, "M") or str.contains(n, "S")
+    int    m   = dwm ? 0 : int(str.tonumber(n))
+    dwm ? (n == "D" or n == "W" or n == "M" ? "P" + n : n + " ") : m % 60 == 0 ? str.tostring(int(m / 60)) + "H " : str.tostring(m) + "m "
 
-f_level(int x1, int x2, float y, color c, string txt) =>
-    pwLines.push(line.new(x1, y, x2, y, color = c, style = pwStyle, width = 1))
-    if pwLabels
-        pwLbls.push(label.new(x2, y, txt + " " + str.tostring(y, format.mintick), style = label.style_label_left, color = color(na), textcolor = c, size = size.small))
+int  chartSec = timeframe.in_seconds()
+bool chg1     = timeframe.change(pp1Tf)
+bool chg2     = timeframe.change(pp2Tf)
+bool chg3     = timeframe.change(pp3Tf)
+
+var Period per1 = Period.new(f_prefix(pp1Tf), pp1Col, pp1On and chartSec < timeframe.in_seconds(pp1Tf))
+var Period per2 = Period.new(f_prefix(pp2Tf), pp2Col, pp2On and chartSec < timeframe.in_seconds(pp2Tf))
+var Period per3 = Period.new(f_prefix(pp3Tf), pp3Col, pp3On and chartSec < timeframe.in_seconds(pp3Tf))
+per1.track(chg1)
+per2.track(chg2)
+per3.track(chg3)
+
+// The current levels are redrawn on the last bar only, so they are always the
+// newest drawings on the chart. Past periods, when wanted, are plots.
+var array<line>  ppLines = array.new<line>()
+var array<label> ppLbls  = array.new<label>()
+string           ppStyle = ppStyleIn == "Solid" ? line.style_solid : ppStyleIn == "Dotted" ? line.style_dotted : line.style_dashed
+
+f_level(int x1, int x2, float y, color c, string txt, string st) =>
+    ppLines.push(line.new(x1, y, x2, y, color = c, style = st, width = 1))
+    if ppLabels
+        ppLbls.push(label.new(x2, y, txt + " " + str.tostring(y, format.mintick), style = label.style_label_left, color = color(na), textcolor = c, size = size.small))
+
+f_draw(Period p, int x2) =>
+    if p.enabled and not na(p.pH)
+        f_level(p.pHBar, x2, p.pH, p.col, p.pfx + "H", ppStyle)
+        f_level(p.pLBar, x2, p.pL, p.col, p.pfx + "L", ppStyle)
+        if ppClose
+            f_level(p.pCBar, x2, p.pC, color.new(p.col, 40), p.pfx + "C", line.style_dotted)
 
 if barstate.islast
-    for l in pwLines
+    for l in ppLines
         l.delete()
-    for lb in pwLbls
+    for lb in ppLbls
         lb.delete()
-    pwLines.clear()
-    pwLbls.clear()
-    if pwOn and not na(pwH)
-        int x2 = bar_index + 10
-        f_level(pwHBar, x2, pwH, colPWH, "PWH")
-        f_level(pwLBar, x2, pwL, colPWL, "PWL")
-        f_level(pwCBar, x2, pwC, colPWC, "PWC")
+    ppLines.clear()
+    ppLbls.clear()
+    int x2 = bar_index + 10
+    f_draw(per1, x2)
+    f_draw(per2, x2)
+    f_draw(per3, x2)
 
-bool pwPast = pwOn and pwHist and not newWeek
-plot(pwPast ? pwH : na, "Prev week high", colPWH, 1, plot.style_linebr)
-plot(pwPast ? pwL : na, "Prev week low", colPWL, 1, plot.style_linebr)
-plot(pwPast ? pwC : na, "Prev week close", colPWC, 1, plot.style_linebr)
+bool past1 = per1.enabled and ppHist and not chg1
+bool past2 = per2.enabled and ppHist and not chg2
+bool past3 = per3.enabled and ppHist and not chg3
+plot(past1 ? per1.pH : na, "Period 1 high", pp1Col, 1, plot.style_linebr)
+plot(past1 ? per1.pL : na, "Period 1 low", pp1Col, 1, plot.style_linebr)
+plot(past2 ? per2.pH : na, "Period 2 high", pp2Col, 1, plot.style_linebr)
+plot(past2 ? per2.pL : na, "Period 2 low", pp2Col, 1, plot.style_linebr)
+plot(past3 ? per3.pH : na, "Period 3 high", pp3Col, 1, plot.style_linebr)
+plot(past3 ? per3.pL : na, "Period 3 low", pp3Col, 1, plot.style_linebr)
 
-bool upPWH = pwOn and close > pwH and close[1] <= pwH
-bool dnPWL = pwOn and close < pwL and close[1] >= pwL
+f_up(Period p) =>
+    p.enabled and close > p.pH and close[1] <= p.pH
+f_dn(Period p) =>
+    p.enabled and close < p.pL and close[1] >= p.pL
+f_alerts(Period p, bool up, bool dn) =>
+    if up
+        alert(syminfo.ticker + ": close above " + p.pfx + "H", alert.freq_once_per_bar_close)
+    if dn
+        alert(syminfo.ticker + ": close below " + p.pfx + "L", alert.freq_once_per_bar_close)
+
+bool up1  = f_up(per1)
+bool up2  = f_up(per2)
+bool up3  = f_up(per3)
+bool dn1  = f_dn(per1)
+bool dn2  = f_dn(per2)
+bool dn3  = f_dn(per3)
+bool ppUp = up1 or up2 or up3
+bool ppDn = dn1 or dn2 or dn3
+f_alerts(per1, up1, dn1)
+f_alerts(per2, up2, dn2)
+f_alerts(per3, up3, dn3)
 
 // ─── Signals ─────────────────────────────────────────────────────────────────
 plotshape(showSig and resBO, "Bullish breakout", shape.labelup, location.belowbar, colSup, text = "BO", textcolor = color.white, size = size.small)
@@ -303,8 +363,8 @@ plotshape(showRetest and supRT, "Bearish retest", shape.triangledown, location.a
 
 alertcondition(resBO, "Bullish trendline breakout", "{{ticker}}: close above a resistance trendline")
 alertcondition(supBD, "Bearish trendline breakdown", "{{ticker}}: close below a support trendline")
-alertcondition(upPWH, "Close above previous week high", "{{ticker}}: close above previous week high")
-alertcondition(dnPWL, "Close below previous week low", "{{ticker}}: close below previous week low")
+alertcondition(ppUp, "Close above previous period high", "{{ticker}}: close above a previous period high")
+alertcondition(ppDn, "Close below previous period low", "{{ticker}}: close below a previous period low")
 alertcondition(resRT, "Bullish retest", "{{ticker}}: retest of a broken resistance trendline")
 alertcondition(supRT, "Bearish retest", "{{ticker}}: retest of a broken support trendline")
 
