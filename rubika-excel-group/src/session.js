@@ -43,11 +43,22 @@
       throw new Error('کلید خصوصی (private key) لازم است');
     }
 
-    const session = await RXG.crypto.createSession(cleanAuth, privateKey);
+    // rubpy stores the auth the AES key is derived from; Rubika Web stores the
+    // swapped form it sends on the wire. Try both.
     const apiUrls = await RXG.getApiUrls();
-    const client = new RXG.RubikaClient(session, apiUrls);
-    const me = await client.call('getUserInfo', {});
-    return { client, me: me.user || me };
+    let lastError;
+    for (const keyAuth of [cleanAuth, RXG.crypto.swapAuth(cleanAuth)]) {
+      const session = await RXG.crypto.createSession(keyAuth, privateKey);
+      const client = new RXG.RubikaClient(session, apiUrls);
+      try {
+        const me = await client.call('getUserInfo', {}, { retries: 0 });
+        return { client, me: me.user || me };
+      } catch (err) {
+        if (!(err instanceof RXG.RubikaError)) throw err;
+        lastError = err;
+      }
+    }
+    throw lastError;
   }
 
   RXG.session = { readFromLocalStorage, build };
