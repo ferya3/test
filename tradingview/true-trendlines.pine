@@ -62,11 +62,36 @@ float volAvg   = ta.sma(volume, 20)
 bool  volOk    = not useVol or volume > volAvg * volMult
 bool  inWindow = bar_index >= last_bar_index - calcBars
 
-// Last completed week's candle. [1] with lookahead_on is the non-repainting
-// form: the values are fixed from the first bar of the new week.
-[pwH, pwL, pwC] = request.security(syminfo.tickerid, "W", [high[1], low[1], close[1]], lookahead = barmerge.lookahead_on)
 bool pwOn    = showPW and timeframe.in_seconds() < timeframe.in_seconds("W")
 bool newWeek = timeframe.change("W")
+
+// Last completed week's H/L/C, taken from the chart's own candles so each
+// level sits exactly on the wick that made it, together with that candle.
+var float wkH    = na
+var float wkL    = na
+var int   wkHBar = na
+var int   wkLBar = na
+var float pwH    = na
+var float pwL    = na
+var float pwC    = na
+var int   pwHBar = na
+var int   pwLBar = na
+var int   pwCBar = na
+if newWeek
+    pwH    := wkH
+    pwHBar := wkHBar
+    pwL    := wkL
+    pwLBar := wkLBar
+    pwC    := close[1]
+    pwCBar := bar_index - 1
+    wkH    := na
+    wkL    := na
+if na(wkH) or high > wkH
+    wkH    := high
+    wkHBar := bar_index
+if na(wkL) or low < wkL
+    wkL    := low
+    wkLBar := bar_index
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type Pivot
@@ -238,17 +263,14 @@ if not na(pl)
 
 // ─── Previous week H / L / C ─────────────────────────────────────────────────
 // This week's levels are redrawn on the last bar only, so they are always the
-// newest drawings on the chart. Past weeks, when wanted, are plots.
-var int weekStart = na
-if newWeek
-    weekStart := bar_index
-
+// newest drawings on the chart. Each starts at the candle that set it. Past
+// weeks, when wanted, are plots.
 var array<line>  pwLines = array.new<line>()
 var array<label> pwLbls  = array.new<label>()
 string           pwStyle = pwStyleIn == "Solid" ? line.style_solid : pwStyleIn == "Dotted" ? line.style_dotted : line.style_dashed
 
 f_level(int x1, int x2, float y, color c, string txt) =>
-    pwLines.push(line.new(x1, y, x2, y, color = c, style = pwStyle, width = 2))
+    pwLines.push(line.new(x1, y, x2, y, color = c, style = pwStyle, width = 1))
     if pwLabels
         pwLbls.push(label.new(x2, y, txt + " " + str.tostring(y, format.mintick), style = label.style_label_left, color = color(na), textcolor = c, size = size.small))
 
@@ -260,11 +282,10 @@ if barstate.islast
     pwLines.clear()
     pwLbls.clear()
     if pwOn and not na(pwH)
-        int x1 = nz(weekStart, math.max(0, bar_index - 20))
         int x2 = bar_index + 10
-        f_level(x1, x2, pwH, colPWH, "PWH")
-        f_level(x1, x2, pwL, colPWL, "PWL")
-        f_level(x1, x2, pwC, colPWC, "PWC")
+        f_level(pwHBar, x2, pwH, colPWH, "PWH")
+        f_level(pwLBar, x2, pwL, colPWL, "PWL")
+        f_level(pwCBar, x2, pwC, colPWC, "PWC")
 
 bool pwPast = pwOn and pwHist and not newWeek
 plot(pwPast ? pwH : na, "Prev week high", colPWH, 1, plot.style_linebr)
