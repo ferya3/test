@@ -4,7 +4,7 @@
 // closes through the line, more touches = stronger line, and a close beyond
 // the line (optionally on volume) is the breakout. Broken lines are watched
 // for the classic break-and-retest (role reversal).
-indicator("True Trendlines [Pivot · Touch · Breakout]", shorttitle = "True TL", overlay = true, max_lines_count = 500, max_labels_count = 500, max_bars_back = 2000)
+indicator("True Trendlines [Pivot · Touch · Breakout]", shorttitle = "True TL", overlay = true, max_lines_count = 500, max_labels_count = 500, max_boxes_count = 500, max_bars_back = 2000)
 
 // ─── Inputs ──────────────────────────────────────────────────────────────────
 const string G_PIV = "Pivots"
@@ -46,6 +46,24 @@ string htf1Tf = input.timeframe("240", "", group = G_MTF, inline = "h1")
 bool   htf2On = input.bool(true, "", group = G_MTF, inline = "h2")
 string htf2Tf = input.timeframe("D", "", group = G_MTF, inline = "h2")
 int    htfPiv = input.int(3, "HTF pivot strength", minval = 2, maxval = 20, group = G_MTF, tooltip = "تعداد کندل تایم‌فریم بالا در هر طرف پیوت. چون کندل‌های بالاتر بزرگ‌ترند، عدد کمتری لازم است.")
+
+const string G_OB = "Order blocks (strict)"
+bool   obOn        = input.bool(true, "Show order blocks", group = G_OB, tooltip = "اوردر بلاک = آخرین کندل مخالف قبل از حرکت قوی‌ای که ساختار (آخرین سقف/کف سوئینگ) را با کلوز می‌شکند. فقط وقتی رسم می‌شود که همه فیلترهای فعال پاس شوند.")
+int    obPiv       = input.int(5, "Structure pivot strength", minval = 2, maxval = 20, group = G_OB, tooltip = "سقف/کف سوئینگی که شکستش (BOS) لازم است.")
+string obZone      = input.string("Wick", "Zone", options = ["Wick", "Body"], group = G_OB, tooltip = "Wick: کل کندل اوردر بلاک (سایه تا سایه). Body: فقط بدنه.")
+float  obDisp      = input.float(2.0, "Min impulse (× ATR)", minval = 0.5, step = 0.25, group = G_OB, tooltip = "فاصله کلوز شکست تا لبه اوردر بلاک باید حداقل این مقدار باشد (حرکت قوی / Displacement).")
+float  obBody      = input.float(1.0, "Min displacement candle body (× ATR)", minval = 0.25, step = 0.25, group = G_OB, tooltip = "حداقل یک کندل در حرکت باید بدنه‌ای به این بزرگی داشته باشد.")
+bool   obFvg       = input.bool(true, "Require fair value gap", group = G_OB, tooltip = "حرکت باید گپ ارزش منصفانه (FVG / Imbalance) به جا بگذارد.")
+bool   obSweep     = input.bool(false, "Require liquidity sweep", group = G_OB, tooltip = "اوردر بلاک باید یکی از سقف/کف‌های قبلی را جارو کرده باشد (شکار نقدینگی). سخت‌گیرانه‌ترین فیلتر.")
+bool   obVol       = input.bool(false, "Require above-average volume", group = G_OB)
+bool   obTrend     = input.bool(false, "Only with trend (EMA 200)", group = G_OB)
+int    obMaxLeg    = input.int(100, "Max bars from swing to break", minval = 10, maxval = 500, group = G_OB)
+int    obMax       = input.int(3, "Active order blocks per side", minval = 1, maxval = 10, group = G_OB)
+int    obMaxAge    = input.int(500, "Drop order block after N bars", minval = 20, group = G_OB)
+bool   obHideTap   = input.bool(false, "Remove after first tap", group = G_OB, tooltip = "خاموش: بعد از اولین برخورد کم‌رنگ و خط‌چین می‌شود. روشن: بعد از اولین برخورد حذف می‌شود.")
+bool   obMid       = input.bool(true, "Show 50% line", group = G_OB)
+color  obBullCol   = input.color(#089981, "Bullish", group = G_OB, inline = "obc")
+color  obBearCol   = input.color(#f23645, "Bearish", group = G_OB, inline = "obc")
 
 const string G_PP = "Previous period H / L / C (multi-timeframe)"
 bool   pp1On     = input.bool(true, "", group = G_PP, inline = "p1", tooltip = "سقف، کف و کلوز دوره قبل در هر تایم‌فریم، دقیقاً از نوک کندلی که آن را ساخته. هر دوره فقط در چارت‌هایی با تایم‌فریم کوچک‌تر نمایش داده می‌شود.")
@@ -92,6 +110,15 @@ type TL
     int   lastTouch
     int   brokenBar = na
     bool  done      = false
+
+type OB
+    box   bx
+    line  mid
+    float top
+    float btm
+    bool  bull
+    int   born
+    bool  tapped = false
 
 // One higher-timeframe period: the running H/L of the period in progress and
 // the H/L/C of the last completed one, each with the bar that set it.
@@ -442,6 +469,161 @@ bool b2New = f_newBreak(b2bt)
 bool htfBO = (htf1Ok and a1New) or (htf2Ok and a2New)
 bool htfBD = (htf1Ok and b1New) or (htf2Ok and b2New)
 
+// ─── Order blocks (strict) ───────────────────────────────────────────────────
+// Bullish OB: the last down-close candle at the origin of a leg that closes
+// above the latest swing high (BOS), passing every enabled filter. Bearish is
+// the mirror image. A zone dies on a close beyond its far edge.
+float obPH  = ta.pivothigh(high, obPiv, obPiv)
+float obPL  = ta.pivotlow(low, obPiv, obPiv)
+float emaT  = ta.ema(close, 200)
+bool  obBodyZone = obZone == "Body"
+
+var float shP      = na
+var int   shI      = na
+var bool  shBroken = true
+var float slP      = na
+var int   slI      = na
+var bool  slBroken = true
+var array<float> shPr    = array.new<float>()
+var array<int>   shIx    = array.new<int>()
+var array<float> slPr    = array.new<float>()
+var array<int>   slIx    = array.new<int>()
+var array<OB>    bullOBs = array.new<OB>()
+var array<OB>    bearOBs = array.new<OB>()
+
+if not na(obPH)
+    shP      := obPH
+    shI      := bar_index - obPiv
+    shBroken := false
+    shPr.push(obPH)
+    shIx.push(shI)
+    if shPr.size() > 5
+        shPr.shift()
+        shIx.shift()
+if not na(obPL)
+    slP      := obPL
+    slI      := bar_index - obPiv
+    slBroken := false
+    slPr.push(obPL)
+    slIx.push(slI)
+    if slPr.size() > 5
+        slPr.shift()
+        slIx.shift()
+
+// Did the OB's wick take out one of the last swing lows (bull) / highs (bear)
+// that formed before it?
+f_swept(bool bull, float price, int beforeIdx) =>
+    array<float> pr  = bull ? slPr : shPr
+    array<int>   ix  = bull ? slIx : shIx
+    bool         hit = false
+    if pr.size() > 0
+        for i = 0 to pr.size() - 1
+            if ix.get(i) < beforeIdx and (bull ? price < pr.get(i) : price > pr.get(i))
+                hit := true
+    hit
+
+// Returns [offset of the OB candle or -1, top, bottom].
+f_findOB(bool bull, int fromIdx) =>
+    int span = math.min(bar_index - fromIdx, 1990)
+    // Extreme of the leg: lowest low (bull) / highest high (bear).
+    int ek = 0
+    for k = 0 to span
+        if bull ? low[k] < low[ek] : high[k] > high[ek]
+            ek := k
+    // Last opposite-colour candle at that extreme or just before it.
+    int obk = -1
+    for k = ek to math.min(ek + 3, 1990)
+        if bull ? close[k] < open[k] : close[k] > open[k]
+            obk := k
+            break
+    float top  = na
+    float btm  = na
+    bool  pass = false
+    if obk >= 1
+        top := obBodyZone ? math.max(open[obk], close[obk]) : high[obk]
+        btm := obBodyZone ? math.min(open[obk], close[obk]) : low[obk]
+        float impulse = bull ? close - btm : top - close
+        bool  disp    = false
+        bool  fvg     = false
+        float vsum    = 0.0
+        for j = 0 to obk - 1
+            float body = bull ? close[j] - open[j] : open[j] - close[j]
+            if body >= obBody * atrV
+                disp := true
+            if j <= obk - 2 and (bull ? low[j] > high[j + 2] : high[j] < low[j + 2])
+                fvg := true
+            vsum := vsum + nz(volume[j])
+        bool volPass   = not obVol or vsum / obk > volAvg * volMult
+        bool trendPass = not obTrend or (bull ? close > emaT : close < emaT)
+        bool sweepPass = not obSweep or f_swept(bull, bull ? low[obk] : high[obk], bar_index - obk)
+        pass := impulse >= obDisp * atrV and disp and (fvg or not obFvg) and volPass and trendPass and sweepPass
+    [pass ? obk : -1, top, btm]
+
+f_newOB(bool bull, int fromIdx) =>
+    [k, top, btm] = f_findOB(bull, fromIdx)
+    bool made = false
+    if k >= 1
+        array<OB> lst     = bull ? bullOBs : bearOBs
+        bool      overlap = false
+        for o in lst
+            if top >= o.btm and btm <= o.top
+                overlap := true
+        if not overlap
+            color c  = bull ? obBullCol : obBearCol
+            int   x1 = bar_index - k
+            box   bx = box.new(x1, top, bar_index, btm, border_color = c, bgcolor = color.new(c, 80), text = bull ? "Bull OB" : "Bear OB", text_color = c, text_size = size.small, text_halign = text.align_right, text_valign = text.align_center)
+            line  md = obMid ? line.new(x1, (top + btm) / 2, bar_index, (top + btm) / 2, color = c, style = line.style_dashed) : na
+            lst.push(OB.new(bx, md, top, btm, bull, bar_index))
+            made := true
+            while lst.size() > obMax
+                OB old = lst.shift()
+                old.bx.delete()
+                if not na(old.mid)
+                    old.mid.delete()
+    made
+
+// Extends live zones, marks the first tap, and drops zones that are broken
+// or too old. Returns true on a first tap.
+f_obUpdate(array<OB> lst) =>
+    bool tap = false
+    int  n   = lst.size()
+    if n > 0
+        for i = n - 1 to 0
+            OB   o    = lst.get(i)
+            bool dead = (o.bull ? close < o.btm : close > o.top) or bar_index - o.born > obMaxAge
+            bool hit  = not dead and not o.tapped and bar_index > o.born and (o.bull ? low <= o.top : high >= o.btm)
+            if hit
+                o.tapped := true
+                tap      := true
+                color c = o.bull ? obBullCol : obBearCol
+                o.bx.set_bgcolor(color.new(c, 92))
+                o.bx.set_border_style(line.style_dashed)
+            if dead or (hit and obHideTap)
+                o.bx.delete()
+                if not na(o.mid)
+                    o.mid.delete()
+                lst.remove(i)
+            else
+                int xr = bar_index + (barstate.islast ? 10 : 0)
+                o.bx.set_right(xr)
+                if not na(o.mid)
+                    o.mid.set_x2(xr)
+    tap
+
+bool obBullTap = f_obUpdate(bullOBs)
+bool obBearTap = f_obUpdate(bearOBs)
+bool obBullNew = false
+bool obBearNew = false
+
+if obOn and inWindow and not shBroken and close > shP
+    shBroken := true
+    if bar_index - shI <= obMaxLeg
+        obBullNew := f_newOB(true, shI)
+if obOn and inWindow and not slBroken and close < slP
+    slBroken := true
+    if bar_index - slI <= obMaxLeg
+        obBearNew := f_newOB(false, slI)
+
 // ─── Previous period H / L / C (multi-timeframe) ─────────────────────────────
 // "1D" → "PD", "1W" → "PW", "1M" → "PM", "240" → "4H "
 f_prefix(string tf) =>
@@ -528,6 +710,8 @@ plotshape(showSig and htfBO, "HTF bullish breakout", shape.labelup, location.bel
 plotshape(showSig and htfBD, "HTF bearish breakdown", shape.labeldown, location.abovebar, colRes, text = "HTF BD", textcolor = color.white, size = size.normal)
 plotshape(showRetest and resRT, "Bullish retest", shape.triangleup, location.belowbar, colSup, text = "RT", textcolor = colSup, size = size.tiny)
 plotshape(showRetest and supRT, "Bearish retest", shape.triangledown, location.abovebar, colRes, text = "RT", textcolor = colRes, size = size.tiny)
+plotshape(obOn and obBullTap, "Bullish OB tap", shape.diamond, location.belowbar, obBullCol, text = "OB", textcolor = obBullCol, size = size.tiny)
+plotshape(obOn and obBearTap, "Bearish OB tap", shape.diamond, location.abovebar, obBearCol, text = "OB", textcolor = obBearCol, size = size.tiny)
 
 alertcondition(resBO, "Bullish trendline breakout", "{{ticker}}: close above a resistance trendline")
 alertcondition(supBD, "Bearish trendline breakdown", "{{ticker}}: close below a support trendline")
@@ -537,6 +721,10 @@ alertcondition(resRT, "Bullish retest", "{{ticker}}: retest of a broken resistan
 alertcondition(supRT, "Bearish retest", "{{ticker}}: retest of a broken support trendline")
 alertcondition(htfBO, "HTF bullish trendline breakout", "{{ticker}}: higher-timeframe resistance trendline broken")
 alertcondition(htfBD, "HTF bearish trendline breakdown", "{{ticker}}: higher-timeframe support trendline broken")
+alertcondition(obBullNew, "New bullish order block", "{{ticker}}: new bullish order block")
+alertcondition(obBearNew, "New bearish order block", "{{ticker}}: new bearish order block")
+alertcondition(obBullTap, "Bullish order block tapped", "{{ticker}}: price tapped a bullish order block")
+alertcondition(obBearTap, "Bearish order block tapped", "{{ticker}}: price tapped a bearish order block")
 
 if resBO
     alert(syminfo.ticker + ": breakout above resistance trendline", alert.freq_once_per_bar_close)
@@ -550,3 +738,7 @@ if htfBO
     alert(syminfo.ticker + ": higher-timeframe resistance trendline broken", alert.freq_once_per_bar_close)
 if htfBD
     alert(syminfo.ticker + ": higher-timeframe support trendline broken", alert.freq_once_per_bar_close)
+if obOn and obBullTap
+    alert(syminfo.ticker + ": price tapped a bullish order block", alert.freq_once_per_bar_close)
+if obOn and obBearTap
+    alert(syminfo.ticker + ": price tapped a bearish order block", alert.freq_once_per_bar_close)
