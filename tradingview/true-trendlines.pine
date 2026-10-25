@@ -65,6 +65,13 @@ bool   obMid       = input.bool(true, "Show 50% line", group = G_OB)
 color  obBullCol   = input.color(#089981, "Bullish", group = G_OB, inline = "obc")
 color  obBearCol   = input.color(#f23645, "Bearish", group = G_OB, inline = "obc")
 
+const string G_OBM = "Higher-timeframe order blocks"
+bool   obH1On  = input.bool(true, "", group = G_OBM, inline = "o1", tooltip = "همان اوردر بلاک با همه فیلترهای بالا، روی کندل‌های تایم‌فریم بالاتر. دو اوردر بلاک زنده آخر هر جهت روی چارت فعلی کشیده می‌شود. فقط وقتی نمایش داده می‌شود که تایم‌فریم چارت کوچک‌تر باشد.")
+string obH1Tf  = input.timeframe("240", "", group = G_OBM, inline = "o1")
+bool   obH2On  = input.bool(true, "", group = G_OBM, inline = "o2")
+string obH2Tf  = input.timeframe("D", "", group = G_OBM, inline = "o2")
+int    obH_Piv = input.int(3, "HTF structure pivot strength", minval = 2, maxval = 20, group = G_OBM)
+
 const string G_PP = "Previous period H / L / C (multi-timeframe)"
 bool   pp1On     = input.bool(true, "", group = G_PP, inline = "p1", tooltip = "سقف، کف و کلوز دوره قبل در هر تایم‌فریم، دقیقاً از نوک کندلی که آن را ساخته. هر دوره فقط در چارت‌هایی با تایم‌فریم کوچک‌تر نمایش داده می‌شود.")
 string pp1Tf     = input.timeframe("D", "", group = G_PP, inline = "p1")
@@ -624,6 +631,182 @@ if obOn and inWindow and not slBroken and close < slP
     if bar_index - slI <= obMaxLeg
         obBearNew := f_newOB(false, slI)
 
+// ─── Higher-timeframe order blocks ───────────────────────────────────────────
+// The same strict OB rules, run on the higher timeframe's own candles inside
+// request.security. Returns the two newest live zones: candle open time, top,
+// bottom and whether the HTF has tapped it. off = 1 in realtime → no repaint.
+f_htfOB(simple int len, bool bull, int off) =>
+    float a   = ta.atr(14)
+    float e   = ta.ema(close, 200)
+    float va  = ta.sma(volume, 20)
+    float ph_ = ta.pivothigh(high, len, len)
+    float pl_ = ta.pivotlow(low, len, len)
+    float sw  = bull ? ph_ : pl_
+    float lq  = bull ? pl_ : ph_
+    var float swP = na
+    var int   swI = na
+    var bool  swB = true
+    var array<float> lqP  = array.new<float>()
+    var array<int>   lqI  = array.new<int>()
+    var array<int>   oT   = array.new<int>()
+    var array<float> oTop = array.new<float>()
+    var array<float> oBtm = array.new<float>()
+    var array<bool>  oTap = array.new<bool>()
+    if not na(sw)
+        swP := sw
+        swI := bar_index - len
+        swB := false
+    if not na(lq)
+        lqP.push(lq)
+        lqI.push(bar_index - len)
+        if lqP.size() > 5
+            lqP.shift()
+            lqI.shift()
+    if oT.size() > 0
+        for i = oT.size() - 1 to 0
+            float tp = oTop.get(i)
+            float bt = oBtm.get(i)
+            if bull ? close < bt : close > tp
+                oT.remove(i)
+                oTop.remove(i)
+                oBtm.remove(i)
+                oTap.remove(i)
+            else if not oTap.get(i) and (bull ? low <= tp : high >= bt)
+                oTap.set(i, true)
+    if not swB and (bull ? close > swP : close < swP)
+        swB := true
+        int span = bar_index - swI
+        if span <= obMaxLeg
+            int ek = 0
+            for k = 0 to span
+                if bull ? low[k] < low[ek] : high[k] > high[ek]
+                    ek := k
+            int obk = -1
+            for k = ek to ek + 3
+                if bull ? close[k] < open[k] : close[k] > open[k]
+                    obk := k
+                    break
+            if obk >= 1
+                float top  = obBodyZone ? math.max(open[obk], close[obk]) : high[obk]
+                float btm  = obBodyZone ? math.min(open[obk], close[obk]) : low[obk]
+                float imp  = bull ? close - btm : top - close
+                bool  disp = false
+                bool  fvg  = false
+                float vsum = 0.0
+                for j = 0 to obk - 1
+                    float body = bull ? close[j] - open[j] : open[j] - close[j]
+                    if body >= obBody * a
+                        disp := true
+                    if j <= obk - 2 and (bull ? low[j] > high[j + 2] : high[j] < low[j + 2])
+                        fvg := true
+                    vsum := vsum + nz(volume[j])
+                bool sweepOk = not obSweep
+                if obSweep and lqP.size() > 0
+                    float ext = bull ? low[obk] : high[obk]
+                    for i = 0 to lqP.size() - 1
+                        if lqI.get(i) < bar_index - obk and (bull ? ext < lqP.get(i) : ext > lqP.get(i))
+                            sweepOk := true
+                bool volOk_   = not obVol or vsum / obk > va * volMult
+                bool trendOk_ = not obTrend or (bull ? close > e : close < e)
+                if imp >= obDisp * a and disp and (fvg or not obFvg) and volOk_ and trendOk_ and sweepOk
+                    bool overlap = false
+                    if oT.size() > 0
+                        for i = 0 to oT.size() - 1
+                            if top >= oBtm.get(i) and btm <= oTop.get(i)
+                                overlap := true
+                    if not overlap
+                        oT.push(time[obk])
+                        oTop.push(top)
+                        oBtm.push(btm)
+                        oTap.push(false)
+                        if oT.size() > 2
+                            oT.shift()
+                            oTop.shift()
+                            oBtm.shift()
+                            oTap.shift()
+    int   n   = oT.size()
+    int   t1  = na
+    float tp1 = na
+    float bt1 = na
+    bool  tk1 = false
+    int   t2  = na
+    float tp2 = na
+    float bt2 = na
+    bool  tk2 = false
+    if n >= 1
+        t1  := oT.get(n - 1)
+        tp1 := oTop.get(n - 1)
+        bt1 := oBtm.get(n - 1)
+        tk1 := oTap.get(n - 1)
+    if n >= 2
+        t2  := oT.get(n - 2)
+        tp2 := oTop.get(n - 2)
+        bt2 := oBtm.get(n - 2)
+        tk2 := oTap.get(n - 2)
+    [t1[off], tp1[off], bt1[off], tk1[off], t2[off], tp2[off], bt2[off], tk2[off]]
+
+[u1t1, u1p1, u1b1, u1k1, u1t2, u1p2, u1b2, u1k2] = request.security(syminfo.tickerid, obH1Tf, f_htfOB(obH_Piv, true, iH))
+[d1t1, d1p1, d1b1, d1k1, d1t2, d1p2, d1b2, d1k2] = request.security(syminfo.tickerid, obH1Tf, f_htfOB(obH_Piv, false, iH))
+[u2t1, u2p1, u2b1, u2k1, u2t2, u2p2, u2b2, u2k2] = request.security(syminfo.tickerid, obH2Tf, f_htfOB(obH_Piv, true, iH))
+[d2t1, d2p1, d2b1, d2k1, d2t2, d2p2, d2b2, d2k2] = request.security(syminfo.tickerid, obH2Tf, f_htfOB(obH_Piv, false, iH))
+
+bool obH1Ok = obOn and obH1On and chartSec < timeframe.in_seconds(obH1Tf)
+bool obH2Ok = obOn and obH2On and chartSec < timeframe.in_seconds(obH2Tf)
+
+var array<box>  htfBoxes = array.new<box>()
+var array<line> htfMids  = array.new<line>()
+
+f_htfBox(int t, float top, float btm, bool tapped, bool bull, string tag) =>
+    if not na(t)
+        color c  = bull ? obBullCol : obBearCol
+        box   bx = box.new(t, top, time, btm, xloc = xloc.bar_time, extend = extend.right, border_color = c, border_width = 2, border_style = tapped ? line.style_dashed : line.style_solid, bgcolor = color.new(c, tapped ? 90 : 75), text = tag + (bull ? " Bull OB" : " Bear OB"), text_color = c, text_size = size.small, text_halign = text.align_left, text_valign = text.align_center)
+        htfBoxes.push(bx)
+        if obMid
+            htfMids.push(line.new(t, (top + btm) / 2, time, (top + btm) / 2, xloc = xloc.bar_time, extend = extend.right, color = c, style = line.style_dashed))
+
+if barstate.islast
+    for b in htfBoxes
+        b.delete()
+    for l in htfMids
+        l.delete()
+    htfBoxes.clear()
+    htfMids.clear()
+    if obH1Ok
+        string n1 = f_tfName(obH1Tf)
+        f_htfBox(u1t1, u1p1, u1b1, u1k1, true, n1)
+        f_htfBox(u1t2, u1p2, u1b2, u1k2, true, n1)
+        f_htfBox(d1t1, d1p1, d1b1, d1k1, false, n1)
+        f_htfBox(d1t2, d1p2, d1b2, d1k2, false, n1)
+    if obH2Ok
+        string n2 = f_tfName(obH2Tf)
+        f_htfBox(u2t1, u2p1, u2b1, u2k1, true, n2)
+        f_htfBox(u2t2, u2p2, u2b2, u2k2, true, n2)
+        f_htfBox(d2t1, d2p1, d2b1, d2k1, false, n2)
+        f_htfBox(d2t2, d2p2, d2b2, d2k2, false, n2)
+
+// First tap of an HTF zone, seen on the chart's own candles (earlier than
+// waiting for the HTF candle to close). Each zone fires once.
+var array<int> tapU1 = array.new<int>()
+var array<int> tapD1 = array.new<int>()
+var array<int> tapU2 = array.new<int>()
+var array<int> tapD2 = array.new<int>()
+
+f_tap(int t, float top, float btm, bool tk, bool bull, array<int> done) =>
+    bool hit = false
+    if not na(t) and not tk and not done.includes(t) and (bull ? low <= top : high >= btm)
+        hit := true
+        done.push(t)
+        if done.size() > 10
+            done.shift()
+    hit
+
+bool hU1 = obH1Ok and (f_tap(u1t1, u1p1, u1b1, u1k1, true, tapU1) or f_tap(u1t2, u1p2, u1b2, u1k2, true, tapU1))
+bool hD1 = obH1Ok and (f_tap(d1t1, d1p1, d1b1, d1k1, false, tapD1) or f_tap(d1t2, d1p2, d1b2, d1k2, false, tapD1))
+bool hU2 = obH2Ok and (f_tap(u2t1, u2p1, u2b1, u2k1, true, tapU2) or f_tap(u2t2, u2p2, u2b2, u2k2, true, tapU2))
+bool hD2 = obH2Ok and (f_tap(d2t1, d2p1, d2b1, d2k1, false, tapD2) or f_tap(d2t2, d2p2, d2b2, d2k2, false, tapD2))
+bool htfObBullTap = hU1 or hU2
+bool htfObBearTap = hD1 or hD2
+
 // ─── Previous period H / L / C (multi-timeframe) ─────────────────────────────
 // "1D" → "PD", "1W" → "PW", "1M" → "PM", "240" → "4H "
 f_prefix(string tf) =>
@@ -712,6 +895,8 @@ plotshape(showRetest and resRT, "Bullish retest", shape.triangleup, location.bel
 plotshape(showRetest and supRT, "Bearish retest", shape.triangledown, location.abovebar, colRes, text = "RT", textcolor = colRes, size = size.tiny)
 plotshape(obOn and obBullTap, "Bullish OB tap", shape.diamond, location.belowbar, obBullCol, text = "OB", textcolor = obBullCol, size = size.tiny)
 plotshape(obOn and obBearTap, "Bearish OB tap", shape.diamond, location.abovebar, obBearCol, text = "OB", textcolor = obBearCol, size = size.tiny)
+plotshape(htfObBullTap, "HTF bullish OB tap", shape.diamond, location.belowbar, obBullCol, text = "HTF OB", textcolor = obBullCol, size = size.small)
+plotshape(htfObBearTap, "HTF bearish OB tap", shape.diamond, location.abovebar, obBearCol, text = "HTF OB", textcolor = obBearCol, size = size.small)
 
 alertcondition(resBO, "Bullish trendline breakout", "{{ticker}}: close above a resistance trendline")
 alertcondition(supBD, "Bearish trendline breakdown", "{{ticker}}: close below a support trendline")
@@ -725,6 +910,8 @@ alertcondition(obBullNew, "New bullish order block", "{{ticker}}: new bullish or
 alertcondition(obBearNew, "New bearish order block", "{{ticker}}: new bearish order block")
 alertcondition(obBullTap, "Bullish order block tapped", "{{ticker}}: price tapped a bullish order block")
 alertcondition(obBearTap, "Bearish order block tapped", "{{ticker}}: price tapped a bearish order block")
+alertcondition(htfObBullTap, "HTF bullish order block tapped", "{{ticker}}: price tapped a higher-timeframe bullish order block")
+alertcondition(htfObBearTap, "HTF bearish order block tapped", "{{ticker}}: price tapped a higher-timeframe bearish order block")
 
 if resBO
     alert(syminfo.ticker + ": breakout above resistance trendline", alert.freq_once_per_bar_close)
@@ -742,3 +929,7 @@ if obOn and obBullTap
     alert(syminfo.ticker + ": price tapped a bullish order block", alert.freq_once_per_bar_close)
 if obOn and obBearTap
     alert(syminfo.ticker + ": price tapped a bearish order block", alert.freq_once_per_bar_close)
+if htfObBullTap
+    alert(syminfo.ticker + ": price tapped a higher-timeframe bullish order block", alert.freq_once_per_bar_close)
+if htfObBearTap
+    alert(syminfo.ticker + ": price tapped a higher-timeframe bearish order block", alert.freq_once_per_bar_close)
