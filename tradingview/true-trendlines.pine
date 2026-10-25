@@ -40,6 +40,15 @@ int   confWidth = input.int(2, "Confirmed line width", minval = 1, maxval = 5, g
 bool  showTouch = input.bool(true, "Show touch count", group = G_STY)
 bool  showSig   = input.bool(true, "Show breakout labels", group = G_STY)
 
+const string G_PW = "Previous week H / L / C"
+bool   showPW    = input.bool(true, "Show previous week levels", group = G_PW, tooltip = "سقف، کف و کلوز هفته قبل از اولین کندل هفته جاری (دوشنبه) کشیده می‌شود. فقط در تایم‌فریم‌های کمتر از هفتگی.")
+color  colPWH    = input.color(#2962ff, "High", group = G_PW, inline = "pwc")
+color  colPWL    = input.color(#ff9800, "Low", group = G_PW, inline = "pwc")
+color  colPWC    = input.color(color.silver, "Close", group = G_PW, inline = "pwc")
+string pwStyleIn = input.string("Dashed", "Line style", options = ["Solid", "Dashed", "Dotted"], group = G_PW)
+int    pwKeep    = input.int(1, "Weeks kept on chart", minval = 1, maxval = 52, group = G_PW)
+bool   pwLabels  = input.bool(true, "Show labels with price", group = G_PW)
+
 // ─── Series ──────────────────────────────────────────────────────────────────
 bool  bodyMode = anchorMode == "Bodies"
 float hSrc     = bodyMode ? math.max(open, close) : high
@@ -52,6 +61,12 @@ float brkBuf   = atrV * brkMult
 float volAvg   = ta.sma(volume, 20)
 bool  volOk    = not useVol or volume > volAvg * volMult
 bool  inWindow = bar_index >= last_bar_index - calcBars
+
+// Last completed week's candle. [1] with lookahead_on is the non-repainting
+// form: the values are fixed from the first bar of the new week.
+[pwH, pwL, pwC] = request.security(syminfo.tickerid, "W", [high[1], low[1], close[1]], lookahead = barmerge.lookahead_on)
+bool pwOn    = showPW and timeframe.in_seconds() < timeframe.in_seconds("W")
+bool newWeek = timeframe.change("W")
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type Pivot
@@ -219,6 +234,41 @@ if not na(ph)
 if not na(pl)
     f_onPivot(pLo, supLines, pl, false)
 
+// ─── Previous week H / L / C ─────────────────────────────────────────────────
+type Level
+    line  ln
+    label lb
+
+var array<Level> pwLevels = array.new<Level>()
+string           pwStyle  =pwStyleIn == "Solid" ? line.style_solid : pwStyleIn == "Dotted" ? line.style_dotted : line.style_dashed
+
+f_level(float y, color c, string txt) =>
+    line  ln = line.new(bar_index, y, bar_index + 1, y, color = c, style = pwStyle, width = 1)
+    label lb = pwLabels ? label.new(bar_index + 1, y, txt + " " + str.tostring(y, format.mintick), style = label.style_label_left, color = color(na), textcolor = c, size = size.small) : na
+    Level.new(ln, lb)
+
+if pwOn and newWeek and not na(pwH)
+    pwLevels.push(f_level(pwH, colPWH, "PWH"))
+    pwLevels.push(f_level(pwL, colPWL, "PWL"))
+    pwLevels.push(f_level(pwC, colPWC, "PWC"))
+    while pwLevels.size() > pwKeep * 3
+        Level old = pwLevels.shift()
+        old.ln.delete()
+        if not na(old.lb)
+            old.lb.delete()
+
+// Stretch this week's levels to the current bar, a little past it on the last.
+if pwOn and pwLevels.size() >= 3
+    int x2 = bar_index + (barstate.islast ? 10 : 0)
+    for i = pwLevels.size() - 3 to pwLevels.size() - 1
+        Level lv = pwLevels.get(i)
+        lv.ln.set_x2(x2)
+        if not na(lv.lb)
+            lv.lb.set_x(x2)
+
+bool upPWH = pwOn and close > pwH and close[1] <= pwH
+bool dnPWL = pwOn and close < pwL and close[1] >= pwL
+
 // ─── Signals ─────────────────────────────────────────────────────────────────
 plotshape(showSig and resBO, "Bullish breakout", shape.labelup, location.belowbar, colSup, text = "BO", textcolor = color.white, size = size.small)
 plotshape(showSig and supBD, "Bearish breakdown", shape.labeldown, location.abovebar, colRes, text = "BD", textcolor = color.white, size = size.small)
@@ -227,6 +277,8 @@ plotshape(showRetest and supRT, "Bearish retest", shape.triangledown, location.a
 
 alertcondition(resBO, "Bullish trendline breakout", "{{ticker}}: close above a resistance trendline")
 alertcondition(supBD, "Bearish trendline breakdown", "{{ticker}}: close below a support trendline")
+alertcondition(upPWH, "Close above previous week high", "{{ticker}}: close above previous week high")
+alertcondition(dnPWL, "Close below previous week low", "{{ticker}}: close below previous week low")
 alertcondition(resRT, "Bullish retest", "{{ticker}}: retest of a broken resistance trendline")
 alertcondition(supRT, "Bearish retest", "{{ticker}}: retest of a broken support trendline")
 
