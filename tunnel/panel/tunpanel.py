@@ -168,6 +168,7 @@ SERVICES = {
     "youtube": ("یوتیوب", ["geosite:youtube"], []),
     "twitter": ("ایکس (توییتر)", ["geosite:twitter"], []),
     "tiktok": ("تیک‌تاک", ["geosite:tiktok"], []),
+    "porn": ("سایت‌های پورن", ["geosite:category-porn"], []),
 }
 
 
