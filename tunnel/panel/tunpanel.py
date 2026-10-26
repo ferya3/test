@@ -380,7 +380,7 @@ def days_left(user):
 
 def user_link(user):
     env = tunnel_env()
-    return (f"vless://{user['uuid']}@{env['IRAN_HOST']}:443?encryption=none&flow=xtls-rprx-vision"
+    return (f"vless://{user['uuid']}@{env['IRAN_HOST']}:{env.get('IRAN_PORT', '443')}?encryption=none&flow=xtls-rprx-vision"
             f"&security=reality&sni={env['SNI']}&fp=chrome&pbk={env['PUB']}&sid={env['SID']}"
             f"&type=tcp#{quote(user['name'])}")
 
