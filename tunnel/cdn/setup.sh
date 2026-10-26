@@ -142,6 +142,8 @@ ss -tln | grep -q ":$CDN_PORT " || die "nothing listens on :$CDN_PORT"
 
 step "relay on the Iran server"
 # Outbound i goes to f<i>.DOMAIN; f1 is this server, the rest follow /etc/tun-peers.
+# IPv4 only: Cloudflare publishes AAAA records too, and an Iran server with an
+# IPv6 address but no working IPv6 route hangs on them instead of falling back.
 OUTBOUNDS=$(for i in $(seq 1 $((${#PEERS[@]} + 1))); do
     jq -n --arg host "f$i.$DOMAIN" --arg id "$CDN_UUID" --arg path "$CDN_PATH" --argjson port "$CDN_PORT" \
         --arg tag "cdn-f$i" '{
@@ -150,7 +152,8 @@ OUTBOUNDS=$(for i in $(seq 1 $((${#PEERS[@]} + 1))); do
             streamSettings: {
                 network: "ws", security: "tls",
                 tlsSettings: {serverName: $host, fingerprint: "chrome", alpn: ["http/1.1"]},
-                wsSettings: {path: $path, host: $host}
+                wsSettings: {path: $path, host: $host},
+                sockopt: {domainStrategy: "ForceIPv4"}
             }}'
 done | jq -s .)
 RELAY=$(jq -n --argjson outs "$OUTBOUNDS" --argjson port "$RELAY_PORT" '{
@@ -190,7 +193,7 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-User=nobody
+DynamicUser=yes
 ExecStart=/usr/local/bin/xray-relay run -config /etc/xray-relay/config.json
 Restart=always
 RestartSec=3
