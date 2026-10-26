@@ -133,6 +133,10 @@ def init_db():
                 last_seen   INTEGER NOT NULL DEFAULT 0,
                 note        TEXT NOT NULL DEFAULT ''
             )""")
+        columns = [row[1] for row in con.execute("PRAGMA table_info(users)")]
+        if "blocked" not in columns:
+            # Comma-separated SERVICES keys this user may not reach.
+            con.execute("ALTER TABLE users ADD COLUMN blocked TEXT NOT NULL DEFAULT ''")
         if con.execute("SELECT COUNT(*) FROM users").fetchone()[0]:
             return
         # First start: adopt the users already in the Xray config, unlimited.
@@ -152,6 +156,23 @@ def all_users():
 def get_user(user_id):
     with tx() as con:
         return con.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+
+
+# Services the admin can close per user: label, geosite domains, geoip ranges.
+# Domains are matched on the sniffed TLS name, so they cover apps and sites;
+# apps that connect to bare IPs are only caught where an IP list exists.
+SERVICES = {
+    "instagram": ("اینستاگرام", ["geosite:instagram"], []),
+    "whatsapp": ("واتس‌اپ", ["geosite:whatsapp"], []),
+    "telegram": ("تلگرام", ["geosite:telegram"], ["geoip:telegram"]),
+    "youtube": ("یوتیوب", ["geosite:youtube"], []),
+    "twitter": ("ایکس (توییتر)", ["geosite:twitter"], []),
+    "tiktok": ("تیک‌تاک", ["geosite:tiktok"], []),
+}
+
+
+def blocked_of(user):
+    return [key for key in user["blocked"].split(",") if key in SERVICES]
 
 
 def status_of(user, now=None):
@@ -194,6 +215,22 @@ def build_config(users):
         placeholder = uuid.uuid5(uuid.NAMESPACE_URL, "tunpanel:" + tunnel_env().get("PRIV", ""))
         clients = [{"id": str(placeholder), "flow": "xtls-rprx-vision", "email": "placeholder"}]
     vless_inbound(cfg)["settings"]["clients"] = clients
+
+    # Per-user blocks go first, so they win over every other rule. Rules this
+    # panel owns carry a "tunpanel-" ruleTag and are rebuilt on every call.
+    # Conditions in one rule are ANDed, hence one rule for domains, one for IPs.
+    routing = cfg.setdefault("routing", {})
+    others = [r for r in routing.get("rules", []) if not str(r.get("ruleTag", "")).startswith("tunpanel-")]
+    managed = []
+    for key, (_, domains, ips) in SERVICES.items():
+        names = [u["name"] for u in users if status_of(u) == "active" and key in blocked_of(u)]
+        for field, values in (("domain", domains), ("ip", ips)):
+            if names and values:
+                managed.append({"type": "field", "ruleTag": f"tunpanel-{key}-{field}",
+                                "user": names, field: values, "outboundTag": "block"})
+    routing["rules"] = managed + others
+    if not any(o.get("tag") == "block" for o in cfg.setdefault("outbounds", [])):
+        cfg["outbounds"].append({"protocol": "blackhole", "tag": "block"})
     return json.dumps(cfg, indent=2) + "\n"
 
 
@@ -442,6 +479,10 @@ button.danger{background:var(--bad)}
 .qr svg{display:block;width:100%;height:auto}
 .muted{color:var(--muted);font-size:13px}
 .login{max-width:340px;margin:12vh auto}
+.checks{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:12px}
+label.check{display:flex;align-items:center;gap:8px;margin:0;padding:10px;border:1px solid var(--line);
+border-radius:8px;color:var(--text);font-size:15px;cursor:pointer}
+label.check input{width:18px;height:18px;margin:0;accent-color:var(--bad)}
 """
 
 
@@ -503,10 +544,12 @@ def dashboard(sess):
         expiry = "بدون انقضا" if left is None else f'تا {jalali(u["expires_at"])} ({left} روز)'
         bar = (f'<div class="bar"><i style="width:{min(100, u["used_bytes"] * 100 // limit)}%"></i></div>'
                if limit else "")
+        blocked = "، ".join(SERVICES[k][0] for k in blocked_of(u))
+        blocked = f"<span>بسته: {blocked}</span>" if blocked else ""
         rows.append(f"""
 <a class="user" href="/u/{u['id']}"><div class="top"><b dir="ltr">{esc(u['name'])}</b>
 <span class="badge {kind}">{label}</span></div>
-<div class="meta"><span>{used}</span><span>{expiry}</span><span>آخرین استفاده: {ago(u['last_seen'])}</span></div>
+<div class="meta"><span>{used}</span><span>{expiry}</span><span>آخرین استفاده: {ago(u['last_seen'])}</span>{blocked}</div>
 {bar}</a>""")
 
     return page("پنل تانل", f"""
@@ -540,6 +583,10 @@ def user_page(sess, u):
         f'<form class="inline" method="post" action="/u/{u["id"]}/{action}"'
         + (f' onsubmit="return confirm(\'{confirm}\')"' if confirm else "")
         + f'>{csrf_field(sess)}<button class="{cls}">{text}</button></form>')
+    blocked = blocked_of(u)
+    checks = "".join(
+        f'<label class="check"><input type="checkbox" name="{key}"{" checked" if key in blocked else ""}>{name}</label>'
+        for key, (name, _, _) in SERVICES.items())
     return page(u["name"], f"""
 <div class="card"><div class="row"><h2 dir="ltr" style="margin:0">{esc(u['name'])}</h2>
 <span class="badge {kind}">{label}</span></div>
@@ -556,6 +603,12 @@ def user_page(sess, u):
 <div><label>روزهای باقی‌مانده از امروز (۰ = نامحدود)</label><input name="days" type="number" min="0" value="{left or 0}"></div>
 <div><label>یادداشت</label><input name="note" value="{esc(u['note'])}"></div>
 </div><button>ذخیره</button></form></div>
+<div class="card"><h2>محدودیت دسترسی</h2>
+<form method="post" action="/u/{u['id']}/access">{csrf_field(sess)}
+<p class="muted">سرویس‌هایی که تیک بزنید برای این کاربر بسته می‌شوند.</p>
+<div class="checks">{checks}</div>
+<p class="muted">اپ‌هایی که مستقیم به IP وصل می‌شوند ممکن است کامل بسته نشوند؛ برای مثال تماس صوتی واتس‌اپ.</p>
+<button>ذخیره</button></form></div>
 <div class="card actions">
 {form('renew', 'تمدید ۳۰ روز')}
 {form('reset', 'صفر کردن مصرف', confirm='مصرف این کاربر صفر شود؟')}
@@ -679,7 +732,7 @@ class Handler(BaseHTTPRequestHandler):
                 apply_config(f"add {name}")
             return f"/u/{cur.lastrowid}", f"کاربر {name} ساخته شد."
 
-        m = re.fullmatch(r"/u/(\d+)/(edit|renew|reset|toggle|delete)", self.path)
+        m = re.fullmatch(r"/u/(\d+)/(edit|access|renew|reset|toggle|delete)", self.path)
         u = m and get_user(int(m.group(1)))
         if not u:
             return None
@@ -692,6 +745,10 @@ class Handler(BaseHTTPRequestHandler):
                                 (int(gb * GB), now + int(days * DAY) if days else 0,
                                  form.get("note", [""])[0][:200], u["id"]))
                     message = "تغییرات ذخیره شد."
+                elif action == "access":
+                    keys = [key for key in SERVICES if form.get(key)]
+                    con.execute("UPDATE users SET blocked = ? WHERE id = ?", (",".join(keys), u["id"]))
+                    message = "محدودیت‌ها ذخیره شد."
                 elif action == "renew":
                     base = max(now, u["expires_at"]) if u["expires_at"] else now
                     con.execute("UPDATE users SET expires_at = ? WHERE id = ?", (base + 30 * DAY, u["id"]))
