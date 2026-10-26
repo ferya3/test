@@ -134,7 +134,8 @@ fi
 for p in "${PEERS[@]}"; do
     read -r ip port <<< "$p"
     ssh "${SSHO[@]}" -p "$port" "root@$ip" \
-        "cat > $NEW && xray run -test -c $NEW >/dev/null && mv $NEW $CFG && systemctl restart xray && echo \"\$(hostname): config synced\"" \
+        "cat > $NEW && if cmp -s $NEW $CFG; then rm -f $NEW; echo \"\$(hostname): config already current\";
+         else xray run -test -c $NEW >/dev/null && mv $NEW $CFG && systemctl restart xray && echo \"\$(hostname): config synced\"; fi" \
         < "$CFG" || die "could not push the config to $ip"
 done
 [ "$panel" = 1 ] && systemctl start tunpanel
