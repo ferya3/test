@@ -1,0 +1,9 @@
+{
+    "name": "iva2-cpt",
+    "private": true,
+    "description": "Bilingual (Persian/English) visual and auditory continuous performance test in the style of the IVA-2. No build step: open index.html.",
+    "type": "commonjs",
+    "scripts": {
+        "test": "node --test"
+    }
+}

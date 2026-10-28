@@ -5,6 +5,9 @@
 @source '../../app/**/*.php';
 @source '../views/**/*.blade.php';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+/* The standalone attention test has its own stylesheet; its markup and
+   scripts must not add utilities to the site's bundle. */
+@source not '../../iva2';
 
 /* ==========================================================================
    Fonts

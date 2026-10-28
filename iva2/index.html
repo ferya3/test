@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <title>آزمون IVA-2 فارسی</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231f6f78'/%3E%3Ctext x='16' y='23' font-size='19' font-family='sans-serif' font-weight='700' text-anchor='middle' fill='white'%3E1%3C/text%3E%3C/svg%3E">
+    <link rel="stylesheet" href="css/fonts.css">
+    <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+    <header class="topbar">
+        <a class="brand" href="#home">
+            <span class="brand-mark" aria-hidden="true">۱</span>
+            <span class="brand-text">
+                <strong data-i18n="app.short"></strong>
+                <small data-i18n="app.subtitle"></small>
+            </span>
+        </a>
+        <nav class="nav" aria-label="main">
+            <a href="#home" data-nav="home" data-i18n="nav.home"></a>
+            <a href="#setup" data-nav="setup" data-i18n="nav.newTest"></a>
+            <a href="#sessions" data-nav="sessions" data-i18n="nav.sessions"></a>
+            <a href="#norms" data-nav="norms" data-i18n="nav.norms"></a>
+            <a href="#settings" data-nav="settings" data-i18n="nav.settings"></a>
+            <a href="#about" data-nav="about" data-i18n="nav.about"></a>
+        </nav>
+        <button type="button" class="lang-toggle" id="lang-toggle" data-i18n="nav.language"></button>
+    </header>
+
+    <main id="app">
+        <!-- Home ---------------------------------------------------------- -->
+        <section data-screen="home" class="screen" hidden>
+            <div class="hero">
+                <h1 data-i18n="app.title"></h1>
+                <p class="lead" data-i18n="home.lead"></p>
+                <div class="actions">
+                    <a class="btn primary large" href="#setup" data-i18n="home.start"></a>
+                    <a class="btn large" href="#sessions" data-i18n="home.results"></a>
+                </div>
+            </div>
+            <div class="card">
+                <h2 data-i18n="home.featuresTitle"></h2>
+                <ul class="features">
+                    <li data-i18n="home.f1"></li>
+                    <li data-i18n="home.f2"></li>
+                    <li data-i18n="home.f3"></li>
+                    <li data-i18n="home.f4"></li>
+                    <li data-i18n="home.f5"></li>
+                    <li data-i18n="home.f6"></li>
+                </ul>
+            </div>
+            <p class="notice warn" data-i18n="home.disclaimer"></p>
+            <p class="notice" id="home-storage" data-i18n="home.storage"></p>
+        </section>
+
+        <!-- Setup --------------------------------------------------------- -->
+        <section data-screen="setup" class="screen" hidden>
+            <h1 data-i18n="setup.title"></h1>
+            <form id="setup-form" class="card form" novalidate>
+                <fieldset>
+                    <legend data-i18n="setup.participant"></legend>
+                    <div class="grid-2">
+                        <label>
+                            <span data-i18n="field.code"></span>
+                            <input name="code" autocomplete="off" required maxlength="40">
+                        </label>
+                        <label>
+                            <span data-i18n="field.name"></span>
+                            <input name="name" autocomplete="off" maxlength="80">
+                        </label>
+                        <label>
+                            <span data-i18n="field.age"></span>
+                            <input name="age" inputmode="decimal" autocomplete="off" required maxlength="5">
+                            <small class="hint" data-i18n="setup.ageNote"></small>
+                        </label>
+                        <label>
+                            <span data-i18n="field.sex"></span>
+                            <select name="sex">
+                                <option value="" data-i18n="opt.none"></option>
+                                <option value="m" data-i18n="sex.m"></option>
+                                <option value="f" data-i18n="sex.f"></option>
+                            </select>
+                        </label>
+                        <label>
+                            <span data-i18n="field.handedness"></span>
+                            <select name="handedness">
+                                <option value="" data-i18n="opt.none"></option>
+                                <option value="right" data-i18n="hand.right"></option>
+                                <option value="left" data-i18n="hand.left"></option>
+                                <option value="both" data-i18n="hand.both"></option>
+                            </select>
+                        </label>
+                        <label>
+                            <span data-i18n="field.examiner"></span>
+                            <input name="examiner" autocomplete="off" maxlength="80">
+                        </label>
+                    </div>
+                    <label>
+                        <span data-i18n="field.notes"></span>
+                        <textarea name="notes" rows="2" maxlength="1000"></textarea>
+                    </label>
+                    <label class="check">
+                        <input type="checkbox" name="normative">
+                        <span data-i18n="field.normative"></span>
+                    </label>
+                </fieldset>
+                <fieldset>
+                    <legend data-i18n="setup.options"></legend>
+                    <div class="grid-2">
+                        <label>
+                            <span data-i18n="field.testLang"></span>
+                            <select name="testLang">
+                                <option value="fa" data-i18n="lang.fa"></option>
+                                <option value="en" data-i18n="lang.en"></option>
+                            </select>
+                        </label>
+                        <label>
+                            <span data-i18n="field.digits"></span>
+                            <select name="digits">
+                                <option value="fa" data-i18n="digits.fa"></option>
+                                <option value="latin" data-i18n="digits.latin"></option>
+                            </select>
+                        </label>
+                        <label>
+                            <span data-i18n="field.response"></span>
+                            <select name="response">
+                                <option value="mouse" data-i18n="response.mouse"></option>
+                                <option value="key" data-i18n="response.key"></option>
+                                <option value="touch" data-i18n="response.touch"></option>
+                                <option value="any" data-i18n="response.any"></option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="radios" role="radiogroup">
+                        <span class="radios-label" data-i18n="field.protocol"></span>
+                        <label class="check"><input type="radio" name="protocol" value="standard"> <span data-protocol-label="standard"></span></label>
+                        <label class="check"><input type="radio" name="protocol" value="short"> <span data-protocol-label="short"></span></label>
+                    </div>
+                </fieldset>
+                <p class="form-error" id="setup-error" role="alert" hidden></p>
+                <div class="actions">
+                    <button type="submit" class="btn primary large" data-i18n="setup.continue"></button>
+                </div>
+            </form>
+        </section>
+
+        <!-- Sound and room checks ----------------------------------------- -->
+        <section data-screen="checks" class="screen" hidden>
+            <h1 data-i18n="checks.title"></h1>
+            <div class="card">
+                <p data-i18n="checks.sound"></p>
+                <div class="actions">
+                    <button type="button" class="btn" id="check-play-1"></button>
+                    <button type="button" class="btn" id="check-play-2"></button>
+                </div>
+                <p class="hint" id="checks-voice"></p>
+                <p class="form-error" id="checks-error" role="alert" hidden></p>
+            </div>
+            <div class="card">
+                <p data-i18n="checks.room"></p>
+                <p data-i18n="checks.keys"></p>
+            </div>
+            <div class="actions">
+                <a class="btn" href="#setup" data-i18n="instr.back"></a>
+                <a class="btn primary large" href="#instructions" data-i18n="checks.continue"></a>
+            </div>
+        </section>
+
+        <!-- Participant instructions (in the test language) --------------- -->
+        <section data-screen="instructions" class="screen instructions" hidden>
+            <h1 id="instr-title"></h1>
+            <div class="instr-body" id="instr-body"></div>
+            <div class="examples">
+                <div class="example yes">
+                    <span class="example-digit" id="instr-digit-1"></span>
+                    <button type="button" class="btn" id="instr-play-1"></button>
+                    <span class="example-label" id="instr-yes"></span>
+                </div>
+                <div class="example no">
+                    <span class="example-digit" id="instr-digit-2"></span>
+                    <button type="button" class="btn" id="instr-play-2"></button>
+                    <span class="example-label" id="instr-no"></span>
+                </div>
+            </div>
+            <div class="actions center">
+                <a class="btn" href="#checks" data-i18n="instr.back"></a>
+                <button type="button" class="btn primary large" id="instr-begin"></button>
+            </div>
+        </section>
+
+        <!-- Report -------------------------------------------------------- -->
+        <section data-screen="results" class="screen wide" hidden>
+            <div class="toolbar no-print">
+                <a class="btn" href="#sessions" data-i18n="results.back"></a>
+                <span class="spacer"></span>
+                <button type="button" class="btn" id="results-csv" data-i18n="results.csv"></button>
+                <button type="button" class="btn" id="results-json" data-i18n="results.json"></button>
+                <button type="button" class="btn primary" id="results-print" data-i18n="results.print"></button>
+            </div>
+            <p class="notice danger no-print" id="results-unsaved" data-i18n="results.saveFailed" hidden></p>
+            <div id="report"></div>
+        </section>
+
+        <!-- Saved sessions ------------------------------------------------ -->
+        <section data-screen="sessions" class="screen wide" hidden>
+            <h1 data-i18n="sessions.title"></h1>
+            <div class="toolbar">
+                <input type="search" id="sessions-search" data-i18n-placeholder="sessions.search">
+                <span class="spacer"></span>
+                <label class="btn file-btn"><span data-i18n="sessions.import"></span><input type="file" id="sessions-import" accept=".json,application/json" hidden></label>
+                <button type="button" class="btn" id="sessions-export" data-i18n="sessions.exportAll"></button>
+                <button type="button" class="btn" id="sessions-summary" data-i18n="sessions.exportSummary"></button>
+            </div>
+            <div class="table-wrap">
+                <table class="grid list" id="sessions-table">
+                    <thead>
+                        <tr>
+                            <th data-i18n="sessions.date"></th>
+                            <th data-i18n="sessions.code"></th>
+                            <th data-i18n="sessions.name"></th>
+                            <th data-i18n="sessions.age"></th>
+                            <th data-i18n="sessions.protocol"></th>
+                            <th data-i18n="sessions.status"></th>
+                            <th data-i18n="sessions.normative"></th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <p class="empty" id="sessions-empty" data-i18n="sessions.empty" hidden></p>
+            <p class="hint" id="sessions-usage"></p>
+        </section>
+
+        <!-- Norms --------------------------------------------------------- -->
+        <section data-screen="norms" class="screen wide" hidden>
+            <h1 data-i18n="norms.title"></h1>
+            <p class="lead" id="norms-lead"></p>
+            <div class="card">
+                <h2 data-i18n="norms.buildTitle"></h2>
+                <p id="norms-available"></p>
+                <form id="norms-form" class="inline-form">
+                    <label>
+                        <span data-i18n="norms.name"></span>
+                        <input name="name" maxlength="80" required>
+                    </label>
+                    <button type="submit" class="btn primary" data-i18n="norms.build"></button>
+                </form>
+            </div>
+            <div class="card">
+                <div class="toolbar">
+                    <h2 data-i18n="norms.listTitle"></h2>
+                    <span class="spacer"></span>
+                    <label class="btn file-btn"><span data-i18n="norms.import"></span><input type="file" id="norms-import" accept=".json,application/json" hidden></label>
+                </div>
+                <div id="norms-list"></div>
+            </div>
+        </section>
+
+        <!-- Settings ------------------------------------------------------ -->
+        <section data-screen="settings" class="screen" hidden>
+            <h1 data-i18n="settings.title"></h1>
+            <div class="card">
+                <h2 data-i18n="settings.voiceTitle"></h2>
+                <p class="hint" data-i18n="settings.voiceLead"></p>
+                <div id="voices"></div>
+            </div>
+            <div class="card">
+                <h2 data-i18n="settings.defaultsTitle"></h2>
+                <form id="defaults-form" class="form">
+                    <div class="grid-2">
+                        <label>
+                            <span data-i18n="field.testLang"></span>
+                            <select name="testLang">
+                                <option value="fa" data-i18n="lang.fa"></option>
+                                <option value="en" data-i18n="lang.en"></option>
+                            </select>
+                        </label>
+                        <label>
+                            <span data-i18n="field.digits"></span>
+                            <select name="digits">
+                                <option value="fa" data-i18n="digits.fa"></option>
+                                <option value="latin" data-i18n="digits.latin"></option>
+                            </select>
+                        </label>
+                        <label>
+                            <span data-i18n="field.response"></span>
+                            <select name="response">
+                                <option value="mouse" data-i18n="response.mouse"></option>
+                                <option value="key" data-i18n="response.key"></option>
+                                <option value="touch" data-i18n="response.touch"></option>
+                                <option value="any" data-i18n="response.any"></option>
+                            </select>
+                        </label>
+                        <label>
+                            <span data-i18n="field.examiner"></span>
+                            <input name="examiner" maxlength="80">
+                        </label>
+                    </div>
+                    <div class="actions">
+                        <button type="submit" class="btn primary" data-i18n="common.save"></button>
+                    </div>
+                </form>
+            </div>
+            <div class="card">
+                <h2 data-i18n="settings.dataTitle"></h2>
+                <p class="hint" id="settings-usage"></p>
+                <button type="button" class="btn danger" id="settings-clear" data-i18n="settings.clearAll"></button>
+            </div>
+        </section>
+
+        <!-- About --------------------------------------------------------- -->
+        <section data-screen="about" class="screen prose" hidden>
+            <div data-lang-block="fa">
+                <h1>دربارهٔ آزمون</h1>
+                <p>
+                    <strong>IVA-2</strong> (آزمون عملکرد پیوستهٔ یکپارچهٔ دیداری و شنیداری، نسخهٔ ۲) محصول شرکت
+                    BrainTrain است و برای کمک به تشخیص و اندازه‌گیری نشانه‌های اختلال کم‌توجهی/بیش‌فعالی (ADHD) در سنین
+                    ۶ تا ۹۶ سال به کار می‌رود. ویژگی اصلی آن این است که توجه و کنترل پاسخ را هم‌زمان در دو حس می‌سنجد:
+                    محرک‌ها گاهی دیده و گاهی شنیده می‌شوند و آزمودنی باید مدام بین دیدن و شنیدن جابه‌جا شود.
+                </p>
+                <p>
+                    این برنامه همان پارادایم منتشرشده را اجرا می‌کند، با دستورالعمل و صدای فارسی. این برنامه نسخهٔ رسمی IVA-2 نیست،
+                    به هنجارهای آن دسترسی ندارد و نمره‌هایش با نمره‌های IVA-2 قابل مقایسه نیست.
+                </p>
+
+                <h2>ساختار آزمون</h2>
+                <ol>
+                    <li><strong>گرم‌کردن:</strong> ۱۰ بار عدد ۱ دیداری و سپس ۱۰ بار «یک» شنیداری؛ فقط زمان واکنش ساده.</li>
+                    <li><strong>تمرین:</strong> ۲۰ کوشش با ۱ و ۲ در هر دو حس. اگر درستی کمتر از ۷۰٪ باشد، تمرین تا دو بار دیگر تکرار می‌شود.</li>
+                    <li><strong>آزمون اصلی:</strong> ۵۰۰ کوشش در ۵ مجموعهٔ ۱۰۰تایی. هر مجموعه یک بلوک ۵۰تایی <em>پرتقاضا</em> (۸۴٪ هدف؛ خطای تکانشی را برمی‌انگیزد) و سپس یک بلوک ۵۰تایی <em>کم‌تقاضا</em> (۱۶٪ هدف؛ خطای بی‌توجهی را برمی‌انگیزد) دارد. در هر بلوک نیمی از کوشش‌ها دیداری و نیمی شنیداری‌اند.</li>
+                    <li><strong>سردکردن:</strong> مانند گرم‌کردن؛ مقایسهٔ آن با گرم‌کردن نشان می‌دهد آزمودنی تا پایان تلاش کرده است یا نه.</li>
+                </ol>
+                <p>
+                    هر ۱٫۵ ثانیه یک محرک ارائه می‌شود. محرک دیداری ۱۶۷ میلی‌ثانیه روی صفحه می‌ماند و محرک شنیداری کمتر از ۵۰۰ میلی‌ثانیه طول می‌کشد.
+                    ترتیب کوشش‌ها شبه‌تصادفی اما ثابت است (همهٔ آزمودنی‌ها دقیقاً یک ترتیب را می‌بینند) تا نتایج قابل مقایسه باشند.
+                    پاسخ زودتر از ۱۲۵ میلی‌ثانیه پس از محرک، واکنش به آن محرک حساب نمی‌شود و «پیش‌دستانه» ثبت می‌شود.
+                    کل آزمون حدود ۱۴ دقیقه طول می‌کشد.
+                </p>
+
+                <h2>مقیاس‌ها</h2>
+                <p>هر مقیاس جداگانه برای شنیداری، دیداری و کلی (هر دو) گزارش می‌شود.</p>
+                <h3>کنترل پاسخ</h3>
+                <ul>
+                    <li><strong>احتیاط</strong>: خطای ارتکاب (کلیک روی ۲)؛ تکانشگری.</li>
+                    <li><strong>ثبات</strong>: یکنواختی زمان واکنش؛ ماندن در تکلیف.</li>
+                    <li><strong>استقامت</strong>: مقایسهٔ سرعت ۲۰۰ کوشش اول با ۲۰۰ کوشش آخر؛ حفظ تلاش در طول زمان.</li>
+                </ul>
+                <h3>توجه</h3>
+                <ul>
+                    <li><strong>گوش‌به‌زنگی</strong>: خطای حذف (کلیک نکردن روی ۱)؛ بی‌توجهی.</li>
+                    <li><strong>تمرکز</strong>: پراکندگی زمان واکنش؛ افت‌های لحظه‌ای توجه.</li>
+                    <li><strong>سرعت</strong>: میانگین زمان واکنش پاسخ‌های درست.</li>
+                </ul>
+                <h3>ویژگی و اعتبار</h3>
+                <ul>
+                    <li><strong>توازن</strong>: کدام حس سریع‌تر پردازش می‌شود.</li>
+                    <li><strong>آمادگی</strong>: عملکرد وقتی هدف‌ها کم‌اند در برابر وقتی زیادند.</li>
+                    <li><strong>تنظیم حرکتی ظریف</strong>: پاسخ‌های پیش‌دستانه و کلیک‌های اضافه؛ بیش‌فعالی حرکتی.</li>
+                    <li><strong>درک تکلیف</strong>: خطاهایی که نه تکانشگری توضیحشان می‌دهد نه بی‌توجهی؛ آیا تکلیف فهمیده شده است.</li>
+                    <li><strong>پشتکار</strong> و <strong>حسی‌حرکتی</strong>: از گرم‌کردن و سردکردن؛ تلاش تا پایان و سرعت پایه.</li>
+                </ul>
+                <p>تعریف دقیق هر نمرهٔ خام در جدول‌های گزارش و در فایل README آمده است.</p>
+
+                <h2>نمرهٔ استاندارد و هنجار</h2>
+                <p>
+                    IVA-2 نمره‌ها را به‌صورت «بهره» با میانگین ۱۰۰ و انحراف معیار ۱۵ گزارش می‌کند، بر پایهٔ هنجار حدود ۱٬۷۰۰ نفر.
+                    آن هنجارها منتشر نشده‌اند و برای این برنامه هم معتبر نیستند (محرک، صدا، سخت‌افزار و فرمول‌ها فرق دارند).
+                    این برنامه در بخش «هنجارها» به شما امکان می‌دهد از آزمودنی‌های سالم خودتان هنجار محلی (به تفکیک سن و جنس) بسازید؛
+                    پس از آن، گزارش‌ها نمرهٔ استاندارد، صدک و شاخص‌های کلی کنترل پاسخ و توجه را هم نشان می‌دهند.
+                </p>
+
+                <h2>نکته‌های اجرا</h2>
+                <ul>
+                    <li>از هدفون سیمی یا بلندگو استفاده کنید؛ بلوتوث تأخیر صدا دارد.</li>
+                    <li>ماوس سیمی بهتر از تاچ‌پد است. همهٔ آزمودنی‌هایی را که مقایسه می‌کنید با یک دستگاه و یک روش پاسخ آزمون کنید.</li>
+                    <li>مرورگر Chrome، Edge یا Firefox به‌روز؛ پنجره‌ها و اعلان‌های دیگر را ببندید.</li>
+                    <li>نتایج فقط در همین مرورگر ذخیره می‌شوند؛ به‌طور منظم از بخش «نتایج» خروجی بگیرید.</li>
+                </ul>
+
+                <h2>محدودیت‌ها</h2>
+                <p>
+                    هیچ آزمون عملکرد پیوسته‌ای به‌تنهایی ADHD را تشخیص نمی‌دهد. نتیجه را متخصص و در کنار مصاحبهٔ بالینی، سابقهٔ رشدی،
+                    مقیاس‌های درجه‌بندی والد/معلم/خود و سایر ارزیابی‌ها تفسیر کند. خستگی، دارو، اضطراب، مشکل بینایی یا شنوایی
+                    و ناآشنایی با رایانه همه بر نتیجه اثر می‌گذارند.
+                </p>
+                <p class="muted">منبع توصیف IVA-2: وب‌سایت BrainTrain (braintrain.com/iva2) و گزارش‌های نمونهٔ منتشرشدهٔ آن.</p>
+            </div>
+            <div data-lang-block="en" hidden>
+                <h1>About the test</h1>
+                <p>
+                    The <strong>IVA-2</strong> (Integrated Visual and Auditory Continuous Performance Test, version 2) is a BrainTrain
+                    product used to help diagnose and quantify symptoms of ADHD from age 6 to 96. Its distinguishing feature is that it
+                    measures attention and response control in two senses at once: stimuli are sometimes seen and sometimes heard, so the
+                    participant must keep switching between looking and listening.
+                </p>
+                <p>
+                    This program runs the same published paradigm, with Persian instructions and voice. It is not the official IVA-2, has
+                    no access to its norms, and its scores are not comparable to IVA-2 scores.
+                </p>
+
+                <h2>Structure</h2>
+                <ol>
+                    <li><strong>Warm-up:</strong> 10 visual 1s then 10 spoken “one”s; simple reaction time only.</li>
+                    <li><strong>Practice:</strong> 20 trials with 1s and 2s in both senses. Below 70% accuracy it is repeated, up to twice more.</li>
+                    <li><strong>Main test:</strong> 500 trials in 5 sets of 100. Each set is a 50-trial <em>high-demand</em> block (84% targets; provokes impulsive errors) followed by a 50-trial <em>low-demand</em> block (16% targets; provokes inattentive errors). Half the trials in every block are visual and half auditory.</li>
+                    <li><strong>Cool-down:</strong> like the warm-up; comparing the two shows whether effort lasted to the end.</li>
+                </ol>
+                <p>
+                    One stimulus every 1.5 s. Visual stimuli stay on screen for 167 ms; auditory stimuli last under 500 ms. The order is
+                    pseudo-random but fixed (every participant gets the same sequence) so results are comparable. A response within
+                    125 ms of a stimulus is not a reaction to it and is recorded as anticipatory. The whole test takes about 14 minutes.
+                </p>
+
+                <h2>Scales</h2>
+                <p>Each scale is reported for auditory, visual and full scale (both).</p>
+                <h3>Response control</h3>
+                <ul>
+                    <li><strong>Prudence</strong>: commission errors (clicking on 2); impulsivity.</li>
+                    <li><strong>Consistency</strong>: steadiness of reaction times; staying on task.</li>
+                    <li><strong>Stamina</strong>: speed over the first 200 trials versus the last 200; sustaining effort.</li>
+                </ul>
+                <h3>Attention</h3>
+                <ul>
+                    <li><strong>Vigilance</strong>: omission errors (not clicking on 1); inattention.</li>
+                    <li><strong>Focus</strong>: reaction-time variability; momentary lapses of attention.</li>
+                    <li><strong>Speed</strong>: mean reaction time of correct responses.</li>
+                </ul>
+                <h3>Attribute and validity</h3>
+                <ul>
+                    <li><strong>Balance</strong>: which sense is processed faster.</li>
+                    <li><strong>Readiness</strong>: performance when targets are rare versus frequent.</li>
+                    <li><strong>Fine motor regulation</strong>: anticipatory and extra clicks; motor hyperactivity.</li>
+                    <li><strong>Comprehension</strong>: errors neither impulsivity nor inattention explains; was the task understood.</li>
+                    <li><strong>Persistence</strong> and <strong>Sensory/motor</strong>: from warm-up and cool-down; effort to the end, basic speed.</li>
+                </ul>
+                <p>The exact raw definition of every score is in the report tables and in README.md.</p>
+
+                <h2>Standard scores and norms</h2>
+                <p>
+                    The IVA-2 reports quotients with mean 100 and SD 15 based on norms of about 1,700 people. Those norms are unpublished and
+                    would not be valid for this program (stimuli, voice, hardware and formulas differ). Under Norms you can build local norms
+                    (by age and sex) from your own healthy participants; reports then also show standard scores, percentiles and the global
+                    Response Control and Attention quotients.
+                </p>
+
+                <h2>Administration tips</h2>
+                <ul>
+                    <li>Use wired headphones or speakers; Bluetooth delays sound.</li>
+                    <li>A wired mouse is better than a touchpad. Test everyone you compare on the same device and response method.</li>
+                    <li>Use an up-to-date Chrome, Edge or Firefox; close other windows and notifications.</li>
+                    <li>Results stay in this browser only; export them regularly from Results.</li>
+                </ul>
+
+                <h2>Limitations</h2>
+                <p>
+                    No continuous performance test diagnoses ADHD on its own. A professional should interpret the result alongside a
+                    clinical interview, developmental history, parent/teacher/self rating scales and other assessment. Fatigue, medication,
+                    anxiety, vision or hearing problems and unfamiliarity with computers all affect the result.
+                </p>
+                <p class="muted">Source for the IVA-2 description: BrainTrain’s website (braintrain.com/iva2) and its published sample reports.</p>
+            </div>
+        </section>
+    </main>
+
+    <!-- The test itself: full screen, outside the normal layout ------------- -->
+    <div id="stage" class="stage" tabindex="-1" hidden>
+        <div class="stage-frame" aria-hidden="true">
+            <span class="digit" data-digit="1"></span>
+            <span class="digit" data-digit="2"></span>
+        </div>
+        <div class="stage-message" id="stage-message" hidden>
+            <div class="stage-lines" id="stage-lines"></div>
+            <p class="stage-prompt" id="stage-prompt"></p>
+            <button type="button" class="btn primary large" id="stage-finish" hidden></button>
+        </div>
+        <button type="button" class="stage-pause" id="stage-pause" aria-label="pause">❚❚</button>
+        <div class="pause-panel" id="pause-panel" hidden>
+            <div class="pause-card" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+                <h2 id="pause-title" data-i18n="pause.title"></h2>
+                <p id="pause-where"></p>
+                <p id="pause-reason" class="hint"></p>
+                <p class="hint" data-i18n="pause.note"></p>
+                <div class="actions">
+                    <button type="button" class="btn primary" id="pause-resume" data-i18n="pause.resume"></button>
+                    <button type="button" class="btn danger" id="pause-abort" data-i18n="pause.abort"></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+    <script src="js/audio-data.js"></script>
+    <script src="js/i18n.js"></script>
+    <script src="js/protocol.js"></script>
+    <script src="js/scoring.js"></script>
+    <script src="js/norms.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/engine.js"></script>
+    <script src="js/report.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

@@ -132,6 +132,23 @@ jobs:
           CACHE_CATALOG_ENABLED: 'true'
         run: php artisan test
 
+  # The standalone attention test in iva2/ has no build step and no
+  # dependencies; its scoring, norms and storage are plain Node tests.
+  iva2:
+    name: IVA-2 test (node)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - run: node --test
+        working-directory: iva2
+
   static-analysis:
     name: Lint
     runs-on: ubuntu-latest
