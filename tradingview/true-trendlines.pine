@@ -72,6 +72,11 @@ bool   obH2On  = input.bool(true, "", group = G_OBM, inline = "o2")
 string obH2Tf  = input.timeframe("D", "", group = G_OBM, inline = "o2")
 int    obH_Piv = input.int(3, "HTF structure pivot strength", minval = 2, maxval = 20, group = G_OBM)
 
+const string G_LG = "Legend (راهنمای فارسی)"
+bool   lgOn   = input.bool(true, "Show legend box", group = G_LG, tooltip = "کادری روی چارت که معنی همه برچسب‌ها و آخرین سیگنال را به فارسی نشان می‌دهد. فقط بخش‌های روشن در آن می‌آیند.")
+string lgPos  = input.string("Bottom right", "Position", options = ["Top right", "Top left", "Bottom right", "Bottom left", "Middle right", "Middle left"], group = G_LG)
+string lgSize = input.string("Small", "Text size", options = ["Tiny", "Small", "Normal"], group = G_LG)
+
 const string G_PP = "Previous period H / L / C (multi-timeframe)"
 bool   pp1On     = input.bool(true, "", group = G_PP, inline = "p1", tooltip = "سقف، کف و کلوز دوره قبل در هر تایم‌فریم، دقیقاً از نوک کندلی که آن را ساخته. هر دوره فقط در چارت‌هایی با تایم‌فریم کوچک‌تر نمایش داده می‌شود.")
 string pp1Tf     = input.timeframe("D", "", group = G_PP, inline = "p1")
@@ -707,6 +712,8 @@ f_msDraw(int x1, float y, bool bull, bool choch) =>
 
 bool chochUp = bullBreak and msTrend == -1
 bool chochDn = bearBreak and msTrend == 1
+bool bosUpSig = bullBreak and not chochUp and msShowBos
+bool bosDnSig = bearBreak and not chochDn and msShowBos
 if bullBreak
     if msOn and inWindow and (chochUp or msShowBos)
         f_msDraw(brkHiI, brkHiP, true, chochUp)
@@ -1029,3 +1036,123 @@ if msOn and chochUp
     alert(syminfo.ticker + ": bullish change of character (CHoCH)", alert.freq_once_per_bar_close)
 if msOn and chochDn
     alert(syminfo.ticker + ": bearish change of character (CHoCH)", alert.freq_once_per_bar_close)
+
+// ─── Legend (Persian) ────────────────────────────────────────────────────────
+// Explains every label the chart can show, listing only the features that are
+// on, plus the latest signal with its time.
+f_faPeriod(string tf) =>
+    string n = f_tfName(tf)
+    n == "D" ? "روز قبل" : n == "W" ? "هفته قبل" : n == "M" ? "ماه قبل" : "کندل قبلیِ " + n
+
+var string lastSig = "هنوز سیگنالی نیامده"
+var color  lastCol = chart.fg_color
+string     sigTxt  = ""
+color      sigCol  = na
+if ppUp
+    sigTxt := "کلوز بالای سقف دوره قبل"
+    sigCol := colSup
+if ppDn
+    sigTxt := "کلوز زیر کف دوره قبل"
+    sigCol := colRes
+if resRT and showRetest
+    sigTxt := "RT: برگشت صعودی به خط روند شکسته‌شده"
+    sigCol := colSup
+if supRT and showRetest
+    sigTxt := "RT: برگشت نزولی به خط روند شکسته‌شده"
+    sigCol := colRes
+if obOn and obBullNew
+    sigTxt := "اوردر بلاک صعودی جدید"
+    sigCol := obBullCol
+if obOn and obBearNew
+    sigTxt := "اوردر بلاک نزولی جدید"
+    sigCol := obBearCol
+if msOn and bosUpSig
+    sigTxt := "BOS صعودی: ادامه روند صعودی"
+    sigCol := obBullCol
+if msOn and bosDnSig
+    sigTxt := "BOS نزولی: ادامه روند نزولی"
+    sigCol := obBearCol
+if obOn and obBullTap
+    sigTxt := "OB: برخورد قیمت با اوردر بلاک صعودی"
+    sigCol := obBullCol
+if obOn and obBearTap
+    sigTxt := "OB: برخورد قیمت با اوردر بلاک نزولی"
+    sigCol := obBearCol
+if resBO
+    sigTxt := "BO: شکست خط روند مقاومت به بالا"
+    sigCol := colSup
+if supBD
+    sigTxt := "BD: شکست خط روند حمایت به پایین"
+    sigCol := colRes
+if htfObBullTap
+    sigTxt := "HTF OB: برخورد با اوردر بلاک صعودی تایم‌فریم بالا"
+    sigCol := obBullCol
+if htfObBearTap
+    sigTxt := "HTF OB: برخورد با اوردر بلاک نزولی تایم‌فریم بالا"
+    sigCol := obBearCol
+if htfBO
+    sigTxt := "HTF BO: شکست خط روند مقاومت تایم‌فریم بالا"
+    sigCol := colSup
+if htfBD
+    sigTxt := "HTF BD: شکست خط روند حمایت تایم‌فریم بالا"
+    sigCol := colRes
+if msOn and chochUp
+    sigTxt := "CHoCH صعودی: احتمال برگشت روند به بالا"
+    sigCol := obBullCol
+if msOn and chochDn
+    sigTxt := "CHoCH نزولی: احتمال برگشت روند به پایین"
+    sigCol := obBearCol
+if sigTxt != ""
+    lastSig := sigTxt + "  (" + str.format_time(time, "yyyy-MM-dd HH:mm", syminfo.timezone) + ")"
+    lastCol := sigCol
+
+string lgPosV = lgPos == "Top right" ? position.top_right : lgPos == "Top left" ? position.top_left : lgPos == "Bottom left" ? position.bottom_left : lgPos == "Middle right" ? position.middle_right : lgPos == "Middle left" ? position.middle_left : position.bottom_right
+string lgSz   = lgSize == "Tiny" ? size.tiny : lgSize == "Normal" ? size.normal : size.small
+var table lg  = table.new(lgPosV, 2, 40, bgcolor = color.new(chart.bg_color, 8), frame_color = color.new(chart.fg_color, 60), frame_width = 1, border_color = color.new(chart.fg_color, 85), border_width = 1)
+
+f_row(int r, string code, color cc, string desc) =>
+    if r < 40
+        lg.cell(0, r, code, text_color = cc, text_size = lgSz, text_halign = text.align_center)
+        lg.cell(1, r, desc, text_color = chart.fg_color, text_size = lgSz, text_halign = text.align_right)
+    r + 1
+
+f_periodRow(int r, Period p, string tf) =>
+    int rr = r
+    if p.enabled
+        string codes = p.pfx + "H / " + p.pfx + "L" + (ppClose ? " / " + p.pfx + "C" : "")
+        rr := f_row(rr, codes, p.col, "سقف / کف" + (ppClose ? " / کلوز " : " ") + f_faPeriod(tf))
+        if ppPoc
+            rr := f_row(rr, str.trim(p.pfx) + " POC", p.col, "نقطه کنترل: بیشترین حجم معامله در " + f_faPeriod(tf))
+    rr
+
+if barstate.islast and lgOn
+    lg.clear(0, 0, 1, 39)
+    int r = 0
+    r := f_row(r, "علامت", chart.fg_color, "توضیح")
+    r := f_row(r, "BO", colSup, "شکست خط روند مقاومت به بالا با کلوز (سیگنال خرید)")
+    r := f_row(r, "BD", colRes, "شکست خط روند حمایت به پایین با کلوز (سیگنال فروش)")
+    if showRetest
+        r := f_row(r, "RT", chart.fg_color, "برگشت قیمت به خط شکسته‌شده و رد شدن از آن (ورود کم‌ریسک‌تر)")
+    if showTouch
+        r := f_row(r, "3×  /  3× ✓", chart.fg_color, "تعداد برخورد قیمت با خط روند؛ ✓ یعنی خط تأییدشده")
+    r := f_row(r, "خط‌چین خاکستری", colBroken, "خط روندی که شکسته شده است")
+    if htf1Ok or htf2Ok
+        r := f_row(r, "4H 3×  /  D 2×", chart.fg_color, "خط روند تایم‌فریم بالاتر (ضخیم‌تر) و تعداد برخوردهایش")
+        r := f_row(r, "HTF BO / HTF BD", chart.fg_color, "شکست خط روند تایم‌فریم بالاتر با کلوز همان تایم‌فریم")
+    if obOn
+        r := f_row(r, "Bull OB", obBullCol, "اوردر بلاک صعودی: آخرین کندل نزولی قبل از حرکت قوی و شکست ساختار")
+        r := f_row(r, "Bear OB", obBearCol, "اوردر بلاک نزولی: آخرین کندل صعودی قبل از حرکت قوی و شکست ساختار")
+        r := f_row(r, "◆ OB", chart.fg_color, "اولین برخورد قیمت با اوردر بلاک (باکس کم‌رنگ و خط‌چین می‌شود)")
+        if obMid
+            r := f_row(r, "خط وسط باکس", chart.fg_color, "سطح ۵۰٪ اوردر بلاک")
+    if obH1Ok or obH2Ok
+        r := f_row(r, "4H Bull OB", chart.fg_color, "اوردر بلاک تایم‌فریم بالاتر (حاشیه ضخیم)")
+        r := f_row(r, "◆ HTF OB", chart.fg_color, "اولین برخورد قیمت با اوردر بلاک تایم‌فریم بالاتر")
+    if msOn
+        r := f_row(r, "CHoCH", chart.fg_color, "تغییر کاراکتر: اولین شکست ساختار خلاف روند (احتمال برگشت)")
+        if msShowBos
+            r := f_row(r, "BOS", chart.fg_color, "شکست ساختار در جهت روند (ادامه روند)")
+    r := f_periodRow(r, per1, pp1Tf)
+    r := f_periodRow(r, per2, pp2Tf)
+    r := f_periodRow(r, per3, pp3Tf)
+    r := f_row(r, "آخرین سیگنال", lastCol, lastSig)
