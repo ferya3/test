@@ -579,6 +579,14 @@ td.ss {
     font-weight: 700;
 }
 
+/* The band colours carry meaning, so they print even with background
+   graphics turned off in the print dialog. */
+td.ss,
+.flag {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
 td.band-superior {
     background: var(--band-superior);
 }
@@ -1092,6 +1100,11 @@ svg.chart .mark text {
 /* ==========================================================================
    Print: the report only, on white
    ========================================================================== */
+
+@page {
+    size: A4;
+    margin: 14mm 12mm;
+}
 
 @media print {
     :root {
