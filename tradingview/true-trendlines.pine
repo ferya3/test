@@ -47,14 +47,15 @@ bool   htf2On = input.bool(true, "", group = G_MTF, inline = "h2")
 string htf2Tf = input.timeframe("D", "", group = G_MTF, inline = "h2")
 int    htfPiv = input.int(3, "HTF pivot strength", minval = 2, maxval = 20, group = G_MTF, tooltip = "تعداد کندل تایم‌فریم بالا در هر طرف پیوت. چون کندل‌های بالاتر بزرگ‌ترند، عدد کمتری لازم است.")
 
-const string G_OB = "Order blocks (strict)"
+const string G_OB = "Order blocks"
 bool   obOn        = input.bool(true, "Show order blocks", group = G_OB, tooltip = "اوردر بلاک = آخرین کندل مخالف قبل از حرکت قوی‌ای که ساختار (آخرین سقف/کف سوئینگ) را با کلوز می‌شکند. فقط وقتی رسم می‌شود که همه فیلترهای فعال پاس شوند.")
-int    obPiv       = input.int(5, "Structure pivot strength", minval = 2, maxval = 20, group = G_OB, tooltip = "سقف/کف سوئینگی که شکستش (BOS) لازم است.")
+string obLevel     = input.string("Strict", "Strictness", options = ["Very strict", "Strict", "Normal", "Loose", "Custom"], group = G_OB, tooltip = "سطح سخت‌گیری فیلترها:\nVery strict: مثل Strict + جارو شدن نقدینگی الزامی\nStrict: پیوت ۵، حرکت ۲×ATR، کندل قوی ۱×ATR، FVG الزامی\nNormal: پیوت ۴، حرکت ۱.۵×ATR، کندل قوی ۰.۷۵×ATR، FVG الزامی\nLoose: پیوت ۳، حرکت ۱×ATR، کندل قوی ۰.۵×ATR، بدون FVG\nCustom: پنج تنظیم پایینی که با (Custom) مشخص شده‌اند استفاده می‌شوند. در بقیه حالت‌ها آن پنج تنظیم نادیده گرفته می‌شوند.")
+int    obPivIn     = input.int(5, "Structure pivot strength (Custom)", minval = 2, maxval = 20, group = G_OB, tooltip = "سقف/کف سوئینگی که شکستش (BOS) لازم است.")
 string obZone      = input.string("Wick", "Zone", options = ["Wick", "Body"], group = G_OB, tooltip = "Wick: کل کندل اوردر بلاک (سایه تا سایه). Body: فقط بدنه.")
-float  obDisp      = input.float(2.0, "Min impulse (× ATR)", minval = 0.5, step = 0.25, group = G_OB, tooltip = "فاصله کلوز شکست تا لبه اوردر بلاک باید حداقل این مقدار باشد (حرکت قوی / Displacement).")
-float  obBody      = input.float(1.0, "Min displacement candle body (× ATR)", minval = 0.25, step = 0.25, group = G_OB, tooltip = "حداقل یک کندل در حرکت باید بدنه‌ای به این بزرگی داشته باشد.")
-bool   obFvg       = input.bool(true, "Require fair value gap", group = G_OB, tooltip = "حرکت باید گپ ارزش منصفانه (FVG / Imbalance) به جا بگذارد.")
-bool   obSweep     = input.bool(false, "Require liquidity sweep", group = G_OB, tooltip = "اوردر بلاک باید یکی از سقف/کف‌های قبلی را جارو کرده باشد (شکار نقدینگی). سخت‌گیرانه‌ترین فیلتر.")
+float  obDispIn    = input.float(2.0, "Min impulse (× ATR) (Custom)", minval = 0.5, step = 0.25, group = G_OB, tooltip = "فاصله کلوز شکست تا لبه اوردر بلاک باید حداقل این مقدار باشد (حرکت قوی / Displacement).")
+float  obBodyIn    = input.float(1.0, "Min displacement candle body (× ATR) (Custom)", minval = 0.25, step = 0.25, group = G_OB, tooltip = "حداقل یک کندل در حرکت باید بدنه‌ای به این بزرگی داشته باشد.")
+bool   obFvgIn     = input.bool(true, "Require fair value gap (Custom)", group = G_OB, tooltip = "حرکت باید گپ ارزش منصفانه (FVG / Imbalance) به جا بگذارد.")
+bool   obSweepIn   = input.bool(false, "Require liquidity sweep (Custom)", group = G_OB, tooltip = "اوردر بلاک باید یکی از سقف/کف‌های قبلی را جارو کرده باشد (شکار نقدینگی). سخت‌گیرانه‌ترین فیلتر.")
 bool   obVol       = input.bool(false, "Require above-average volume", group = G_OB)
 bool   obTrend     = input.bool(false, "Only with trend (EMA 200)", group = G_OB)
 int    obMaxLeg    = input.int(100, "Max bars from swing to break", minval = 10, maxval = 500, group = G_OB)
@@ -64,6 +65,14 @@ bool   obHideTap   = input.bool(false, "Remove after first tap", group = G_OB, t
 bool   obMid       = input.bool(true, "Show 50% line", group = G_OB)
 color  obBullCol   = input.color(#089981, "Bullish", group = G_OB, inline = "obc")
 color  obBearCol   = input.color(#f23645, "Bearish", group = G_OB, inline = "obc")
+
+// The strictness preset decides the five core filters; Custom uses the inputs.
+bool  obCustom = obLevel == "Custom"
+int   obPiv    = obCustom ? obPivIn : obLevel == "Loose" ? 3 : obLevel == "Normal" ? 4 : 5
+float obDisp   = obCustom ? obDispIn : obLevel == "Loose" ? 1.0 : obLevel == "Normal" ? 1.5 : 2.0
+float obBody   = obCustom ? obBodyIn : obLevel == "Loose" ? 0.5 : obLevel == "Normal" ? 0.75 : 1.0
+bool  obFvg    = obCustom ? obFvgIn : obLevel != "Loose"
+bool  obSweep  = obCustom ? obSweepIn : obLevel == "Very strict"
 
 const string G_OBM = "Higher-timeframe order blocks"
 bool   obH1On  = input.bool(true, "", group = G_OBM, inline = "o1", tooltip = "همان اوردر بلاک با همه فیلترهای بالا، روی کندل‌های تایم‌فریم بالاتر. دو اوردر بلاک زنده آخر هر جهت روی چارت فعلی کشیده می‌شود. فقط وقتی نمایش داده می‌شود که تایم‌فریم چارت کوچک‌تر باشد.")
@@ -1140,6 +1149,8 @@ if barstate.islast and lgOn
         r := f_row(r, "4H 3×  /  D 2×", chart.fg_color, "خط روند تایم‌فریم بالاتر (ضخیم‌تر) و تعداد برخوردهایش")
         r := f_row(r, "HTF BO / HTF BD", chart.fg_color, "شکست خط روند تایم‌فریم بالاتر با کلوز همان تایم‌فریم")
     if obOn
+        string obLevelFa = obLevel == "Very strict" ? "خیلی سخت‌گیرانه" : obLevel == "Strict" ? "سخت‌گیرانه" : obLevel == "Normal" ? "معمولی" : obLevel == "Loose" ? "آزاد" : "دستی"
+        r := f_row(r, "سخت‌گیری OB", chart.fg_color, "سطح فیلتر اوردر بلاک‌ها: " + obLevelFa)
         r := f_row(r, "Bull OB", obBullCol, "اوردر بلاک صعودی: آخرین کندل نزولی قبل از حرکت قوی و شکست ساختار")
         r := f_row(r, "Bear OB", obBearCol, "اوردر بلاک نزولی: آخرین کندل صعودی قبل از حرکت قوی و شکست ساختار")
         r := f_row(r, "◆ OB", chart.fg_color, "اولین برخورد قیمت با اوردر بلاک (باکس کم‌رنگ و خط‌چین می‌شود)")
