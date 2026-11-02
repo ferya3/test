@@ -49,8 +49,10 @@ const SURFACE_EN: Record<string, string> = {
  * English for a seeded product, worked out from its slug
  * (`<decor>-<surface>-<cabinet|compact>`), or null for anything else.
  */
+// The decor part is matched lazily: with a greedy match, "linen-super-matte"
+// read as decor "linen-super" and surface "matte", and returned nothing.
 export function productEnglish(slug: string): { name: string; short: string; description: string } | null {
-  const match = slug.match(/^(.+)-(high-gloss|super-matte|semi-matte|matte|embossed)-(cabinet|compact)$/);
+  const match = slug.match(/^(.+?)-(high-gloss|super-matte|semi-matte|matte|embossed)-(cabinet|compact)$/);
   if (!match) return null;
 
   const [, decorKey, surfaceKey, kind] = match;

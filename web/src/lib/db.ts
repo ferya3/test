@@ -286,6 +286,23 @@ const MIGRATIONS: Migration[] = [
     // and a group may want a product close-up there and a room on its page.
     db.exec(`ALTER TABLE categories ADD COLUMN card_image TEXT`);
   },
+
+  /* 8 — English for the super-matte starter products */
+  (db) => {
+    // productEnglish() misread "<decor>-super-matte-<kind>" slugs, so
+    // migration 4 left those products without English. Filled in only where
+    // still empty: anything an editor wrote stays.
+    const fill = db.prepare(
+      `UPDATE products SET name_en = ?, short_en = ?, description_en = ? WHERE id = ? AND trim(name_en) = ''`,
+    );
+    for (const row of db.prepare(`SELECT id, slug FROM products WHERE slug LIKE '%-super-matte-%'`).all() as {
+      id: number;
+      slug: string;
+    }[]) {
+      const en = productEnglish(row.slug);
+      if (en) fill.run(en.name, en.short, en.description, row.id);
+    }
+  },
 ];
 
 /**
