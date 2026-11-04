@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
 import site_block as sb
 
@@ -91,6 +92,61 @@ class RuleTests(unittest.TestCase):
         self.assertLessEqual(len('Host: ' + longest + '\r\n'), 128)
         with self.assertRaises(ValueError):
             sb.normalize_domain('a' + longest)
+
+
+class DiagnoseTests(unittest.TestCase):
+    def test_instagram_media_on_fbcdn_is_blocked_but_facebook_media_is_not(self):
+        cfg = config(categories=['instagram'])
+        self.assertIsNotNone(sb.explain(cfg, 'instagram.fist1-1.fna.fbcdn.net'))
+        self.assertIsNone(sb.explain(cfg, 'scontent.xx.fbcdn.net'))
+        self.assertIsNone(sb.explain(cfg, 'media.whatsapp.net'))
+
+    def test_adds_blocking(self):
+        off = config(categories=[])
+        insta = config(categories=['instagram'])
+        self.assertTrue(sb.adds_blocking(off, insta))
+        self.assertFalse(sb.adds_blocking(insta, insta))
+        self.assertFalse(sb.adds_blocking(insta, off))
+        self.assertTrue(sb.adds_blocking(insta, config(categories=['instagram'], custom=['a.com'])))
+        self.assertTrue(sb.adds_blocking(config(categories=['instagram'], block_quic=False), insta))
+        self.assertTrue(sb.adds_blocking(config(categories=['instagram'], enabled=False), insta))
+        self.assertFalse(sb.adds_blocking(insta, config(categories=['instagram'], enabled=False)))
+
+    def test_xray_outbounds_that_hide_traffic(self):
+        with tempfile.TemporaryDirectory() as folder:
+            first = Path(folder)/'a.json'
+            first.write_text(json.dumps({'outbounds': [
+                {'protocol': 'freedom', 'tag': 'direct', 'settings': {'fragment': {'packets': 'tlshello'}}},
+                {'protocol': 'wireguard', 'tag': 'warp'},
+                {'protocol': 'vless', 'tag': 'next-hop'},
+                {'protocol': 'blackhole', 'tag': 'blocked'}]}))
+            second = Path(folder)/'b.json'
+            second.write_text(json.dumps({'outbounds': [{'protocol': 'wireguard', 'tag': 'all-warp'}]}))
+            broken = Path(folder)/'c.json'
+            broken.write_text('{not json')
+            kinds = [(k, tag) for k, tag, _ in sb.xray_findings([str(first), str(second), str(broken),
+                                                                 str(Path(folder)/'missing.json')])]
+            self.assertEqual(kinds, [('fragment', 'direct'), ('warp', 'warp'), ('chain', 'next-hop'),
+                                     ('default', 'all-warp')])
+
+    def test_plain_xray_config_has_no_findings(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder)/'x.json'
+            path.write_text(json.dumps({'outbounds': [{'protocol': 'freedom', 'tag': 'direct'},
+                                                      {'protocol': 'blackhole', 'tag': 'blocked'}]}))
+            self.assertEqual(sb.xray_findings([str(path)]), [])
+
+    def test_reset_without_ss_reports_none(self):
+        with mock.patch.object(sb.shutil, 'which', return_value=None):
+            self.assertIsNone(sb.reset_connections())
+
+    def test_reset_falls_back_and_counts(self):
+        results = [mock.Mock(returncode=1, stdout=''), mock.Mock(returncode=0, stdout='a\nb\n\n')]
+        with mock.patch.object(sb.shutil, 'which', return_value='/usr/bin/ss'), \
+                mock.patch.object(sb, 'run', side_effect=results) as run:
+            self.assertEqual(sb.reset_connections(), 2)
+        self.assertIn('not dst 127.0.0.0/8', run.call_args_list[0].args[-1])
+        self.assertEqual(run.call_args_list[1].args[-1], '( dport = :443 or dport = :80 )')
 
 
 class ConfigTests(unittest.TestCase):

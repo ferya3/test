@@ -38,6 +38,8 @@ sudo tg-siteblock
 | `status` | Settings, active rules and blocked counters |
 | `check DOMAIN` | Show whether and why a name is blocked |
 | `rules` | Print the generated `iptables-restore` input; changes nothing |
+| `diagnose` | Explain why a blocked site still opens (role, IPv4/IPv6 rules, QUIC, live SNI and DNS test, Xray WARP/chain/fragment outbounds) |
+| `reset` | Close open web connections so that apps reconnect through the filter |
 | `uninstall` | Remove rules, service, command and configuration |
 
 ## How it works
@@ -51,12 +53,20 @@ Only the first 8 KiB of each new connection are inspected:
 
 Rules hook `OUTPUT` (local cores: x-ui/Xray, sing-box, SSH, Chisel) and `FORWARD` (routed WireGuard/GRE traffic), for IPv4 and IPv6. Loopback is skipped. Rules are replaced atomically with `iptables-restore --noflush`.
 
+## A blocked site still opens?
+
+Run `sudo tg-siteblock diagnose` on the outside server.
+
+Apps such as Instagram keep one connection open for a long time, and only new connections carry the site name. Since 1.1, adding a block closes the server's open web connections (`ss -K`), so apps reconnect through the filter. Run `reset` to do this manually, or pass `--keep-connections` to skip it.
+
+If Xray sends traffic through WARP, another server or a `fragment` outbound, the name is hidden. In that case block it in Xray instead: in 3x-ui, open Routing Rules, then add Domain `geosite:instagram` → Outbound `blocked`.
+
 ## Limitations
 
 - **Blocking QUIC disables HTTP/3 for every site.** Sites fall back to HTTP/2. Turn it off if this server reaches a Hysteria2 endpoint on UDP 443.
 - **It can be bypassed.** ECH, a VPN inside your service, or a fragmented ClientHello can get around the filter.
 - **The adult list is keyword-based** (`porn`, `xvideos`, `hentai`, …), plus about 50 domains and the `.xxx`, `.adult` and `.sex` TLDs. Add missing sites as custom domains.
-- **`fbcdn.net` is intentionally not blocked.** It is shared with Facebook and WhatsApp.
+- **Only Instagram's `fbcdn.net` hosts are blocked.** Names that contain `instagram` (for example `instagram.fist1-1.fna.fbcdn.net`) are blocked; the rest of `fbcdn.net` stays open for Facebook and WhatsApp.
 - **Reapply after a firewall rebuild.** If another tool rebuilds `OUTPUT`, run:
 
 ```bash

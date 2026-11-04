@@ -27,12 +27,13 @@ import os
 from pathlib import Path
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
 from urllib.parse import urlsplit
 
-VERSION = '1.0.0'
+VERSION = '1.1.0'
 HERE = Path(__file__).resolve()
 CONFIG_DIR = Path('/etc/tunnelguard-siteblock')
 CONFIG = CONFIG_DIR/'config.json'
@@ -60,6 +61,8 @@ CATEGORIES = {
     'instagram': dict(
         fa='اینستاگرام', en='Instagram',
         domains=['instagram.com', 'cdninstagram.com', 'instagr.am', 'ig.me'],
+        # Much Instagram media is served as instagram.<pop>.fna.fbcdn.net.
+        keywords=['instagram'],
     ),
     'youtube': dict(
         fa='یوتیوب', en='YouTube',
@@ -111,6 +114,9 @@ TEXT = {
         applied='✅ اعمال شد', blocked='⛔ مسدود است', allowed='✅ مسدود نیست', reason='دلیل',
         unknown='گزینه نامعتبر', failed='❌ انجام نشد', confirm='مطمئن هستید؟ (y/N): ',
         removed='حذف شد', hits='تعداد اتصال/درخواست مسدودشده', rules='تعداد قوانین فعال',
+        diagnose='🩺 عیب‌یابی (چرا سایت هنوز باز می‌شود؟)', reset='🔌 قطع اتصال‌های فعلی (تا با فیلتر دوباره وصل شوند)',
+        reset_done='🔌 {} اتصال باز قبلی بسته شد تا برنامه‌ها با فیلتر دوباره وصل شوند',
+        reset_missing='⚠️  فرمان ss پیدا نشد (apt install iproute2)؛ برنامهٔ اینستاگرام را کامل ببندید و دوباره باز کنید',
     ),
     'en': dict(
         title='🛡  TunnelGuard — Site blocking',
@@ -124,6 +130,9 @@ TEXT = {
         applied='✅ Applied', blocked='⛔ Blocked', allowed='✅ Not blocked', reason='Reason',
         unknown='Unknown option', failed='❌ Failed', confirm='Are you sure? (y/N): ',
         removed='Removed', hits='Blocked connections/requests', rules='Active rules',
+        diagnose='🩺 Diagnose (why does a site still open?)', reset='🔌 Reset current connections',
+        reset_done='🔌 Closed {} open connection(s) so that apps reconnect through the filter',
+        reset_missing='⚠️  ss not found (apt install iproute2); fully close and reopen the app',
     ),
 }
 
@@ -377,6 +386,249 @@ def server_role():
     return None
 
 
+def adds_blocking(before, after):
+    """True when `after` blocks something `before` did not."""
+    if not after['enabled']:
+        return False
+    if not before['enabled'] or (after['block_quic'] and not before['block_quic']):
+        return True
+    old, new = targets(before), targets(after)
+    return any(set(n) - set(o) for o, n in zip(old, new))
+
+
+def reset_connections():
+    """Close this server's established outgoing web connections.
+
+    Apps such as Instagram keep one connection open for a long time, and only
+    the start of a connection carries the site name. After a block is added,
+    closing these connections makes every app reconnect through the filter.
+    Clients reconnect on their own; this is a one-time short interruption.
+    Returns the number of closed connections, or None when `ss` is missing."""
+    if not shutil.which('ss'):
+        return None
+    base = ['ss', '-K', '-H', '-t', '-n', 'state', 'established']
+    for expression in ('( dport = :443 or dport = :80 ) and not dst 127.0.0.0/8',
+                       '( dport = :443 or dport = :80 )'):
+        result = run(*base, expression)
+        if result.returncode == 0:
+            return len([line for line in result.stdout.splitlines() if line.strip()])
+    return None
+
+
+# --------------------------------------------------------------- diagnose
+
+XRAY_CONFIGS = ('/usr/local/x-ui/bin/config.json', '/usr/local/etc/xray/config.json',
+                '/etc/xray/config.json', '/var/lib/marzban/xray_config.json')
+HIDING_PROCESSES = ('wireproxy', 'warp-plus', 'warp-go', 'usque', 'warp-svc')
+PROXY_PROTOCOLS = ('vless', 'vmess', 'trojan', 'shadowsocks', 'socks', 'http', 'hysteria2', 'wireguard')
+
+DIAG = {
+    'fa': dict(
+        title='🩺 عیب‌یابی مسدودسازی', ok='✅', warn='⚠️ ', bad='❌',
+        not_root='این بررسی باید با sudo اجرا شود.',
+        role_iran='این سرور «ایران» است. ترافیک کاربران از سرور خارج به اینترنت می‌رود؛ افزونه را روی سرور خارج نصب و همان‌جا فعال کنید.',
+        role_outside='این سرور «خارج» است (درست).',
+        role_unknown='نقش سرور مشخص نیست؛ مطمئن شوید این همان سروری است که ترافیک کاربران از آن به اینترنت می‌رود.',
+        disabled='فیلتر خاموش است یا هیچ دسته‌ای انتخاب نشده.',
+        selected='دسته‌های فعال: {}',
+        no_rules='قوانین {} بارگذاری نشده‌اند. گزینه «اعمال» یا `sudo systemctl restart tunnelguard-siteblock` را بزنید.',
+        rules='قوانین {}: {} قانون، {} مورد مسدود‌شده تا الان.',
+        ipv6_open='سرور IPv6 دارد ولی قوانین IPv6 بارگذاری نشده‌اند؛ اینستاگرام ترجیحاً از IPv6 استفاده می‌کند و فیلتر نمی‌شود.',
+        quic_off='بستن QUIC خاموش است؛ اینستاگرام و یوتیوب از QUIC استفاده می‌کنند و از فیلتر رد می‌شوند. گزینه QUIC را روشن کنید.',
+        sni_ok='تست زنده: اتصال با نام www.instagram.com از همین سرور قطع شد — فیلتر روی این سرور کار می‌کند.',
+        sni_open='تست زنده: اتصال با نام www.instagram.com از همین سرور قطع نشد — قوانین روی ترافیک این سرور اثر ندارند.',
+        sni_skip='تست زنده انجام نشد (این سرور به 1.1.1.1:443 دسترسی ندارد).',
+        dns_ok='تست DNS: پرسش instagram.com مسدود شد.',
+        dns_open='تست DNS: پرسش instagram.com مسدود نشد.',
+        warp='Xray خروجی «{}» از نوع WireGuard/WARP دارد ({}). ترافیکی که به آن فرستاده شود قبل از خروج رمز می‌شود و این فیلتر آن را نمی‌بیند.',
+        chain='Xray خروجی «{}» ({}) دارد که ترافیک را به سرور دیگری می‌فرستد؛ آن ترافیک رمزشده خارج می‌شود و فیلتر نمی‌شود.',
+        default_hidden='خروجی پیش‌فرض Xray «{}» است؛ یعنی همهٔ ترافیک کاربران از آن مسیر می‌رود و این فیلتر هیچ‌چیز را نمی‌بیند.',
+        fragment='خروجی «{}» در Xray تنظیم fragment دارد؛ نام سایت در چند بسته تکه می‌شود و فیلتر آن را نمی‌بیند. fragment را از خروجی سرور بردارید (روی کلاینت مشکلی ندارد).',
+        process='برنامهٔ «{}» روی سرور در حال اجراست؛ اگر ترافیک کاربران از آن رد شود (WARP در حالت پراکسی)، فیلتر نمی‌شود.',
+        xray_tip='راه مطمئن‌تر برای کاربران 3x-ui: در پنل، Xray Configs ← Routing Rules ← Add Rule، در Domain بنویسید geosite:instagram و Outbound Tag را blocked بگذارید، ذخیره و Xray را ری‌استارت کنید. این روش با WARP و fragment هم کار می‌کند.',
+        reset='اتصال‌هایی که قبل از فعال شدن فیلتر باز بوده‌اند تا وقتی بسته نشوند کار می‌کنند. گزینه «قطع اتصال‌های فعلی» را بزنید یا برنامهٔ اینستاگرام را کامل ببندید و دوباره باز کنید.',
+        found='{} مشکل احتمالی پیدا شد.', none_found='مشکلی پیدا نشد.',
+    ),
+    'en': dict(
+        title='🩺 Site blocking diagnostics', ok='✅', warn='⚠️ ', bad='❌',
+        not_root='Run this check with sudo.',
+        role_iran='This is the Iran server. User traffic reaches the Internet from the outside server; install and enable the add-on there.',
+        role_outside='This is the outside server (correct).',
+        role_unknown='Server role unknown; make sure user traffic leaves to the Internet from this server.',
+        disabled='The filter is off or no category is selected.',
+        selected='Active categories: {}',
+        no_rules='{} rules are not loaded. Use "apply" or `sudo systemctl restart tunnelguard-siteblock`.',
+        rules='{} rules: {} rules, {} blocked so far.',
+        ipv6_open='This server has IPv6 but IPv6 rules are not loaded; Instagram prefers IPv6 and passes unfiltered.',
+        quic_off='QUIC blocking is off; Instagram and YouTube use QUIC and pass the filter. Turn QUIC blocking on.',
+        sni_ok='Live test: a connection named www.instagram.com from this server was reset; the filter works here.',
+        sni_open='Live test: a connection named www.instagram.com from this server was NOT reset; the rules do not affect this server.',
+        sni_skip='Live test skipped (this server cannot reach 1.1.1.1:443).',
+        dns_ok='DNS test: a query for instagram.com was blocked.',
+        dns_open='DNS test: a query for instagram.com was not blocked.',
+        warp='Xray has a WireGuard/WARP outbound "{}" ({}). Traffic routed to it is encrypted before it leaves and cannot be filtered.',
+        chain='Xray has outbound "{}" ({}) that forwards traffic to another server; that traffic leaves encrypted and is not filtered.',
+        default_hidden='The default Xray outbound is "{}": all user traffic takes that path and this filter sees nothing.',
+        fragment='Xray outbound "{}" uses fragment; the site name is split across packets and cannot be matched. Remove fragment from the server outbound.',
+        process='"{}" is running; traffic passing through it (WARP proxy mode) is not filtered.',
+        xray_tip='More reliable for 3x-ui: Xray Configs → Routing Rules → Add Rule, Domain geosite:instagram, Outbound Tag blocked; save and restart Xray. This also works with WARP and fragment.',
+        reset='Connections opened before the filter keep working until they close. Use "reset connections" or fully close and reopen the Instagram app.',
+        found='{} possible problem(s) found.', none_found='No problem found.',
+    ),
+}
+
+
+def ipv6_global():
+    try:
+        for line in Path('/proc/net/if_inet6').read_text().splitlines():
+            fields = line.split()
+            if len(fields) == 6 and fields[3] == '00' and fields[5] != 'lo':
+                return True
+    except OSError:
+        pass
+    return False
+
+
+def chain_counters(tool):
+    """(rules, blocked packets) for one family, or None when not loaded."""
+    if not any(has_jump(tool, hook) for hook in HOOKS):
+        return None
+    rules = hits = 0
+    for chain in CHAINS:
+        result = run(tool, '-w', '-nvxL', chain)
+        for line in result.stdout.splitlines()[2:] if result.returncode == 0 else []:
+            fields = line.split()
+            if len(fields) > 2 and fields[2] == 'REJECT':
+                rules += 1
+                hits += int(fields[0])
+    return rules, hits
+
+
+def sni_probe(sni, address='1.1.1.1', port=443, timeout=6):
+    """'blocked' when the ClientHello is reset, 'open' when the server answers."""
+    import ssl
+    context = ssl.create_default_context()
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    try:
+        with socket.create_connection((address, port), timeout=timeout) as raw:
+            with context.wrap_socket(raw, server_hostname=sni):
+                return 'open'
+    except ConnectionResetError:
+        return 'blocked'
+    except ssl.SSLError:
+        return 'open'  # the server itself answered, e.g. with an alert
+    except OSError:
+        return 'error'
+
+
+def dns_probe(name, address='1.1.1.1', timeout=3):
+    query = os.urandom(2) + b'\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00' + b''.join(
+        bytes([len(label)]) + label.encode() for label in name.split('.')) + b'\x00\x00\x01\x00\x01'
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        s.settimeout(timeout)
+        try:
+            s.connect((address, 53))
+            s.send(query)
+            s.recv(512)
+            return 'open'
+        except (PermissionError, ConnectionRefusedError):
+            return 'blocked'
+        except OSError:
+            return 'error'
+
+
+def xray_findings(paths=None):
+    """Outbounds that would hide traffic from the filter: (kind, tag, detail)."""
+    findings = []
+    for path in paths or XRAY_CONFIGS:
+        try:
+            config = json.loads(Path(path).read_text(encoding='utf-8'))
+            outbounds = config.get('outbounds') or []
+        except (OSError, ValueError, AttributeError):
+            continue
+        for index, outbound in enumerate(o for o in outbounds if isinstance(o, dict)):
+            protocol = str(outbound.get('protocol', ''))
+            tag = str(outbound.get('tag', protocol))
+            settings = outbound.get('settings') or {}
+            if protocol == 'freedom' and isinstance(settings, dict) and settings.get('fragment'):
+                findings.append(('fragment', tag, path))
+            elif protocol == 'wireguard':
+                findings.append(('default' if index == 0 else 'warp', tag, path))
+            elif protocol in PROXY_PROTOCOLS:
+                findings.append(('default' if index == 0 else 'chain', tag, f'{protocol}, {path}'))
+    return findings
+
+
+def running_processes(names=HIDING_PROCESSES):
+    found = set()
+    for comm in Path('/proc').glob('[0-9]*/comm'):
+        try:
+            name = comm.read_text().strip()
+        except OSError:
+            continue
+        if name in names:
+            found.add(name)
+    return sorted(found)
+
+
+def diagnose(cfg, lang='fa'):
+    t = DIAG[lang]
+    print(t['title'])
+    problems = 0
+
+    def say(level, text):
+        nonlocal problems
+        problems += level != 'ok'
+        print(t[level], text)
+
+    if sys.platform != 'linux' or os.geteuid() != 0:
+        say('bad', t['not_root'])
+        return 1
+    role = server_role()
+    say('bad' if role == 'iran' else 'ok' if role == 'outside' else 'warn', t['role_' + (role or 'unknown')])
+    domains, keywords, tlds = targets(cfg)
+    if not cfg['enabled'] or not (domains or keywords or tlds):
+        say('bad', t['disabled'])
+    else:
+        say('ok', t['selected'].format(', '.join(CATEGORIES[c][lang] for c in cfg['categories']) or '-'))
+    loaded = {}
+    for tool in families():
+        loaded[tool] = chain_counters(tool)
+        if loaded[tool] is None:
+            say('bad', t['no_rules'].format('IPv6' if tool == 'ip6tables' else 'IPv4'))
+    if ipv6_global() and loaded.get('ip6tables') is None:
+        say('bad', t['ipv6_open'])
+    if not cfg['block_quic']:
+        say('bad', t['quic_off'])
+    if loaded.get('iptables') is not None:
+        control = sni_probe('www.wikipedia.org')
+        if control != 'open':
+            say('warn', t['sni_skip'])
+        elif sni_probe('www.instagram.com') == 'blocked':
+            say('ok', t['sni_ok'])
+        else:
+            say('bad', t['sni_open'])
+        if dns_probe('wikipedia.org') == 'open':
+            blocked = dns_probe('instagram.com') == 'blocked'
+            say('ok' if blocked else 'bad', t['dns_ok'] if blocked else t['dns_open'])
+    for tool, counts in loaded.items():
+        if counts is not None:  # read after the live tests, which add to them
+            print(t['ok'], t['rules'].format('IPv6' if tool == 'ip6tables' else 'IPv4', *chain_counters(tool)))
+    findings = xray_findings()
+    for kind, tag, detail in findings:
+        key = {'default': 'default_hidden', 'warp': 'warp', 'chain': 'chain', 'fragment': 'fragment'}[kind]
+        say('bad' if kind in ('default', 'fragment') else 'warn',
+            t[key].format(tag) if kind == 'default' else t[key].format(tag, detail))
+    for name in running_processes():
+        say('warn', t['process'].format(name))
+    print(t['warn'], t['reset'])
+    if any(Path(p).exists() for p in XRAY_CONFIGS):
+        print('💡', t['xray_tip'])
+    print(t['found'].format(problems) if problems else t['none_found'])
+    return 0
+
+
 # ----------------------------------------------------------------- service
 
 def install():
@@ -432,6 +684,11 @@ def installed():
 
 # -------------------------------------------------------------------- menu
 
+def report_reset(t):
+    count = reset_connections()
+    print(t['reset_missing'] if count is None else t['reset_done'].format(count))
+
+
 def menu(lang='fa', path=CONFIG):
     require_root()
     t = TEXT[lang]
@@ -454,18 +711,21 @@ def menu(lang='fa', path=CONFIG):
         print(f'{n + 4:>3}) {t["check"]}')
         print(f'{n + 5:>3}) {mark(cfg["enabled"])} {t["toggle"]}')
         print(f'{n + 6:>3}) {t["stats"]}')
-        print(f'{n + 7:>3}) {t["install"]}')
-        print(f'{n + 8:>3}) {t["uninstall"]}')
+        print(f'{n + 7:>3}) {t["diagnose"]}')
+        print(f'{n + 8:>3}) {t["reset"]}')
+        print(f'{n + 9:>3}) {t["install"]}')
+        print(f'{n + 10:>3}) {t["uninstall"]}')
         print(f'  0) {t["exit"]}')
         try:
             choice = input('> ').strip()
             if choice == '0':
                 return 0
-            if not choice.isdigit() or not 1 <= int(choice) <= n + 8:
+            if not choice.isdigit() or not 1 <= int(choice) <= n + 10:
                 print(t['unknown'])
                 continue
             number = int(choice)
             changed = True
+            before = json.loads(json.dumps(cfg))
             if number <= n:
                 name = names[number - 1]
                 if name in cfg['categories']:
@@ -493,6 +753,12 @@ def menu(lang='fa', path=CONFIG):
                 print(f"{t['rules']}: {rules}\n{t['hits']}: {hits}")
             elif number == n + 7:
                 changed = False
+                diagnose(cfg, lang)
+            elif number == n + 8:
+                changed = False
+                report_reset(t)
+            elif number == n + 9:
+                changed = False
                 install()
                 print(t['applied'])
             else:
@@ -502,8 +768,11 @@ def menu(lang='fa', path=CONFIG):
                     print(t['removed'])
                     return 0
             if changed:
-                apply(save(cfg, path))
+                cfg = save(cfg, path)
+                apply(cfg)
                 print(t['applied'])
+                if adds_blocking(before, cfg):
+                    report_reset(t)
         except (ValueError, OSError, RuntimeError) as error:
             print(t['failed'] + ':', error)
         except (EOFError, KeyboardInterrupt):
@@ -538,6 +807,10 @@ def main(argv=None):
     sub.add_parser('rules', help='print the generated iptables-restore input (no changes)')
     sub.add_parser('install', help='install persistent service and the tg-siteblock command')
     sub.add_parser('uninstall', help='remove rules, service, command and configuration')
+    sub.add_parser('diagnose', help='find out why a blocked site still opens')
+    sub.add_parser('reset', help='close open web connections so that apps reconnect through the filter')
+    parser.add_argument('--keep-connections', action='store_true',
+                        help='do not close open connections after adding a block')
     a = parser.parse_args(argv)
     command = a.command or 'menu'
     try:
@@ -574,6 +847,13 @@ def main(argv=None):
             uninstall()
             print('Removed')
             return 0
+        if command == 'diagnose':
+            return diagnose(cfg, a.lang)
+        if command == 'reset':
+            require_root()
+            report_reset(TEXT[a.lang])
+            return 0
+        before = json.loads(json.dumps(cfg))
         if command == 'enable':
             cfg['categories'] += a.categories
         elif command == 'disable':
@@ -588,8 +868,11 @@ def main(argv=None):
         elif command in ('on', 'off'):
             cfg['enabled'] = command == 'on'
         require_root()
-        apply(save(cfg, a.config))
+        cfg = save(cfg, a.config)
+        apply(cfg)
         print('Applied')
+        if adds_blocking(before, cfg) and not a.keep_connections:
+            report_reset(TEXT[a.lang])
         return 0
     except (ValueError, OSError, RuntimeError) as error:
         print('Failed:', error, file=sys.stderr)
