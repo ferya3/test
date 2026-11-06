@@ -1,0 +1,481 @@
+// This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0
+//@version=6
+indicator("Order Blocks MTF + POC (5m…4H)", shorttitle = "OB+POC", overlay = true, max_boxes_count = 500, max_lines_count = 500, max_labels_count = 500, max_bars_back = 5000)
+
+// =====================================================================================
+//  اردربلاک‌های 5m / 10m / 15m / 30m / 45m / 1H / 4H + POC — همه در یک اندیکاتور
+//  (مناسب نسخه‌ی رایگان تریدینگ‌ویو که تعداد اندیکاتور محدود است)
+//
+//  • هر تایم‌فریم تیک و رنگ جداگانه‌ی خودش را دارد و روی هر زون اسم تایم نوشته می‌شود
+//    (▲ = صعودی، ▼ = نزولی) تا تایم‌ها با هم قاطی نشوند.
+//  • حالت Single TF: فقط یک تایم نمایش داده می‌شود (انتخاب از منو).
+//  • فیلتر نویز: هرچه تایم کوچک‌تر، سخت‌گیرانه‌تر (Swing، ایمپالس×ATR، حجم، FVG، اندازه زون).
+//  • POC داخل هر اردربلاک: قیمتی که بیشترین حجم داخل کندل اردربلاک معامله شده (خط‌چین).
+//    برای محاسبه، تایم چارت باید کوچک‌تر از تایم اردربلاک باشد.
+//  • POC دوره‌ای (روز / هفته / 4 ساعت): POC دوره‌های قبل تا زمانی که قیمت به آن نخورده
+//    ادامه پیدا می‌کند (Naked POC) + POC در حال شکل‌گیری دوره‌ی جاری.
+//  • داده‌ی هر تایم فقط از کندل بسته‌شده خوانده می‌شود (بدون ریپینت).
+// =====================================================================================
+
+int MAX_LOOKBACK = 150
+int MAX_BACK     = 4999
+
+// ───────────────────────────── Display ─────────────────────────────
+string G_MODE = "Display"
+string mode     = input.string("Selected TFs", "Mode", options = ["Selected TFs", "Single TF"], group = G_MODE, tooltip = "Selected TFs: تایم‌هایی که پایین تیک خورده‌اند\nSingle TF: فقط تایم انتخاب‌شده در منوی زیر")
+string singleTf = input.string("15m", "Single TF", options = ["5m", "10m", "15m", "30m", "45m", "1H", "4H"], group = G_MODE)
+
+string G_TF = "Timeframes  (show · bull color · bear color)"
+bool  on5   = input.bool(false, "5m ",  group = G_TF, inline = "5")
+color bu5   = input.color(color.rgb(0, 188, 212),   "", group = G_TF, inline = "5")
+color be5   = input.color(color.rgb(255, 152, 0),   "", group = G_TF, inline = "5")
+bool  on10  = input.bool(false, "10m",  group = G_TF, inline = "10")
+color bu10  = input.color(color.rgb(77, 182, 172),  "", group = G_TF, inline = "10")
+color be10  = input.color(color.rgb(255, 138, 101), "", group = G_TF, inline = "10")
+bool  on15  = input.bool(true, "15m",   group = G_TF, inline = "15")
+color bu15  = input.color(color.rgb(76, 175, 80),   "", group = G_TF, inline = "15")
+color be15  = input.color(color.rgb(239, 83, 80),   "", group = G_TF, inline = "15")
+bool  on30  = input.bool(false, "30m",  group = G_TF, inline = "30")
+color bu30  = input.color(color.rgb(41, 98, 255),   "", group = G_TF, inline = "30")
+color be30  = input.color(color.rgb(236, 64, 122),  "", group = G_TF, inline = "30")
+bool  on45  = input.bool(false, "45m",  group = G_TF, inline = "45")
+color bu45  = input.color(color.rgb(126, 87, 194),  "", group = G_TF, inline = "45")
+color be45  = input.color(color.rgb(171, 71, 188),  "", group = G_TF, inline = "45")
+bool  on60  = input.bool(true, "1H ",   group = G_TF, inline = "60")
+color bu60  = input.color(color.rgb(0, 230, 118),   "", group = G_TF, inline = "60")
+color be60  = input.color(color.rgb(255, 23, 68),   "", group = G_TF, inline = "60")
+bool  on240 = input.bool(true, "4H ",   group = G_TF, inline = "240")
+color bu240 = input.color(color.rgb(255, 214, 0),   "", group = G_TF, inline = "240")
+color be240 = input.color(color.rgb(213, 0, 249),   "", group = G_TF, inline = "240")
+
+// ───────────────────────────── Order blocks ─────────────────────────────
+string G_GEN = "Order blocks"
+string zoneType   = input.string("Wick", "Zone type", options = ["Wick", "Body"], group = G_GEN)
+string mitMode    = input.string("Close", "Mitigation by", options = ["Close", "Wick"], group = G_GEN, tooltip = "اردربلاک با بسته شدن کندل یا با سایه از سمت مقابل باطل شود")
+bool   hideMit    = input.bool(true, "Hide mitigated OBs", group = G_GEN)
+int    maxPerTF   = input.int(2, "Max OBs per TF / direction", minval = 1, maxval = 10, group = G_GEN)
+float  strictMult = input.float(1.0, "Strictness ×", minval = 0.5, maxval = 3.0, step = 0.1, group = G_GEN, tooltip = "ضریب کلی سخت‌گیری فیلتر نویز (همه‌ی تایم‌ها). 1 = پیش‌فرض")
+bool   noOverlap  = input.bool(true, "Skip overlapping OBs (same TF)", group = G_GEN)
+int    transp     = input.int(85, "Zone transparency", minval = 0, maxval = 100, group = G_GEN)
+color  mitCol     = input.color(color.gray, "Mitigated color", group = G_GEN)
+bool   showTable  = input.bool(true, "Show info table", group = G_GEN)
+bool   alertsOn   = input.bool(false, "Alert on new OB", group = G_GEN, tooltip = "در ساخت Alert گزینه‌ی Any alert() function call را انتخاب کنید")
+
+// ───────────────────────────── POC ─────────────────────────────
+string G_POC = "POC"
+bool   showObPoc  = input.bool(true, "POC inside each OB", group = G_POC, tooltip = "قیمت با بیشترین حجم داخل کندل اردربلاک. فقط وقتی محاسبه می‌شود که تایم چارت کوچک‌تر از تایم اردربلاک باشد.")
+color  obPocCol   = input.color(color.rgb(255, 255, 255, 20), "OB POC color", group = G_POC)
+string perPoc     = input.string("Day", "Period POC", options = ["Off", "4H", "Day", "Week"], group = G_POC)
+int    perKeep    = input.int(3, "Keep last N period POCs", minval = 1, maxval = 20, group = G_POC)
+bool   nakedOnly  = input.bool(true, "Stop line when price touches it", group = G_POC, tooltip = "Naked POC: خط تا زمانی ادامه دارد که قیمت به آن برخورد نکرده")
+bool   devPoc     = input.bool(true, "Developing POC (current period)", group = G_POC)
+color  perPocCol  = input.color(color.rgb(255, 152, 0), "Period POC color", group = G_POC)
+int    pocBins    = input.int(30, "Profile rows", minval = 5, maxval = 100, group = G_POC, tooltip = "تعداد ردیف‌های پروفایل حجم برای محاسبه‌ی POC")
+
+bool useBody = zoneType == "Body"
+
+// ─────────────────── Noise-filter presets (smaller TF = stricter) ───────────────────
+pSw(string tf) =>
+    switch tf
+        "5"  => 10
+        "10" => 9
+        "15" => 8
+        "30" => 7
+        "45" => 6
+        "60" => 5
+        => 4
+pDp(string tf) =>
+    switch tf
+        "5"  => 2.0
+        "10" => 1.8
+        "15" => 1.6
+        "30" => 1.4
+        "45" => 1.3
+        "60" => 1.2
+        => 1.0
+pVl(string tf) =>
+    switch tf
+        "5"  => 1.5
+        "10" => 1.4
+        "15" => 1.3
+        "30" => 1.2
+        "45" => 1.1
+        "60" => 1.0
+        => 0.0
+pFv(string tf) =>
+    tf == "5" or tf == "10" or tf == "15"
+pMx(string tf) =>
+    switch tf
+        "5"  => 1.5
+        "10" => 1.75
+        "15" => 2.0
+        "30" => 2.25
+        "45" => 2.5
+        "60" => 2.75
+        => 3.0
+
+// =====================================================================================
+//  Order-block detection — runs inside request.security on each timeframe
+// =====================================================================================
+detectOB(int swingLen, float dispMult, float volMult, bool needFvg, float maxSizeAtr, bool body) =>
+    float atr    = ta.atr(14)
+    float volAvg = ta.sma(volume, 20)
+    float ph     = ta.pivothigh(high, swingLen, swingLen)
+    float pl     = ta.pivotlow(low, swingLen, swingLen)
+
+    var float swHigh       = na
+    var int   swHighBar    = na
+    var bool  swHighBroken = true
+    var float swLow        = na
+    var int   swLowBar     = na
+    var bool  swLowBroken  = true
+
+    var float bullTop  = na
+    var float bullBot  = na
+    var int   bullTime = na
+    var float bullId   = 0.0
+    var float bearTop  = na
+    var float bearBot  = na
+    var int   bearTime = na
+    var float bearId   = 0.0
+
+    if not na(ph)
+        swHigh       := ph
+        swHighBar    := bar_index - swingLen
+        swHighBroken := false
+    if not na(pl)
+        swLow       := pl
+        swLowBar    := bar_index - swingLen
+        swLowBroken := false
+
+    // ── Bullish OB: close breaks above the last swing high (BOS up)
+    if not swHighBroken and not na(swHigh) and close > swHigh
+        swHighBroken := true
+        int   window = math.max(1, math.min(bar_index - swHighBar, MAX_LOOKBACK))
+        int   idx    = 1
+        float minL   = low[1]
+        for i = 1 to window
+            if low[i] < minL
+                minL := low[i]
+                idx  := i
+        int obIdx = idx
+        if close[idx] >= open[idx]
+            for j = idx + 1 to idx + 2
+                if close[j] < open[j]
+                    obIdx := j
+                    break
+        float top = body ? math.max(open[obIdx], close[obIdx]) : high[obIdx]
+        float bot = body ? math.min(open[obIdx], close[obIdx]) : minL
+
+        float maxBody = 0.0
+        float maxVol  = 0.0
+        for k = 0 to obIdx - 1
+            maxBody := math.max(maxBody, close[k] - open[k])
+            maxVol  := math.max(maxVol, nz(volume[k]))
+        bool fvgOk = not needFvg
+        if needFvg and obIdx >= 2
+            for k = 0 to obIdx - 2
+                if low[k] > high[k + 2]
+                    fvgOk := true
+                    break
+        bool  dispOk = maxBody >= dispMult * atr
+        bool  volOk  = volMult <= 0 or na(volAvg) or volAvg <= 0 or maxVol >= volMult * volAvg
+        float zoneH  = top - bot
+        bool  sizeOk = zoneH > 0 and zoneH <= maxSizeAtr * atr
+        if dispOk and volOk and fvgOk and sizeOk
+            bullTop  := top
+            bullBot  := bot
+            bullTime := time[obIdx]
+            bullId   += 1
+
+    // ── Bearish OB: close breaks below the last swing low (BOS down)
+    if not swLowBroken and not na(swLow) and close < swLow
+        swLowBroken := true
+        int   window = math.max(1, math.min(bar_index - swLowBar, MAX_LOOKBACK))
+        int   idx    = 1
+        float maxH   = high[1]
+        for i = 1 to window
+            if high[i] > maxH
+                maxH := high[i]
+                idx  := i
+        int obIdx = idx
+        if close[idx] <= open[idx]
+            for j = idx + 1 to idx + 2
+                if close[j] > open[j]
+                    obIdx := j
+                    break
+        float top = body ? math.max(open[obIdx], close[obIdx]) : maxH
+        float bot = body ? math.min(open[obIdx], close[obIdx]) : low[obIdx]
+
+        float maxBody = 0.0
+        float maxVol  = 0.0
+        for k = 0 to obIdx - 1
+            maxBody := math.max(maxBody, open[k] - close[k])
+            maxVol  := math.max(maxVol, nz(volume[k]))
+        bool fvgOk = not needFvg
+        if needFvg and obIdx >= 2
+            for k = 0 to obIdx - 2
+                if high[k] < low[k + 2]
+                    fvgOk := true
+                    break
+        bool  dispOk = maxBody >= dispMult * atr
+        bool  volOk  = volMult <= 0 or na(volAvg) or volAvg <= 0 or maxVol >= volMult * volAvg
+        float zoneH  = top - bot
+        bool  sizeOk = zoneH > 0 and zoneH <= maxSizeAtr * atr
+        if dispOk and volOk and fvgOk and sizeOk
+            bearTop  := top
+            bearBot  := bot
+            bearTime := time[obIdx]
+            bearId   += 1
+
+    // previous (closed) bar values + lookahead_on  →  no repaint
+    [bullTop[1], bullBot[1], bullTime[1], bullId[1], bearTop[1], bearBot[1], bearTime[1], bearId[1]]
+
+// =====================================================================================
+//  Requests
+// =====================================================================================
+[b5T, b5B, b5Tm, b5Id, s5T, s5B, s5Tm, s5Id]                 = request.security(syminfo.tickerid, "5",   detectOB(pSw("5"),   pDp("5")   * strictMult, pVl("5")   * strictMult, pFv("5"),   pMx("5")   / strictMult, useBody), lookahead = barmerge.lookahead_on)
+[b10T, b10B, b10Tm, b10Id, s10T, s10B, s10Tm, s10Id]         = request.security(syminfo.tickerid, "10",  detectOB(pSw("10"),  pDp("10")  * strictMult, pVl("10")  * strictMult, pFv("10"),  pMx("10")  / strictMult, useBody), lookahead = barmerge.lookahead_on)
+[b15T, b15B, b15Tm, b15Id, s15T, s15B, s15Tm, s15Id]         = request.security(syminfo.tickerid, "15",  detectOB(pSw("15"),  pDp("15")  * strictMult, pVl("15")  * strictMult, pFv("15"),  pMx("15")  / strictMult, useBody), lookahead = barmerge.lookahead_on)
+[b30T, b30B, b30Tm, b30Id, s30T, s30B, s30Tm, s30Id]         = request.security(syminfo.tickerid, "30",  detectOB(pSw("30"),  pDp("30")  * strictMult, pVl("30")  * strictMult, pFv("30"),  pMx("30")  / strictMult, useBody), lookahead = barmerge.lookahead_on)
+[b45T, b45B, b45Tm, b45Id, s45T, s45B, s45Tm, s45Id]         = request.security(syminfo.tickerid, "45",  detectOB(pSw("45"),  pDp("45")  * strictMult, pVl("45")  * strictMult, pFv("45"),  pMx("45")  / strictMult, useBody), lookahead = barmerge.lookahead_on)
+[b60T, b60B, b60Tm, b60Id, s60T, s60B, s60Tm, s60Id]         = request.security(syminfo.tickerid, "60",  detectOB(pSw("60"),  pDp("60")  * strictMult, pVl("60")  * strictMult, pFv("60"),  pMx("60")  / strictMult, useBody), lookahead = barmerge.lookahead_on)
+[b240T, b240B, b240Tm, b240Id, s240T, s240B, s240Tm, s240Id] = request.security(syminfo.tickerid, "240", detectOB(pSw("240"), pDp("240") * strictMult, pVl("240") * strictMult, pFv("240"), pMx("240") / strictMult, useBody), lookahead = barmerge.lookahead_on)
+
+// =====================================================================================
+//  POC helpers (volume profile on chart-timeframe bars)
+// =====================================================================================
+// adds bar i's volume to the profile rows it overlaps
+addToProfile(array<float> prof, int i, float lo, float step, int bins) =>
+    float v   = na(volume[i]) ? 1.0 : volume[i]
+    float rng = high[i] - low[i]
+    if rng <= 0
+        int b0 = math.max(0, math.min(bins - 1, int(math.floor((close[i] - lo) / step))))
+        prof.set(b0, prof.get(b0) + v)
+    else
+        int bFrom = math.max(0, int(math.floor((low[i] - lo) / step)))
+        int bTo   = math.min(bins - 1, int(math.floor((high[i] - lo) / step)))
+        if bFrom <= bTo
+            for b = bFrom to bTo
+                float bl = lo + b * step
+                float ov = math.min(high[i], bl + step) - math.max(low[i], bl)
+                if ov > 0
+                    prof.set(b, prof.get(b) + v * ov / rng)
+
+profilePoc(array<float> prof, float lo, float step) =>
+    float mx = prof.max()
+    mx > 0 ? lo + (prof.indexof(mx) + 0.5) * step : na
+
+// POC inside an OB zone, from chart bars whose time is in [tStart, tEnd)
+zonePoc(float top, float bot, int tStart, int tEnd) =>
+    float step = (top - bot) / pocBins
+    array<float> prof = array.new<float>(pocBins, 0.0)
+    int cnt = 0
+    int last = math.min(bar_index, MAX_BACK)
+    for i = 0 to last
+        int t = time[i]
+        if t < tStart
+            break
+        if t < tEnd and high[i] >= bot and low[i] <= top
+            cnt += 1
+            addToProfile(prof, i, bot, step, pocBins)
+    cnt >= 2 ? profilePoc(prof, bot, step) : na
+
+// POC over chart bars with offsets oNew (newest) … oOld (oldest)
+rangePoc(int oNew, int oOld) =>
+    float hi = high[oNew]
+    float lo = low[oNew]
+    for i = oNew to oOld
+        hi := math.max(hi, high[i])
+        lo := math.min(lo, low[i])
+    float res = na
+    if hi > lo
+        float step = (hi - lo) / pocBins
+        array<float> prof = array.new<float>(pocBins, 0.0)
+        for i = oNew to oOld
+            addToProfile(prof, i, lo, step, pocBins)
+        res := profilePoc(prof, lo, step)
+    res
+
+// =====================================================================================
+//  Order-block drawing & mitigation
+// =====================================================================================
+type OB
+    box   bx
+    line  poc
+    float top
+    float bot
+    bool  active
+
+var array<OB> bull5   = array.new<OB>()
+var array<OB> bear5   = array.new<OB>()
+var array<OB> bull10  = array.new<OB>()
+var array<OB> bear10  = array.new<OB>()
+var array<OB> bull15  = array.new<OB>()
+var array<OB> bear15  = array.new<OB>()
+var array<OB> bull30  = array.new<OB>()
+var array<OB> bear30  = array.new<OB>()
+var array<OB> bull45  = array.new<OB>()
+var array<OB> bear45  = array.new<OB>()
+var array<OB> bull60  = array.new<OB>()
+var array<OB> bear60  = array.new<OB>()
+var array<OB> bull240 = array.new<OB>()
+var array<OB> bear240 = array.new<OB>()
+
+tfOn(string name, string req, bool checked) =>
+    bool want = mode == "Single TF" ? singleTf == name : checked
+    want and timeframe.in_seconds(req) >= timeframe.in_seconds(timeframe.period)
+
+hasOverlap(array<OB> arr, float top, float bot) =>
+    bool res = false
+    for ob in arr
+        if ob.active and top >= ob.bot and bot <= ob.top
+            res := true
+            break
+    res
+
+deleteOB(OB ob) =>
+    ob.bx.delete()
+    if not na(ob.poc)
+        ob.poc.delete()
+
+addOB(array<OB> arr, float top, float bot, int t, bool bull, string tfName, color c, int tfMs) =>
+    box bx = box.new(t, top, time, bot, xloc = xloc.bar_time, border_color = color.new(c, 20), border_width = 1, bgcolor = color.new(c, transp), text = tfName + (bull ? " ▲" : " ▼"), text_size = size.small, text_color = color.new(c, 0), text_halign = text.align_right, text_valign = text.align_center)
+    line pLn = na
+    if showObPoc
+        float p = zonePoc(top, bot, t, t + tfMs)
+        if not na(p)
+            pLn := line.new(t, p, time, p, xloc = xloc.bar_time, color = obPocCol, style = line.style_dashed, width = 1)
+    arr.unshift(OB.new(bx, pLn, top, bot, true))
+    if arr.size() > maxPerTF
+        deleteOB(arr.pop())
+
+updateOBs(array<OB> arr, bool bull) =>
+    int n = arr.size()
+    if n > 0
+        for i = n - 1 to 0
+            OB ob = arr.get(i)
+            if ob.active
+                float src    = mitMode == "Close" ? close : bull ? low : high
+                bool  broken = bull ? src < ob.bot : src > ob.top
+                if broken and hideMit
+                    arr.remove(i)
+                    deleteOB(ob)
+                else
+                    ob.bx.set_right(time)
+                    if not na(ob.poc)
+                        ob.poc.set_x2(time)
+                    if broken
+                        ob.active := false
+                        ob.bx.set_bgcolor(color.new(mitCol, 90))
+                        ob.bx.set_border_color(color.new(mitCol, 60))
+                        ob.bx.set_text_color(color.new(mitCol, 30))
+
+processTF(bool enabled, string tfName, string req, color bullC, color bearC, array<OB> bulls, array<OB> bears, float bT, float bB, int bTm, float bId, float sT, float sB, int sTm, float sId) =>
+    int  tfMs    = timeframe.in_seconds(req) * 1000
+    bool newBull = enabled and not na(bId) and bId != nz(bId[1], -1.0) and not na(bT) and not na(bB) and not na(bTm)
+    bool newBear = enabled and not na(sId) and sId != nz(sId[1], -1.0) and not na(sT) and not na(sB) and not na(sTm)
+    if newBull and not (noOverlap and hasOverlap(bulls, bT, bB))
+        addOB(bulls, bT, bB, bTm, true, tfName, bullC, tfMs)
+        if alertsOn
+            alert("New BULLISH order block " + tfName + " | " + syminfo.ticker + " | " + str.tostring(bB, format.mintick) + " – " + str.tostring(bT, format.mintick), alert.freq_once_per_bar)
+    if newBear and not (noOverlap and hasOverlap(bears, sT, sB))
+        addOB(bears, sT, sB, sTm, false, tfName, bearC, tfMs)
+        if alertsOn
+            alert("New BEARISH order block " + tfName + " | " + syminfo.ticker + " | " + str.tostring(sB, format.mintick) + " – " + str.tostring(sT, format.mintick), alert.freq_once_per_bar)
+    updateOBs(bulls, true)
+    updateOBs(bears, false)
+
+bool en5   = tfOn("5m",  "5",   on5)
+bool en10  = tfOn("10m", "10",  on10)
+bool en15  = tfOn("15m", "15",  on15)
+bool en30  = tfOn("30m", "30",  on30)
+bool en45  = tfOn("45m", "45",  on45)
+bool en60  = tfOn("1H",  "60",  on60)
+bool en240 = tfOn("4H",  "240", on240)
+
+processTF(en5,   "5m",  "5",   bu5,   be5,   bull5,   bear5,   b5T,   b5B,   b5Tm,   b5Id,   s5T,   s5B,   s5Tm,   s5Id)
+processTF(en10,  "10m", "10",  bu10,  be10,  bull10,  bear10,  b10T,  b10B,  b10Tm,  b10Id,  s10T,  s10B,  s10Tm,  s10Id)
+processTF(en15,  "15m", "15",  bu15,  be15,  bull15,  bear15,  b15T,  b15B,  b15Tm,  b15Id,  s15T,  s15B,  s15Tm,  s15Id)
+processTF(en30,  "30m", "30",  bu30,  be30,  bull30,  bear30,  b30T,  b30B,  b30Tm,  b30Id,  s30T,  s30B,  s30Tm,  s30Id)
+processTF(en45,  "45m", "45",  bu45,  be45,  bull45,  bear45,  b45T,  b45B,  b45Tm,  b45Id,  s45T,  s45B,  s45Tm,  s45Id)
+processTF(en60,  "1H",  "60",  bu60,  be60,  bull60,  bear60,  b60T,  b60B,  b60Tm,  b60Id,  s60T,  s60B,  s60Tm,  s60Id)
+processTF(en240, "4H",  "240", bu240, be240, bull240, bear240, b240T, b240B, b240Tm, b240Id, s240T, s240B, s240Tm, s240Id)
+
+// =====================================================================================
+//  Period POC (Day / Week / 4H) — naked POCs of past periods + developing POC
+// =====================================================================================
+type PPoc
+    line  ln
+    float price
+    bool  naked
+
+var array<PPoc> perPocs     = array.new<PPoc>()
+var int         perStartBar = na
+var int         perStartT   = na
+var line        devLn       = na
+
+string perTf  = perPoc == "4H" ? "240" : perPoc == "Week" ? "W" : "D"
+bool   perOn  = perPoc != "Off"
+bool   newPer = perOn and timeframe.change(perTf)
+
+if newPer
+    if not na(perStartBar)
+        float pp = rangePoc(1, math.min(bar_index - perStartBar, MAX_BACK))
+        if not na(pp)
+            line ln = line.new(perStartT, pp, time, pp, xloc = xloc.bar_time, color = perPocCol, width = 2)
+            perPocs.unshift(PPoc.new(ln, pp, true))
+            if perPocs.size() > perKeep
+                PPoc old = perPocs.pop()
+                old.ln.delete()
+    perStartBar := bar_index
+    perStartT   := time
+
+// extend past-period POCs until price touches them
+if perPocs.size() > 0
+    for p in perPocs
+        if p.naked
+            p.ln.set_x2(time)
+            if nakedOnly and not newPer and high >= p.price and low <= p.price
+                p.naked := false
+
+// developing POC of the current period (last bar only)
+if barstate.islast and perOn and devPoc and not na(perStartBar)
+    float dp = rangePoc(0, math.min(bar_index - perStartBar, MAX_BACK))
+    if not na(devLn)
+        devLn.delete()
+    if not na(dp)
+        devLn := line.new(perStartT, dp, time, dp, xloc = xloc.bar_time, color = perPocCol, style = line.style_dotted, width = 2)
+
+// =====================================================================================
+//  Info table
+// =====================================================================================
+var table infoT = table.new(position.top_right, 3, 9, bgcolor = color.new(color.black, 75), frame_color = color.new(color.gray, 60), frame_width = 1, border_color = color.new(color.gray, 80), border_width = 1)
+
+countActive(array<OB> arr) =>
+    int c = 0
+    for ob in arr
+        if ob.active
+            c += 1
+    c
+
+fillRow(int row, string tfName, bool enabled, color bullC, color bearC, array<OB> bulls, array<OB> bears) =>
+    color dim = color.new(color.gray, 50)
+    infoT.cell(0, row, tfName, text_color = enabled ? color.white : dim, text_size = size.small)
+    infoT.cell(1, row, enabled ? str.tostring(countActive(bulls)) + " ▲" : "–", text_color = enabled ? bullC : dim, text_size = size.small)
+    infoT.cell(2, row, enabled ? str.tostring(countActive(bears)) + " ▼" : "–", text_color = enabled ? bearC : dim, text_size = size.small)
+
+if showTable and barstate.islast
+    infoT.cell(0, 0, "TF",   text_color = color.white, text_size = size.small)
+    infoT.cell(1, 0, "Bull", text_color = color.white, text_size = size.small)
+    infoT.cell(2, 0, "Bear", text_color = color.white, text_size = size.small)
+    fillRow(1, "5m",  en5,   bu5,   be5,   bull5,   bear5)
+    fillRow(2, "10m", en10,  bu10,  be10,  bull10,  bear10)
+    fillRow(3, "15m", en15,  bu15,  be15,  bull15,  bear15)
+    fillRow(4, "30m", en30,  bu30,  be30,  bull30,  bear30)
+    fillRow(5, "45m", en45,  bu45,  be45,  bull45,  bear45)
+    fillRow(6, "1H",  en60,  bu60,  be60,  bull60,  bear60)
+    fillRow(7, "4H",  en240, bu240, be240, bull240, bear240)
+    infoT.cell(0, 8, "POC", text_color = color.white, text_size = size.small)
+    infoT.cell(1, 8, perOn ? perPoc : "off", text_color = perPocCol, text_size = size.small)
+    infoT.cell(2, 8, showObPoc ? "OB ✔" : "OB –", text_color = obPocCol, text_size = size.small)
