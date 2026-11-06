@@ -35,7 +35,7 @@ color be10  = input.color(color.rgb(255, 138, 101), "", group = G_TF, inline = "
 bool  on15  = input.bool(true, "15m",   group = G_TF, inline = "15")
 color bu15  = input.color(color.rgb(76, 175, 80),   "", group = G_TF, inline = "15")
 color be15  = input.color(color.rgb(239, 83, 80),   "", group = G_TF, inline = "15")
-bool  on30  = input.bool(false, "30m",  group = G_TF, inline = "30")
+bool  on30  = input.bool(true, "30m",   group = G_TF, inline = "30")
 color bu30  = input.color(color.rgb(41, 98, 255),   "", group = G_TF, inline = "30")
 color be30  = input.color(color.rgb(236, 64, 122),  "", group = G_TF, inline = "30")
 bool  on45  = input.bool(false, "45m",  group = G_TF, inline = "45")
@@ -53,8 +53,8 @@ string G_GEN = "Order blocks"
 string zoneType   = input.string("Wick", "Zone type", options = ["Wick", "Body"], group = G_GEN)
 string mitMode    = input.string("Close", "Mitigation by", options = ["Close", "Wick"], group = G_GEN, tooltip = "اردربلاک با بسته شدن کندل یا با سایه از سمت مقابل باطل شود")
 bool   hideMit    = input.bool(true, "Hide mitigated OBs", group = G_GEN)
-int    maxPerTF   = input.int(2, "Max OBs per TF / direction", minval = 1, maxval = 10, group = G_GEN)
-float  strictMult = input.float(1.0, "Strictness ×", minval = 0.5, maxval = 3.0, step = 0.1, group = G_GEN, tooltip = "ضریب کلی سخت‌گیری فیلتر نویز (همه‌ی تایم‌ها). 1 = پیش‌فرض")
+int    maxPerTF   = input.int(3, "Max OBs per TF / direction", minval = 1, maxval = 10, group = G_GEN)
+float  strictMult = input.float(1.0, "Strictness ×", minval = 0.3, maxval = 3.0, step = 0.1, group = G_GEN, tooltip = "ضریب کلی سخت‌گیری فیلتر نویز (همه‌ی تایم‌ها). 1 = پیش‌فرض، کمتر از 1 = اردربلاک بیشتر، بیشتر از 1 = سخت‌گیرانه‌تر")
 bool   noOverlap  = input.bool(true, "Skip overlapping OBs (same TF)", group = G_GEN)
 int    transp     = input.int(85, "Zone transparency", minval = 0, maxval = 100, group = G_GEN)
 color  mitCol     = input.color(color.gray, "Mitigated color", group = G_GEN)
@@ -77,42 +77,39 @@ bool useBody = zoneType == "Body"
 // ─────────────────── Noise-filter presets (smaller TF = stricter) ───────────────────
 pSw(string tf) =>
     switch tf
-        "5"  => 10
-        "10" => 9
-        "15" => 8
-        "30" => 7
-        "45" => 6
-        "60" => 5
-        => 4
+        "5"  => 7
+        "10" => 6
+        "15" => 6
+        "30" => 5
+        "45" => 5
+        "60" => 4
+        => 3
 pDp(string tf) =>
     switch tf
-        "5"  => 2.0
-        "10" => 1.8
-        "15" => 1.6
-        "30" => 1.4
-        "45" => 1.3
-        "60" => 1.2
-        => 1.0
+        "5"  => 1.0
+        "10" => 0.9
+        "15" => 0.8
+        "30" => 0.7
+        "45" => 0.6
+        "60" => 0.5
+        => 0.5
 pVl(string tf) =>
     switch tf
-        "5"  => 1.5
-        "10" => 1.4
-        "15" => 1.3
-        "30" => 1.2
-        "45" => 1.1
-        "60" => 1.0
+        "5"  => 1.2
+        "10" => 1.1
+        "15" => 1.0
         => 0.0
 pFv(string tf) =>
-    tf == "5" or tf == "10" or tf == "15"
+    tf == "5"
 pMx(string tf) =>
     switch tf
-        "5"  => 1.5
-        "10" => 1.75
-        "15" => 2.0
-        "30" => 2.25
-        "45" => 2.5
-        "60" => 2.75
-        => 3.0
+        "5"  => 2.0
+        "10" => 2.25
+        "15" => 2.5
+        "30" => 3.0
+        "45" => 3.25
+        "60" => 3.5
+        => 4.0
 
 // =====================================================================================
 //  Order-block detection — runs inside request.security on each timeframe
