@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "artavilcrown",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-01",
+
+  // فایل‌های سایت از پوشهٔ public سرو می‌شوند.
+  // run_worker_first: هر درخواست اول از src/index.js رد می‌شود تا
+  // ریدایرکت www و هدرهای امنیتی اعمال شود.
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    "run_worker_first": true
+  },
+
+  // دامنه مستقیم به Worker وصل می‌شود. رکورد DNS را خود Cloudflare می‌سازد.
+  "routes": [
+    { "pattern": "artavilcrown.com", "custom_domain": true },
+    { "pattern": "www.artavilcrown.com", "custom_domain": true }
+  ],
+
+  "observability": { "enabled": true }
+}
