@@ -97,10 +97,34 @@ a { color: inherit; }
 
 /* Hero */
 .hero {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  min-height: min(80vh, 760px);
   background: var(--hero-bg);
   color: var(--hero-text);
   padding-block: var(--section);
+  overflow: hidden;
 }
+.hero-media,
+.hero-media img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.hero-media { z-index: -2; }
+.hero-media img { object-fit: cover; object-position: center; }
+/* تیره‌کردن سمت متن تا روی هر عکسی خوانا بماند */
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(to left, rgb(11 13 14 / 0.85) 0%, rgb(11 13 14 / 0.55) 45%, rgb(11 13 14 / 0.1) 100%);
+}
+.hero-content { width: 100%; }
 .overline {
   font-size: 0.85rem;
   font-weight: 700;
@@ -155,8 +179,28 @@ h2 { font-size: clamp(1.5rem, 1rem + 2vw, 2.25rem); line-height: 1.4; margin: 0 
 .error { min-height: 70vh; display: grid; place-items: center; text-align: center; }
 .error h1 { font-size: clamp(3rem, 2rem + 6vw, 6rem); margin: 0; color: var(--accent); }
 
-@media (max-width: 640px) {
+@media (max-width: 767px) {
   .nav { display: none; }
+  .site-header .wrap { min-height: 56px; }
+  .brand { font-size: 1.05rem; }
+  .site-header .btn { padding: 0.45rem 0.9rem; font-size: 0.9rem; }
+
+  /* موبایل: عکس عمودی تمام‌قد، متن پایین عکس */
+  .hero {
+    align-items: flex-end;
+    min-height: calc(100svh - 56px);
+    padding-block: 2.5rem;
+  }
+  .hero::after {
+    background: linear-gradient(to top, rgb(11 13 14 / 0.92) 0%, rgb(11 13 14 / 0.6) 45%, rgb(11 13 14 / 0) 75%);
+  }
+  .hero h1 { font-size: 1.9rem; margin-block-end: 0.75rem; }
+  .hero p { font-size: 1rem; margin-block-end: 1.5rem; }
+  .hero .actions { flex-direction: column; }
+  .hero .btn { text-align: center; }
+
+  .card { padding: 1.5rem; }
+  .contact dd { overflow-wrap: anywhere; }
 }
 
 @media (prefers-reduced-motion: reduce) {

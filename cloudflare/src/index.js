@@ -28,11 +28,11 @@ export default {
       response.headers.set(name, value);
     }
 
-    // فونت‌ها یک سال، تصاویر یک روز کش شوند. HTML همیشه تازه بماند.
+    // فونت‌ها یک سال، تصاویر یک ساعت کش شوند. HTML همیشه تازه بماند.
     if (/\.woff2$/i.test(url.pathname)) {
       response.headers.set('Cache-Control', 'public, max-age=31536000, immutable');
     } else if (/\.(ico|png|jpe?g|webp|avif|svg)$/i.test(url.pathname)) {
-      response.headers.set('Cache-Control', 'public, max-age=86400');
+      response.headers.set('Cache-Control', 'public, max-age=3600');
     }
 
     return response;

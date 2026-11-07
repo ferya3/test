@@ -31,7 +31,17 @@
 
   <main>
     <div class="hero">
-      <div class="wrap">
+      <!--
+        عکس هیرو — دو فایل جدا:
+          موبایل (عرض تا 767px):   public/images/hero-mobile.jpg   پیشنهاد: 1080×1920 (عمودی ۹:۱۶)
+          دسکتاپ (عرض 768px به بالا): public/images/hero-desktop.jpg  پیشنهاد: 1920×1080 (افقی ۱۶:۹)
+        فقط فایل‌ها را با همین نام جایگزین کنید. متن روی بخش پایین (موبایل) و سمت راست (دسکتاپ) عکس می‌نشیند.
+      -->
+      <picture class="hero-media">
+        <source media="(max-width: 767px)" srcset="/images/hero-mobile.jpg" width="1080" height="1920">
+        <img src="/images/hero-desktop.jpg" width="1920" height="1080" alt="" fetchpriority="high" decoding="async">
+      </picture>
+      <div class="wrap hero-content">
         <p class="overline">از سال ۱۳۷۵</p>
         <h1>ورق اچ‌پی‌ال، از پرس تا برش نهایی</h1>
         <p>تولیدکنندهٔ صفحه کابینت اچ‌پی‌ال و ورق کامپکت، با خط تولید تمام‌اتوماتیک و آزمایشگاه کنترل کیفیت داخلی.</p>
