@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Recode AI — one-shot installer for an Ubuntu server (tested target: Ubuntu 24.04 / 26.04).
+# Recode AI — one-shot installer for an Ubuntu server (written for Ubuntu 24.04 / 26.04).
 #
 #   curl -fsSL https://raw.githubusercontent.com/ferya3/test/claude/quirky-bohr-nrggpp/recode-ai/install.sh | sudo bash
 #
