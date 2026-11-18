@@ -24,8 +24,10 @@ x-backend: &backend
     RECODE_S3_BUCKET: recode
     RECODE_S3_ACCESS_KEY: ${MINIO_ROOT_USER:-recode}
     RECODE_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-recode-secret}
-    RECODE_PUBLIC_API_URL: ${PUBLIC_URL:-http://localhost}
-    RECODE_CORS_ORIGINS: '["${PUBLIC_URL:-http://localhost}"]'
+    # browser, API and previews share one origin through nginx, so the same
+    # images work on an IP address or a domain
+    RECODE_PUBLIC_API_URL: ""
+    RECODE_CORS_ORIGINS: '[]'
     # Chromium (visual QA, URL capture) runs inside this non-root container
     RECODE_CHROMIUM_NO_SANDBOX: "true"
   shm_size: 1gb  # Chromium needs more than Docker's 64 MB /dev/shm
@@ -125,7 +127,7 @@ services:
     build:
       context: ./frontend
       args:
-        NEXT_PUBLIC_API_URL: ${PUBLIC_URL:-http://localhost}
+        NEXT_PUBLIC_API_URL: ""  # same origin
     restart: unless-stopped
     depends_on: [api]
 

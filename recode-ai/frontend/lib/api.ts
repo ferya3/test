@@ -13,6 +13,7 @@ import type {
   Version,
 } from "./types";
 
+// "" = same origin (production behind nginx); local development talks to :8000
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
 const TOKEN_KEY = "recode.token";
 export const UNAUTHORIZED_EVENT = "recode:unauthorized";
@@ -172,6 +173,8 @@ export const api = {
 };
 
 export function wsUrl(projectId: string): string {
-  const base = API_URL.replace(/^http/, "ws");
+  const base = API_URL
+    ? API_URL.replace(/^http/, "ws")
+    : `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`;
   return `${base}/api/ws/projects/${projectId}?token=${encodeURIComponent(getToken() ?? "")}`;
 }

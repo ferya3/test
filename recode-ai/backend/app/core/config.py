@@ -36,6 +36,7 @@ class Settings(BaseSettings):
 
     max_upload_mb: int = 500
     cors_origins: list[str] = ["http://localhost:3000"]
+    # prefix of links the API hands out (media, previews); "" = same origin behind a proxy
     public_api_url: str = "http://localhost:8000"
 
     # --- AI model routing (one model per role, swappable) ------------------

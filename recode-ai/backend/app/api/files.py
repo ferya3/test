@@ -146,7 +146,7 @@ def serve_preview(token: str, path: str, db: Session = Depends(get_db)):
             raise HTTPException(404, "Not found")
         body = row.content.encode()
     media = "text/javascript" if path.endswith((".js", ".mjs")) else (mimetypes.guess_type(path)[0] or "text/plain")
-    ancestors = " ".join(get_settings().cors_origins) or "'none'"
+    ancestors = " ".join(["'self'", *get_settings().cors_origins])
     return Response(
         body,
         media_type=media,

@@ -55,6 +55,18 @@ Upload ─► Video Intelligence ─► UI Analysis ─► AI Architect ─► C
 
 ## Run it
 
+### On an Ubuntu server (one line)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ferya3/test/claude/quirky-bohr-nrggpp/recode-ai/install.sh | sudo bash
+```
+
+Installs Docker, fetches the code into `/opt/recode-ai`, writes `.env` with random
+secrets, builds and starts the stack, and prints the address. Run it again to update.
+Add the Claude key afterwards in `/opt/recode-ai/recode-ai/.env` (`ANTHROPIC_API_KEY=`)
+and run `docker compose up -d` there; `HTTP_PORT`, `SANDBOX_MODE` and `INSTALL_DIR` can
+be set in front of `bash`.
+
 ### Development (no Docker)
 
 Requirements: Python 3.12+, Node 22, FFmpeg.
