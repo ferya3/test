@@ -89,7 +89,10 @@ class S3Storage:
         try:
             self.client.head_bucket(Bucket=self.bucket)
         except Exception:
-            self.client.create_bucket(Bucket=self.bucket)
+            try:
+                self.client.create_bucket(Bucket=self.bucket)
+            except Exception:  # another process created it first
+                self.client.head_bucket(Bucket=self.bucket)
 
     def put(self, key: str, data: bytes, content_type: str = "application/octet-stream") -> str:
         key = _safe_key(key)

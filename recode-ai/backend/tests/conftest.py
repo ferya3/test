@@ -10,7 +10,8 @@ _TMP = tempfile.mkdtemp(prefix="recode-test-")
 os.environ.update(
     {
         "RECODE_ENV": "test",
-        "RECODE_DATABASE_URL": f"sqlite:///{_TMP}/test.db",
+        # RECODE_TEST_DATABASE_URL runs the suite against PostgreSQL (an empty database)
+        "RECODE_DATABASE_URL": os.environ.get("RECODE_TEST_DATABASE_URL") or f"sqlite:///{_TMP}/test.db",
         "RECODE_STORAGE_ROOT": f"{_TMP}/storage",
         "RECODE_AI_PROVIDER": "heuristic",
         "RECODE_TASK_MODE": "inline",

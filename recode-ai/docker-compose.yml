@@ -8,9 +8,11 @@
 # nginx (:80) -> web (Next.js) and /api -> api (FastAPI). Celery workers per queue:
 # video (FFmpeg/OpenCV), ai (pipeline), code (edits), test (visual QA).
 
+# One image for the API and every worker. Only `api` builds it; the others reuse
+# it (several services building the same tag in parallel collide).
 x-backend: &backend
-  build: ./backend
   image: recode-backend:latest
+  pull_policy: never
   restart: unless-stopped
   env_file: .env
   environment: &backend-env
@@ -94,7 +96,8 @@ services:
 
   api:
     <<: *backend
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--workers", "2"]
+    build: ./backend
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--workers", "${API_WORKERS:-2}"]
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/health"]
       interval: 10s
@@ -102,19 +105,19 @@ services:
 
   worker-video:
     <<: *backend
-    command: ["celery", "-A", "app.workers.celery_app", "worker", "-Q", "video", "-c", "2", "-n", "video@%h", "--loglevel", "INFO"]
+    command: ["celery", "-A", "app.workers.celery_app", "worker", "-Q", "video", "-c", "${VIDEO_CONCURRENCY:-1}", "--max-tasks-per-child", "50", "-n", "video@%h", "--loglevel", "INFO"]
 
   worker-ai:
     <<: *builder
-    command: ["celery", "-A", "app.workers.celery_app", "worker", "-Q", "ai", "-c", "4", "-n", "ai@%h", "--loglevel", "INFO"]
+    command: ["celery", "-A", "app.workers.celery_app", "worker", "-Q", "ai", "-c", "${AI_CONCURRENCY:-2}", "--max-tasks-per-child", "50", "-n", "ai@%h", "--loglevel", "INFO"]
 
   worker-code:
     <<: *builder
-    command: ["celery", "-A", "app.workers.celery_app", "worker", "-Q", "code", "-c", "4", "-n", "code@%h", "--loglevel", "INFO"]
+    command: ["celery", "-A", "app.workers.celery_app", "worker", "-Q", "code", "-c", "${CODE_CONCURRENCY:-1}", "--max-tasks-per-child", "50", "-n", "code@%h", "--loglevel", "INFO"]
 
   worker-test:
     <<: *builder
-    command: ["celery", "-A", "app.workers.celery_app", "worker", "-Q", "test", "-c", "2", "-n", "test@%h", "--loglevel", "INFO"]
+    command: ["celery", "-A", "app.workers.celery_app", "worker", "-Q", "test", "-c", "${TEST_CONCURRENCY:-1}", "--max-tasks-per-child", "50", "-n", "test@%h", "--loglevel", "INFO"]
 
   # Build-only: the image generated React projects are built in.
   sandbox-image:

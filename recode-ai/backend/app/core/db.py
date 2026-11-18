@@ -36,7 +36,17 @@ def get_sessionmaker() -> sessionmaker[Session]:
 def init_db() -> None:
     from app import models  # noqa: F401  (register tables)
 
-    Base.metadata.create_all(get_engine())
+    engine = get_engine()
+    if engine.dialect.name == "postgresql":
+        # the API and every worker call this at start; serialise them, or two
+        # concurrent CREATE TABLE statements collide
+        from sqlalchemy import text
+
+        with engine.begin() as conn:
+            conn.execute(text("SELECT pg_advisory_xact_lock(7245010)"))
+            Base.metadata.create_all(conn)
+    else:
+        Base.metadata.create_all(engine)
 
 
 def get_db() -> Iterator[Session]:
