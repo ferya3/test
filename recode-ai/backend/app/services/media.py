@@ -14,7 +14,7 @@ from app.models import ProjectAsset, VideoFrame
 from app.qa.render import launch_kwargs
 from app.schemas.spec import VideoAnalysis
 from app.services.context import TaskContext
-from app.video.engine import VideoIntelligenceEngine
+from app.video.engine import ENGINE_VERSION, VideoIntelligenceEngine
 
 
 def ingest_asset(ctx: TaskContext, asset_id: str) -> VideoAnalysis:
@@ -72,6 +72,7 @@ def ingest_asset(ctx: TaskContext, asset_id: str) -> VideoAnalysis:
             **(asset.meta or {}),
             "probe": analysis.meta.model_dump(),
             "analysis": analysis.model_dump(mode="json"),
+            "engine": ENGINE_VERSION,
         }
         asset.status = "analyzed"
     emit(

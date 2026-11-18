@@ -29,6 +29,10 @@ from app.video.probe import VideoError, guess_dpr, probe_video
 
 log = logging.getLogger(__name__)
 
+# Bump when the analysis of the same media changes, so stored analyses are redone instead
+# of reused (2: window chrome trimmed, pictures and OCR text extracted).
+ENGINE_VERSION = 2
+
 Progress = Callable[[float, str], None]
 
 _REASON_PRIORITY = {

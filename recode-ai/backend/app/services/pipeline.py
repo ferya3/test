@@ -32,6 +32,7 @@ from app.services import versions
 from app.services.assets import asset_files
 from app.services.context import TaskContext
 from app.services.media import ingest_asset
+from app.video.engine import ENGINE_VERSION
 
 log = logging.getLogger(__name__)
 
@@ -107,12 +108,18 @@ class Pipeline:
         ctx = self.ctx
         ctx.set_project_status("analyzing")
         ctx.progress(0.02, "ingest", "Collecting media")
+
+        def fresh(asset: ProjectAsset) -> bool:  # analysed by the current engine?
+            return asset.meta.get("engine") == ENGINE_VERSION
+
         with session_scope() as db:
             assets = db.scalars(
                 select(ProjectAsset).where(ProjectAsset.project_id == ctx.project_id).order_by(ProjectAsset.created_at)
             ).all()
             todo = [
-                (a.id, a.meta.get("analysis") if self.reuse_analysis else None) for a in assets if a.status != "failed"
+                (a.id, a.meta.get("analysis") if self.reuse_analysis and fresh(a) else None)
+                for a in assets
+                if a.status != "failed"
             ]
         analyses: list[VideoAnalysis] = []
         for n, (asset_id, cached) in enumerate(todo):
