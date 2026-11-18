@@ -87,14 +87,21 @@ say "Building images (the first build takes several minutes)"
 docker compose build
 say "Starting the stack"
 docker compose up -d --remove-orphans
+# nginx may still hold the addresses of containers this update replaced
+docker compose restart nginx >/dev/null
 
 say "Waiting for the API"
 for _ in $(seq 1 90); do
   curl -fsS "http://127.0.0.1:$HTTP_PORT/api/health" >/dev/null 2>&1 && break
   sleep 2
 done
-curl -fsS "http://127.0.0.1:$HTTP_PORT/api/health" >/dev/null 2>&1 \
-  || die "the API did not come up; inspect: cd $APP_DIR && docker compose logs api"
+if ! curl -fsS "http://127.0.0.1:$HTTP_PORT/api/health" >/dev/null 2>&1; then
+  echo
+  docker compose ps
+  echo; echo "---- api (last 40 lines)"; docker compose logs --tail=40 api
+  echo; echo "---- nginx (last 15 lines)"; docker compose logs --tail=15 nginx
+  die "the API did not come up. Send the output above; logs: cd $APP_DIR && docker compose logs api"
+fi
 
 ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
 port_suffix=""; [ "$HTTP_PORT" = "80" ] || port_suffix=":$HTTP_PORT"
