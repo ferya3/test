@@ -50,6 +50,7 @@ class PipelineState(TypedDict, total=False):
     build_error: str | None
     blocked: bool
     fix_skipped: bool
+    stalled: bool
 
 
 class Pipeline:
@@ -331,6 +332,7 @@ class Pipeline:
 
             db.get(ProjectVersion, state["version_id"]).score = report.score
         best = state.get("best") or {}
+        stalled = bool(best) and report.score < best.get("score", -1) + 0.5  # a fix round that did not help
         if not best or report.score > best.get("score", -1):
             best = {"version_id": state["version_id"], "score": report.score}
         ctx.progress(
@@ -341,7 +343,7 @@ class Pipeline:
             version_id=state["version_id"],
         )
         emit(ctx.project_id, "qa", version_id=state["version_id"], score=report.score, passed=report.passed)
-        return {"report": report.model_dump(mode="json"), "best": best}
+        return {"report": report.model_dump(mode="json"), "best": best, "stalled": stalled}
 
     def route_after_qa(self, state: PipelineState) -> str:
         report = state.get("report") or {}
@@ -349,6 +351,9 @@ class Pipeline:
             return "finalize"
         if not state.get("site_files"):
             return "finalize"  # nothing rendered: a fix loop cannot measure progress
+        if state.get("stalled"):
+            self.ctx.log("The last fix round did not improve the score; keeping the best version")
+            return "finalize"
         return "fix"
 
     def node_fix(self, state: PipelineState) -> PipelineState:
@@ -362,6 +367,9 @@ class Pipeline:
             ctx.log(f"fix: {result.notes}")
             return {"fix_skipped": True}
         files = versions.apply_changes(state["files"], result.files)
+        if files == state["files"]:
+            ctx.log(f"fix: no effective change ({result.notes[:200]})")
+            return {"fix_skipped": True}
         update: PipelineState = {"iteration": it, "files": files}
         spec_id = state.get("spec_id")
         if result.spec is not None:

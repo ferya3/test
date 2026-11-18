@@ -247,7 +247,7 @@ def get_task(task_id: str, project: Project = Depends(owned_project), db: Sessio
 def get_spec(project: Project = Depends(owned_project), db: Session = Depends(get_db)):
     record, spec = versions.latest_spec(db, project.id)
     if record is None:
-        raise HTTPException(404, "No design spec yet")
+        return None  # not generated yet (a 404 here would be expected, but noisy in the browser console)
     data = spec.model_dump(mode="json")
     for page in data["pages"]:
         page["reference_url"] = media_url(page.get("reference_key"))

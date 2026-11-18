@@ -99,11 +99,59 @@ def _columns(edges_band: np.ndarray) -> int:
     if edges_band.size == 0:
         return 1
     profile = edges_band.mean(axis=0)
-    w = len(profile)
     active = profile > max(2.0, profile.max() * 0.08)
     # close small gaps so words inside one card do not split it
-    kernel = max(3, w // 60)
+    kernel = max(3, len(profile) // 60)
     active = np.convolve(active.astype(float), np.ones(kernel), mode="same") > 0
+    return _count_blocks(active)
+
+
+def _surface_columns(band_img: np.ndarray, bg: str) -> int:
+    """Count repeated card surfaces: columns whose colour differs from the section background.
+
+    The background is interpolated per row between the left and right gutters,
+    so horizontal / diagonal gradients are not mistaken for surfaces."""
+    if band_img.size == 0:
+        return 1
+    h, w = band_img.shape[:2]
+    m = max(2, int(w * 0.02))
+    img = band_img.astype(float)
+    left = np.median(img[:, :m], axis=1)  # (h, 3)
+    right = np.median(img[:, -m:], axis=1)
+    t = np.linspace(0, 1, w)[None, :, None]
+    expected = left[:, None, :] * (1 - t) + right[:, None, :] * t
+    diff = np.linalg.norm(img - expected, axis=2) > 3
+    # Per row, the x-extents of solid runs wider than 8% of the band. Cards side
+    # by side repeat the *same* extents over many rows (their padding, the gaps
+    # between their text lines); words of a big headline change shape every row.
+    kernel = np.ones(max(3, w // 60))
+    by_count: dict[int, list[list[tuple[int, int]]]] = {}
+    for row in diff:
+        closed = np.convolve(row.astype(float), kernel, mode="same") >= len(kernel) * 0.8
+        edges = np.diff(np.concatenate([[0], closed.astype(int), [0]]))
+        starts, ends = np.flatnonzero(edges == 1), np.flatnonzero(edges == -1)
+        wide = [(int(s), int(e)) for s, e in zip(starts, ends, strict=True) if e - s > w * 0.08]
+        if len(wide) >= 2:
+            by_count.setdefault(len(wide), []).append(wide)
+    if not by_count:
+        return 1
+    n, rows = max(by_count.items(), key=lambda kv: len(kv[1]))
+    if len(rows) < max(4, h * 0.12):
+        return 1
+    starts = np.array([[s for s, _ in r] for r in rows], dtype=float)
+    ends = np.array([[e for _, e in r] for r in rows], dtype=float)
+    # the same columns on every row (allowing a few px of compression jitter)
+    for edge in (starts, ends):
+        if (np.median(np.abs(edge - np.median(edge, axis=0)), axis=0) > w * 0.03).any():
+            return 1
+    widths = np.median(ends - starts, axis=0)
+    if widths.std() / widths.mean() > 0.35:  # repeated cards have similar widths
+        return 1
+    return int(min(6, n))
+
+
+def _count_blocks(active: np.ndarray) -> int:
+    w = len(active)
     blocks, start = [], None
     for x, on in enumerate(active):
         if on and start is None:
@@ -121,6 +169,86 @@ def _columns(edges_band: np.ndarray) -> int:
     if widths.std() / widths.mean() < 0.35:
         return min(len(blocks), 6)
     return 1
+
+
+def _columns_in_band(edges_band: np.ndarray, band_img: np.ndarray | None = None, bg: str = "") -> int:
+    """Columns of the tallest content block: a section title above a row of
+    cards must not merge the cards into one column. Uses text edges and card
+    surfaces (a different background than the section)."""
+    if edges_band.size == 0:
+        return 1
+    rows = edges_band.mean(axis=1) > 2.0
+    gap = max(3, edges_band.shape[0] // 25)  # blank rows that separate blocks
+    runs, start, blank = [], None, 0
+    for y, on in enumerate(rows):
+        if on:
+            if start is None:
+                start = y
+            blank = 0
+        elif start is not None:
+            blank += 1
+            if blank > gap:
+                runs.append((start, y - blank + 1))
+                start, blank = None, 0
+    if start is not None:
+        runs.append((start, len(rows)))
+    best = _columns(edges_band)
+    if band_img is not None and bg:
+        best = max(best, _surface_columns(band_img, bg))
+    min_h = max(3, int(edges_band.shape[0] * 0.2))
+    for y0, y1 in runs:
+        if y1 - y0 >= min_h:
+            best = max(best, _columns(edges_band[y0:y1]))
+            if band_img is not None and bg:
+                best = max(best, _surface_columns(band_img[y0:y1], bg))
+    return best
+
+
+def _refine_boundary(img: np.ndarray, y_est: int, radius: int) -> int:
+    """Exact row of a background change, searched at full resolution."""
+    h, w = img.shape[:2]
+    y0, y1 = max(1, y_est - radius), min(h - 1, y_est + radius)
+    if y1 <= y0:
+        return y_est
+    margin = max(3, int(w * 0.03))
+    window = img[y0 - 1 : y1 + 1]
+    sides = np.concatenate([window[:, :margin], window[:, -margin:]], axis=1)
+    rows = np.median(sides, axis=1).astype(np.uint8).reshape(-1, 1, 3)
+    lab = cv2.cvtColor(rows, cv2.COLOR_BGR2LAB).reshape(-1, 3).astype(float)
+    jumps = np.linalg.norm(np.diff(lab, axis=0), axis=1)  # jumps[i] = change entering row y0 - 1 + i + 1
+    return int(y0 + int(np.argmax(jumps)))
+
+
+def _gradient(band_img: np.ndarray) -> str | None:
+    """A CSS linear-gradient if the band's gutters change colour across it."""
+    # skip the rows next to the band edges: video chroma subsampling bleeds the
+    # neighbouring band's colour into them
+    inset = max(1, band_img.shape[0] // 12)
+    band_img = band_img[inset:-inset]
+    h, w = band_img.shape[:2]
+    if h < 8:
+        return None
+    m, k = max(2, int(w * 0.03)), max(2, h // 6)
+
+    def color(region: np.ndarray) -> str:
+        return to_hex(np.median(region.reshape(-1, 3), axis=0))
+
+    top_left, bottom_right = color(band_img[:k, :m]), color(band_img[-k:, -m:])
+    left, right = color(band_img[:, :m]), color(band_img[:, -m:])
+    top, bottom = color(band_img[:k, :]), color(band_img[-k:, :])
+    d_h, d_v = delta_e(left, right), delta_e(top, bottom)
+    horizontal, vertical = d_h > 10, d_v > 10
+    # a diagonal gradient across a wide band changes much less vertically
+    if (horizontal and d_v > 4) or (vertical and d_h > 4):
+        return f"linear-gradient(135deg, {top_left}, {bottom_right})"
+    if horizontal:
+        return f"linear-gradient(90deg, {left}, {right})"
+    if vertical:
+        sides_top = color(np.concatenate([band_img[:k, :m], band_img[:k, -m:]], axis=1))
+        sides_bottom = color(np.concatenate([band_img[-k:, :m], band_img[-k:, -m:]], axis=1))
+        if delta_e(sides_top, sides_bottom) > 10:
+            return f"linear-gradient(180deg, {sides_top}, {sides_bottom})"
+    return None
 
 
 def bands(img: np.ndarray, min_height: int = 24, threshold: float = 14.0) -> list[Band]:
@@ -141,15 +269,16 @@ def bands(img: np.ndarray, min_height: int = 24, threshold: float = 14.0) -> lis
     min_rows = max(2, int(round(min_height / scale)))
     segments: list[list[int]] = []
     start = 0
-    ref = lab[0]
     for y in range(1, h):
+        # compare with the rows just above (not the start of the band), so a
+        # gradient background drifting slowly is one band and only edges split
+        ref = np.median(lab[max(start, y - 6) : y], axis=0)
         if np.linalg.norm(lab[y] - ref) > threshold:
             # require the change to persist (ignore thin lines / text)
             end = min(h, y + max(2, min_rows // 3))
             if np.all(np.linalg.norm(lab[y:end] - lab[y], axis=1) < threshold):
                 segments.append([start, y])
                 start = y
-                ref = lab[y]
     segments.append([start, h])
 
     # merge segments that are too short into the previous one
@@ -162,6 +291,11 @@ def bands(img: np.ndarray, min_height: int = 24, threshold: float = 14.0) -> lis
     if len(merged) > 1 and (merged[0][1] - merged[0][0]) < min_rows:
         merged[1][0] = merged[0][0]
         merged.pop(0)
+
+    # boundaries were found on a thumbnail; place them exactly on the full image
+    radius = int(np.ceil(scale * 2))
+    exact = {y: _refine_boundary(img, int(round(y * scale)), radius) for _, y in merged[:-1]}
+    exact[0], exact[h] = 0, img.shape[0]
 
     out: list[Band] = []
     for y0, y1 in merged:
@@ -180,11 +314,12 @@ def bands(img: np.ndarray, min_height: int = 24, threshold: float = 14.0) -> lis
                 text_color = to_hex(np.median(far, axis=0))
         out.append(
             Band(
-                y0=int(round(y0 * scale)),
-                y1=int(round(y1 * scale)),
+                y0=exact.get(y0, int(round(y0 * scale))),
+                y1=exact.get(y1, int(round(y1 * scale))),
                 bg=bg,
+                gradient=_gradient(band_img),
                 text_color=text_color,
-                columns=_columns(band_edges),
+                columns=_columns_in_band(band_edges, band_img, bg),
                 density=round(float(band_edges.mean() / 255), 4),
             )
         )

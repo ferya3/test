@@ -76,6 +76,7 @@ class Band(Loose):
     y0: int
     y1: int
     bg: str
+    gradient: str | None = None  # CSS linear-gradient(...) when the background is not flat
     text_color: str = "#111111"
     columns: int = 1
     density: float = 0.0
@@ -118,6 +119,7 @@ class Region(Loose):
     type: str = "section"  # header | nav | hero | section | card-grid | features | cta | footer | gallery | form
     bbox: list[float]  # x, y, w, h in reference-image px
     background: str = "#ffffff"
+    background_image: str | None = None  # e.g. a CSS linear-gradient(...)
     text_color: str = "#111111"
     columns: int = 1
     elements: list[Element] = Field(default_factory=list)
@@ -213,6 +215,7 @@ class SectionSpec(Loose):
     columns: int = 1
     height_px: int | None = None  # observed height in CSS px
     background: str | None = None
+    background_image: str | None = None
     text_color: str | None = None
     padding_y: int = 64
     sticky: bool = False

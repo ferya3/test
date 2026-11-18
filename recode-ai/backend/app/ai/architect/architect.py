@@ -44,6 +44,12 @@ _COMPONENT = {
 _RTL = re.compile(r"[֐-ࣿ]")
 
 
+def _layout(kind: str, columns: int) -> str:
+    if kind in ("header", "nav", "footer"):
+        return "row"  # side-by-side groups, not a grid of cards
+    return "grid" if columns > 1 else "stack"
+
+
 def _tokens(ui: UIAnalysis) -> DesignTokens:
     tokens = DesignTokens()
     palette = [c for p in ui.pages for c in p.palette]
@@ -95,10 +101,11 @@ def heuristic_spec(
                     id=region.id,
                     kind=kind,
                     component=component,
-                    layout="grid" if region.columns > 1 else ("row" if kind == "header" else "stack"),
+                    layout=_layout(kind, region.columns),
                     columns=max(1, region.columns),
                     height_px=h,
                     background=region.background,
+                    background_image=region.background_image,
                     text_color=region.text_color,
                     padding_y=0 if kind == "header" else max(24, min(96, h // 8)),
                     sticky=False,

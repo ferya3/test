@@ -104,7 +104,7 @@ def interaction_hint(bbox: list[float]) -> str:
         return "side-drawer"
     if x > 0.55 and w < 0.45 and h > 0.5:
         return "side-drawer"
-    if area < 0.03:
+    if area < 0.08:  # a single card / button changing state
         return "hover-or-click-feedback"
     if w > 0.8 and 0.15 < h < 0.6:
         return "carousel-or-slider"

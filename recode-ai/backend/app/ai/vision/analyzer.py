@@ -94,6 +94,7 @@ def heuristic_page(page_id: str, reference_key: str, img, viewport_h: int, route
                 type=kind,
                 bbox=[0, band.y0, w, band.y1 - band.y0],
                 background=band.bg,
+                background_image=band.gradient,
                 text_color=band.text_color,
                 columns=band.columns,
                 elements=elements,

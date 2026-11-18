@@ -70,9 +70,15 @@ class VideoIntelligenceEngine:
         pairs = [compare_frames(samples[i].gray, samples[i + 1].gray) for i in range(len(samples) - 1)]
         scale_to_video = meta.width / samples[0].gray.shape[1]
         events, scenes, positions = self._timeline(samples, pairs, scale_to_video)
-        progress(0.6, f"Detected {len(events)} events across {max(scenes) + 1} scene(s)")
+        valid = self._valid_scenes(samples, scenes)
+        events = [e for e in events if self._event_in_valid_scene(e, samples, scenes, valid)]
+        progress(0.6, f"Detected {len(events)} events across {len(valid)} scene(s)")
 
-        keyframe_samples = self._select_keyframes(samples, pairs, events, scenes)
+        keyframe_samples = {
+            n: reasons
+            for n, reasons in self._select_keyframes(samples, pairs, events, scenes).items()
+            if scenes[n] in valid
+        }
         dpr = guess_dpr(meta.width, meta.height)
         analysis = VideoAnalysis(
             meta=meta,
@@ -81,7 +87,7 @@ class VideoIntelligenceEngine:
             sample_fps=round(meta.fps / max(1, self._step(meta)), 3),
             events=events,
         )
-        self._materialize(path, meta, samples, keyframe_samples, scenes, positions, analysis, key_prefix)
+        self._materialize(path, meta, samples, keyframe_samples, scenes, positions, analysis, key_prefix, valid)
         progress(0.95, f"Saved {len(analysis.keyframes)} keyframes and {len(analysis.pages)} page image(s)")
         return analysis
 
@@ -141,25 +147,67 @@ class VideoIntelligenceEngine:
         fps = meta.fps or 30.0
         width = self.settings.analysis_width
         samples: list[Sample] = []
+        # frames between two samples are kept (small, grayscale) until the next
+        # sample: if the two samples look like a scene cut, a fast scroll may have
+        # jumped further than a viewport between them, and the in-between frames
+        # (already decoded by grab()) let the timeline follow it.
+        between: list[Sample] = []
         index = 0
         total = max(1, meta.frame_count)
         try:
             while True:
                 if not cap.grab():
                     break
-                if index % step == 0:
+                if index % step == 0 or step > 1:
                     ok, frame = cap.retrieve()
                     if not ok:
                         break
                     small = imaging.resize_to_width(frame, width)
-                    gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY).astype(np.float32)
-                    samples.append(Sample(index=index, t=round(index / fps, 3), gray=gray))
-                    if len(samples) % 25 == 0:
-                        progress(0.05 + 0.4 * min(1.0, index / total), f"Reading frame {index}/{total}")
+                    current = Sample(
+                        index=index,
+                        t=round(index / fps, 3),
+                        gray=cv2.cvtColor(small, cv2.COLOR_BGR2GRAY).astype(np.float32),
+                    )
+                    if index % step == 0:
+                        if samples and between and compare_frames(samples[-1].gray, current.gray).kind == "cut":
+                            samples.extend(between)  # densify across the jump
+                        samples.append(current)
+                        between = []
+                        if len(samples) % 25 == 0:
+                            progress(0.05 + 0.4 * min(1.0, index / total), f"Reading frame {index}/{total}")
+                    else:
+                        between.append(current)
                 index += 1
         finally:
             cap.release()
         return samples
+
+    # ----------------------------------------------------------------- scenes
+
+    @staticmethod
+    def _valid_scenes(samples: list[Sample], scenes: list[int]) -> set[int]:
+        """Drop transitional scenes: blank frames (page still loading) and
+        flashes shorter than half a second between real scenes."""
+        members: dict[int, list[int]] = {}
+        for n, s in enumerate(scenes):
+            members.setdefault(s, []).append(n)
+        valid = set()
+        for scene, ns in members.items():
+            blank = all(float(samples[n].gray.std()) < 6.0 for n in ns)
+            flash = (samples[ns[-1]].t - samples[ns[0]].t) < 0.5 and len(members) > 1
+            if not blank and not flash:
+                valid.add(scene)
+        return valid or set(members)
+
+    @staticmethod
+    def _event_in_valid_scene(event: TimelineEvent, samples: list[Sample], scenes: list[int], valid: set[int]) -> bool:
+        position = {s.index: n for n, s in enumerate(samples)}
+        n = position.get(event.frames[0])
+        if n is None:
+            return False
+        if event.kind == "cut":  # frames[0] is the first frame after the cut
+            return n > 0 and scenes[n] in valid and scenes[n - 1] in valid
+        return scenes[n] in valid
 
     # ----------------------------------------------------------------- timeline
 
@@ -299,13 +347,14 @@ class VideoIntelligenceEngine:
         positions: list[float],
         analysis: VideoAnalysis,
         key_prefix: str,
+        valid: set[int],
     ) -> None:
         analysis_w = samples[0].gray.shape[1]
         stitch_w = min(meta.width, self.settings.stitch_max_width)
         stitch_scale = stitch_w / analysis_w
 
         # which scenes scroll far enough to deserve a stitched full page
-        scene_ids = sorted(set(scenes))
+        scene_ids = sorted(set(scenes) & valid)
         scene_samples = {s: [n for n in range(len(samples)) if scenes[n] == s] for s in scene_ids}
         stitch_scenes: dict[int, dict] = {}
         small_h = samples[0].gray.shape[0]

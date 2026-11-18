@@ -57,3 +57,36 @@ def test_image_asset(tmpdir_session):
     analysis = VideoIntelligenceEngine(get_settings(), get_storage()).analyze_image(path, "t/image")
     assert analysis.pages[0].height == PAGE_H
     assert analysis.viewport["width"] == 1280
+
+
+def test_blank_lead_and_fast_jump(tmpdir_session):
+    """Real browser recordings start blank and can scroll further than a viewport
+    between two samples; neither may split the page into fake scenes."""
+    from tests.synthetic import make_recording
+
+    path = f"{tmpdir_session}/jumpy.mp4"
+    make_recording(path, blank_lead=True, jump_end=True)
+    analysis = VideoIntelligenceEngine(get_settings(), get_storage()).analyze_video(path, "t/jumpy")
+    assert not [e for e in analysis.events if e.kind == "cut"]
+    scrolls = [e for e in analysis.events if e.kind == "scroll"]
+    assert len(scrolls) == 2
+    assert abs(scrolls[1].distance_px - 680) < 30
+    assert len(analysis.pages) == 1
+    assert abs(analysis.pages[0].height - PAGE_H) < 40
+    assert all(k.t > 0.05 for k in analysis.keyframes)  # no keyframe of the blank lead
+
+
+def test_bands_on_a_real_browser_recording():
+    """Stitched page from a real Chromium screen recording of scripts/demo/site.html:
+    diagonal-gradient hero, low-contrast cards of unequal height, two-sided footer."""
+    import os
+
+    img = cv2.imread(os.path.join(os.path.dirname(__file__), "fixtures", "northwind-page.png"))
+    measured = imaging.bands(img)
+    heights = [b.y1 - b.y0 for b in measured]
+    assert len(measured) == 6
+    assert abs(heights[0] - 72) <= 2  # header: 72px in the CSS
+    assert abs(heights[1] - 560) <= 3  # hero gradient stays one band
+    assert [b.columns for b in measured[1:5]] == [1, 3, 1, 2]  # hero, features, cta, testimonials
+    assert measured[1].gradient and measured[1].gradient.startswith("linear-gradient(135deg")
+    assert [b.gradient for b in measured if b is not measured[1]] == [None] * 5

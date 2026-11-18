@@ -106,6 +106,7 @@ def run_edit(ctx: TaskContext, message_id: str) -> dict[str, Any]:
     result = EditAgent(ctx.router).run(spec, files, instruction, history)
     new_version_id = None
     score = None
+    result.files = {p: c for p, c in result.files.items() if files.get(p) != c or (c == "" and p in files)}
     if result.files:
         merged = versions.apply_changes(files, result.files)
         scan = scan_files(merged)

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Northwind — demo site for Recode AI</title>
+<style>
+  :root { --ink: #0f172a; --brand: #6d28d9; --soft: #f5f3ff; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); }
+  header { position: sticky; top: 0; z-index: 10; height: 72px; background: #0f172a; color: #fff; display: flex; align-items: center; padding: 0 48px; }
+  header .logo { font-weight: 800; font-size: 20px; letter-spacing: -.02em; }
+  header nav { margin-left: auto; display: flex; gap: 32px; }
+  header nav a { color: #cbd5e1; text-decoration: none; }
+  header button { margin-left: 32px; background: none; border: 0; color: #fff; font-size: 24px; cursor: pointer; }
+  .panel { position: absolute; top: 72px; right: 24px; width: 260px; background: #fff; color: var(--ink); border-radius: 0 0 12px 12px; box-shadow: 0 12px 32px rgba(0,0,0,.18);
+    padding: 16px; transform-origin: top; transform: scaleY(0); opacity: 0; transition: transform .3s ease-out, opacity .3s ease-out; }
+  .panel.open { transform: scaleY(1); opacity: 1; }
+  .panel a { display: block; padding: 10px 8px; color: inherit; text-decoration: none; border-radius: 8px; }
+  .hero { min-height: 560px; background: linear-gradient(135deg, #4c1d95, #6d28d9); color: #fff; display: flex; flex-direction: column; justify-content: center; padding: 0 96px; }
+  .hero h1 { font-size: 60px; line-height: 1.05; margin: 0 0 20px; max-width: 760px; letter-spacing: -.03em; }
+  .hero p { font-size: 20px; max-width: 560px; opacity: .9; margin: 0 0 32px; }
+  .btn { display: inline-block; background: #fbbf24; color: #1f2937; padding: 14px 28px; border-radius: 10px; font-weight: 700; text-decoration: none; width: fit-content; }
+  .features { padding: 96px; background: #fff; }
+  .features h2, .quotes h2 { font-size: 38px; margin: 0 0 40px; letter-spacing: -.02em; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+  .card { background: var(--soft); border-radius: 16px; padding: 28px; transition: transform .2s; }
+  .card:hover { transform: translateY(-4px); }
+  .card i { display: block; width: 48px; height: 48px; border-radius: 12px; background: var(--brand); margin-bottom: 18px; }
+  .card h3 { margin: 0 0 8px; font-size: 21px; }
+  .cta { background: #fbbf24; padding: 80px 96px; text-align: center; }
+  .cta h2 { font-size: 40px; margin: 0 0 12px; }
+  .quotes { background: #f8fafc; padding: 96px; }
+  .quotes .grid { grid-template-columns: repeat(2, 1fr); }
+  .quotes blockquote { margin: 0; background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 28px; font-size: 18px; }
+  footer { background: #0f172a; color: #94a3b8; padding: 56px 96px; display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Northwind</div>
+  <nav><a href="#">Product</a><a href="#">Pricing</a><a href="#">Customers</a><a href="#">Docs</a></nav>
+  <button id="toggle" aria-label="Menu">☰</button>
+  <div class="panel" id="panel"><a href="#">Dashboard</a><a href="#">Settings</a><a href="#">Team</a><a href="#">Sign out</a></div>
+</header>
+<section class="hero">
+  <h1>Ship analytics your whole team understands</h1>
+  <p>Northwind turns raw product events into dashboards anyone can read, in minutes instead of sprints.</p>
+  <a class="btn" href="#">Start free trial</a>
+</section>
+<section class="features">
+  <h2>Everything in one place</h2>
+  <div class="grid">
+    <div class="card"><i></i><h3>Live dashboards</h3><p>Metrics refresh every second, without a single SQL query.</p></div>
+    <div class="card"><i></i><h3>Smart alerts</h3><p>Get told when something changes, not when someone notices.</p></div>
+    <div class="card"><i></i><h3>Shared notebooks</h3><p>Explain every number next to the chart that shows it.</p></div>
+  </div>
+</section>
+<section class="cta"><h2>Ready to see your data clearly?</h2><p>Free for 14 days. No credit card.</p></section>
+<section class="quotes">
+  <h2>Teams love Northwind</h2>
+  <div class="grid">
+    <blockquote>“We replaced three tools and our weekly review now takes ten minutes.” — Sara, Head of Product</blockquote>
+    <blockquote>“The first analytics product our designers actually open.” — Omid, CTO</blockquote>
+  </div>
+</section>
+<footer><span>© 2026 Northwind Labs</span><span>Privacy · Terms · Status</span></footer>
+<script>
+  const t = document.getElementById('toggle'), p = document.getElementById('panel');
+  t.addEventListener('click', () => p.classList.toggle('open'));
+</script>
+</body>
+</html>

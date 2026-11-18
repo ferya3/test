@@ -147,8 +147,9 @@ def section_markup(spec: DesignSpec, s: SectionSpec) -> str:
     anim = ' data-animate="true"' if animate else ""
     body = "".join(_element(e) for e in s.elements)
     tag = "footer" if s.kind == "footer" else "section"
-    inner = f'<div class="section-content"{anim}>{body}</div>' if body else ""
-    if s.layout == "grid" or s.items:
+    row = " section-content--row" if s.layout == "row" else ""
+    inner = f'<div class="section-content{row}"{anim}>{body}</div>' if body else ""
+    if s.layout == "grid" or (s.items and s.layout != "row"):
         inner += _items(s, animate)
     if s.kind == "hero" and not any(e.kind in ("image", "video") for e in s.elements) and s.layout == "split":
         inner = f'<div class="split"><div>{inner}</div><div class="media media--hero" aria-hidden="true"></div></div>'
@@ -212,6 +213,8 @@ p { margin: 0 0 var(--space-md); max-width: 70ch; }
 .section { position: relative; display: flex; flex-direction: column; justify-content: center; }
 .section-content { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-sm); }
 .section--hero .section-content, .section--cta .section-content { gap: var(--space-md); }
+.section-content--row { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-md); }
+.section-content--row > p { margin: 0; }
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; padding: .8rem 1.6rem;
   border-radius: var(--radius-md); background: var(--color-primary); color: var(--color-on-primary);
   font-weight: 600; text-decoration: none; border: 0; cursor: pointer; transition: transform .2s ease, box-shadow .2s ease; }
@@ -280,7 +283,9 @@ p { margin: 0 0 var(--space-md); max-width: 70ch; }
     for page in spec.pages:
         for s in page.sections:
             rules = []
-            if s.background:
+            if s.background_image:
+                rules.append(f"background: {s.background_image};")
+            elif s.background:
                 rules.append(f"background: {s.background};")
             color = s.text_color or (contrast_text(s.background) if s.background else None)
             if color:

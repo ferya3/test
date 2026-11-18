@@ -53,8 +53,14 @@ def make_site_image(seed: int = 3) -> np.ndarray:
     return img
 
 
-def make_recording(path: str, fps: int = 30, width: int = 1280, height: int = 720) -> dict:
-    """Top (1s) -> scroll to 1200px (2.5s) -> pause -> menu opens -> scroll to bottom."""
+def make_recording(
+    path: str, fps: int = 30, width: int = 1280, height: int = 720, blank_lead: bool = False, jump_end: bool = False
+) -> dict:
+    """Top (1s) -> scroll to 1200px (2.5s) -> pause -> menu opens -> scroll to bottom.
+
+    blank_lead: start with a few white frames, like a browser recording before first paint.
+    jump_end:   the last scroll moves ~300px per frame, more than a viewport between two
+                5 fps samples (anchor-link style jumps)."""
     page = make_site_image()
     header = page[0:80].copy()
     max_scroll = PAGE_H - height
@@ -74,6 +80,9 @@ def make_recording(path: str, fps: int = 30, width: int = 1280, height: int = 72
     def ease(t: float) -> float:
         return t * t * (3 - 2 * t)
 
+    if blank_lead:
+        for _ in range(3):
+            frames.append(np.full((height, width, 3), 255, np.uint8))
     for _ in range(fps):  # 1s at top
         frames.append(frame_at(0))
     n = int(2.5 * fps)
@@ -88,9 +97,13 @@ def make_recording(path: str, fps: int = 30, width: int = 1280, height: int = 72
         frames.append(frame_at(1200, 1.0))
     for _ in range(int(0.2 * fps)):  # menu closes instantly, short pause
         frames.append(frame_at(1200))
-    n = int(1.5 * fps)
+    n = 3 if jump_end else int(1.5 * fps)
     for i in range(n):  # scroll to bottom
-        frames.append(frame_at(1200 + int((max_scroll - 1200) * ease((i + 1) / n))))
+        frames.append(
+            frame_at(
+                1200 + int((max_scroll - 1200) * (i + 1) / n if jump_end else (max_scroll - 1200) * ease((i + 1) / n))
+            )
+        )
     for _ in range(int(0.5 * fps)):
         frames.append(frame_at(max_scroll))
     for f in frames:
