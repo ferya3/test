@@ -8,7 +8,7 @@
 | API | FastAPI (Python 3.13), Pydantic 2, SQLAlchemy 2 |
 | Database | PostgreSQL (JSONB columns); SQLite in development and tests |
 | Queue / realtime | Celery on Redis; Redis pub/sub → WebSocket |
-| Storage | S3 / MinIO; local filesystem in development |
+| Storage | shared Docker volume (single host); S3 / MinIO for several hosts |
 | Video | FFmpeg / FFprobe, OpenCV |
 | Browser | Playwright (Chromium) |
 | Orchestration | LangGraph state machine |

@@ -97,7 +97,7 @@ docker compose build
 docker compose up -d            # http://localhost
 ```
 
-PostgreSQL, Redis, MinIO, the API, one Celery worker per queue (`video`, `ai`, `code`,
+PostgreSQL, Redis, the API, one Celery worker per queue (`video`, `ai`, `code`,
 `test`), the Next.js app and nginx. React (Vite) projects are built through the host's
 Docker socket — read [Security](docs/ARCHITECTURE.md#security) before exposing it.
 

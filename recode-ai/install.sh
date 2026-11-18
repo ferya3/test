@@ -74,7 +74,6 @@ if [ ! -f .env ]; then
   cp .env.example .env
   set_env RECODE_SECRET_KEY "$(openssl rand -hex 32)"
   set_env POSTGRES_PASSWORD "$(openssl rand -hex 16)"
-  set_env MINIO_ROOT_PASSWORD "$(openssl rand -hex 16)"
   chmod 600 .env
 else
   say "Keeping the existing .env"
