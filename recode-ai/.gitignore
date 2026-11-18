@@ -1,0 +1,16 @@
+# python
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.venv/
+backend/data/
+# node
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/next-env.d.ts
+*.tsbuildinfo
+# env
+.env
+.env.local
