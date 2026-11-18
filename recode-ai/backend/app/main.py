@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, chat, files, meta, projects, realtime
+from app.api import account, auth, chat, files, meta, projects, realtime
 from app.core.config import get_settings
 from app.core.db import init_db
 
@@ -32,7 +32,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
         expose_headers=["Content-Disposition"],
     )
-    for module in (meta, auth, projects, files, chat, realtime):
+    for module in (meta, auth, account, projects, files, chat, realtime):
         app.include_router(module.router)
     return app
 

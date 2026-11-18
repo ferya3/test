@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     # fallback that needs no key (used by tests and for demos without a key).
     ai_provider: Literal["anthropic", "heuristic"] = "anthropic"
     allow_offline_fallback: bool = True
+    # users without a key of their own may use the server's ANTHROPIC_API_KEY (if set);
+    # false makes every user bring their own key
+    allow_server_key: bool = True
+    # OpenAI-compatible endpoints on private / local addresses (Ollama on the same machine);
+    # off by default: a user-supplied URL must not reach the server's internal network
+    allow_private_llm_urls: bool = False
     model_vision: str = "claude-opus-5-5"
     model_reasoning: str = "claude-opus-5-5"
     model_coding: str = "claude-opus-5-5"

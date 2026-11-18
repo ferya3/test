@@ -33,7 +33,7 @@ class UserOut(ORM):
 
 
 class RoleModel(BaseModel):
-    provider: Literal["anthropic", "heuristic"] | None = None
+    provider: Literal["anthropic", "openai", "heuristic"] | None = None
     model: str | None = None
     effort: Literal["low", "medium", "high", "xhigh", "max"] | None = None
 

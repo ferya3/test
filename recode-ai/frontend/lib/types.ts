@@ -12,8 +12,31 @@ export type Framework = "html" | "react-vite";
 export type Role = "vision" | "reasoning" | "coding" | "qa";
 export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 
+export type ProviderId = "anthropic" | "openai";
+
+export interface ProviderCredential {
+  provider: ProviderId;
+  configured: boolean;
+  key_hint: string | null;
+  base_url: string | null;
+  model: string | null;
+  last_check: { ok?: boolean; message?: string; at?: string };
+  updated_at: string | null;
+}
+
+export interface ProviderTest {
+  ok: boolean;
+  message: string;
+  models: string[];
+}
+
+export interface AccountSettings {
+  preferred_provider?: ProviderId | null;
+  models?: Partial<Record<Role, RoleModel>>;
+}
+
 export interface RoleModel {
-  provider?: "anthropic" | "heuristic" | null;
+  provider?: "anthropic" | "openai" | "heuristic" | null;
   model?: string | null;
   effort?: Effort | null;
 }
@@ -264,7 +287,9 @@ export interface Usage {
 
 export interface Meta {
   roles: Record<Role, { provider: string; model: string; effort: string | null; offline: boolean }>;
-  providers: Record<string, { available: boolean; models: string[] }>;
+  providers: Record<string, { available: boolean; own_key?: boolean; models: string[] }>;
+  preferred_provider: ProviderId | null;
+  server_key_allowed: boolean;
   efforts: Effort[];
   frameworks: Framework[];
   sandbox: { mode: string; available: boolean };

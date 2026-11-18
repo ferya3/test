@@ -3,6 +3,7 @@
 import { CheckCircle2, Cpu, ShieldCheck, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { ApiKeys } from "@/components/settings/api-keys";
 import { Badge, Card, Spinner } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { Meta, Role } from "@/lib/types";
@@ -17,8 +18,9 @@ export default function SettingsPage() {
 
 function SystemSettings() {
   const [meta, setMeta] = useState<Meta | null>(null);
+  const loadMeta = () => api.meta().then(setMeta).catch(() => undefined);
   useEffect(() => {
-    api.meta().then(setMeta).catch(() => undefined);
+    void loadMeta();
   }, []);
   if (!meta)
     return (
@@ -33,14 +35,17 @@ function SystemSettings() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
         <p className="text-sm text-muted">
-          Server defaults. Each project can override models, QA target and fix rounds in its own Settings tab.
+          Your API keys and the models your projects use. Each project can override models, QA target and fix
+          rounds in its own Settings tab.
         </p>
       </div>
+
+      <ApiKeys onChanged={loadMeta} />
 
       <Card className="p-5">
         <div className="mb-4 flex items-center gap-2">
           <Cpu className="size-4 text-accent" />
-          <p className="font-medium">Model routing</p>
+          <p className="font-medium">Model routing for your projects</p>
         </div>
         <table className="w-full text-left text-sm">
           <thead className="text-xs text-faint">
@@ -59,7 +64,7 @@ function SystemSettings() {
                   {cfg.offline ? <Badge tone="warn">offline</Badge> : <Badge tone="good">{cfg.provider}</Badge>}
                 </td>
                 <td className="py-2 font-mono text-xs text-muted">{cfg.offline ? "computer vision" : cfg.model}</td>
-                <td className="py-2 text-muted">{cfg.effort ?? "—"}</td>
+                <td className="py-2 text-muted">{cfg.provider === "anthropic" && !cfg.offline ? (cfg.effort ?? "—") : "—"}</td>
               </tr>
             ))}
           </tbody>
@@ -67,8 +72,11 @@ function SystemSettings() {
         <ul className="mt-4 space-y-1.5 text-sm">
           {Object.entries(meta.providers).map(([name, p]) => (
             <li key={name} className="flex items-center gap-2">
-              {ok(p.available)} <span className="capitalize">{name}</span>
-              <span className="text-xs text-faint">{p.available ? "available" : "no credentials on the server"}</span>
+              {ok(p.available)}{" "}
+              <span>{name === "openai" ? "OpenAI-compatible" : name === "heuristic" ? "Offline (computer vision)" : "Anthropic"}</span>
+              <span className="text-xs text-faint">
+                {name === "heuristic" ? "always available" : p.own_key ? "your key" : p.available ? "server key" : "not configured"}
+              </span>
             </li>
           ))}
         </ul>

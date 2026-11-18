@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Code2, Download, Eye, Files, Film, History, Microscope, Play, RotateCw, ScanSearch, Settings2, Sparkles, Wifi, WifiOff } from "lucide-react";
+import { ArrowLeft, Code2, KeyRound, Download, Eye, Files, Film, History, Microscope, Play, RotateCw, ScanSearch, Settings2, Sparkles, Wifi, WifiOff } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Empty, ScoreBadge, Spinner, StatusBadge, Tabs } from "@/components/ui";
@@ -42,6 +42,14 @@ export function Workspace({ projectId }: { projectId: string }) {
   const [starting, setStarting] = useState(false);
   const [qaRunning, setQaRunning] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [offline, setOffline] = useState(false);
+
+  useEffect(() => {
+    api
+      .meta()
+      .then((m) => setOffline(Object.values(m.roles).every((r) => r.offline)))
+      .catch(() => undefined);
+  }, []);
 
   const versionId = pinnedVersion ?? project?.current_version_id ?? null;
 
@@ -371,6 +379,21 @@ export function Workspace({ projectId }: { projectId: string }) {
           {project.current_version_id ? "Regenerate" : "Generate"}
         </Button>
       </header>
+
+      {offline && (
+        <div className="flex items-center gap-3 border-b border-warn/30 bg-warn/10 px-4 py-2 text-sm">
+          <KeyRound className="size-4 text-warn" />
+          <span className="text-fg">
+            Offline mode: layout, pictures and text are measured from your media, but no AI model is used.
+          </span>
+          <Link href="/settings" className="ml-auto shrink-0 font-medium text-warn underline-offset-4 hover:underline">
+            Add your API key
+          </Link>
+          <button onClick={() => setOffline(false)} aria-label="Dismiss" className="text-muted hover:text-fg">
+            ×
+          </button>
+        </div>
+      )}
 
       {!project.current_version_id && !activeTask && hasMedia && project.status !== "failed" && (
         <div className="flex items-center gap-3 border-b border-accent/30 bg-accent/10 px-4 py-2 text-sm">

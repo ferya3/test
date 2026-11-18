@@ -544,7 +544,10 @@ export function SettingsPanel({ project, onSaved }: { project: Project; onSaved:
   const [framework, setFramework] = useState(project.framework);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
-  const models = useMemo(() => meta?.providers.anthropic.models ?? [], [meta]);
+  const models = useMemo(
+    () => [...(meta?.providers.anthropic.models ?? []), ...(meta?.providers.openai?.models ?? [])],
+    [meta],
+  );
 
   useEffect(() => {
     api.meta().then(setMeta).catch(() => undefined);
@@ -586,16 +589,15 @@ export function SettingsPanel({ project, onSaved }: { project: Project; onSaved:
                 <Select value={current.provider ?? ""} onChange={(e) => setRole(role, { provider: (e.target.value || null) as never })}>
                   <option value="">Provider: {fallback?.provider ?? "default"}</option>
                   <option value="anthropic">Anthropic (Claude)</option>
+                  <option value="openai">OpenAI-compatible (your key)</option>
                   <option value="heuristic">Offline (computer vision)</option>
                 </Select>
-                <Select value={current.model ?? ""} onChange={(e) => setRole(role, { model: e.target.value || null })}>
-                  <option value="">Model: {fallback?.model ?? "default"}</option>
-                  {models.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </Select>
+                <Input
+                  list="recode-models"
+                  value={current.model ?? ""}
+                  placeholder={`Model: ${fallback?.model || "default"}`}
+                  onChange={(e) => setRole(role, { model: e.target.value || null })}
+                />
                 <Select value={current.effort ?? ""} onChange={(e) => setRole(role, { effort: (e.target.value || null) as Effort | null })}>
                   <option value="">Effort: {fallback?.effort ?? "default"}</option>
                   {(meta?.efforts ?? []).map((m) => (
@@ -608,10 +610,19 @@ export function SettingsPanel({ project, onSaved }: { project: Project; onSaved:
             );
           })}
         </div>
-        {meta && !meta.providers.anthropic.available && (
+        <datalist id="recode-models">
+          {models.map((m) => (
+            <option key={m} value={m} />
+          ))}
+        </datalist>
+        {meta && Object.values(meta.roles).every((r) => r.offline) && (
           <p className="mt-4 rounded-lg bg-warn/10 px-3 py-2 text-xs text-warn">
-            No Anthropic credentials on the server: every role runs in offline mode (layout, colours and behaviours are
-            measured; texts and fonts are placeholders).
+            No API key: every role runs in offline mode (layout, pictures, colours and OCR text are measured; fonts
+            and widget logic are not understood).{" "}
+            <a href="/settings" className="underline">
+              Add your key in Settings
+            </a>
+            .
           </p>
         )}
       </Card>

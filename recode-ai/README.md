@@ -115,6 +115,19 @@ Upload `northwind.webm` as a new project and press **Generate**.
 
 ## Models
 
+**Every user brings their own key.** In *Settings → Your API keys* a user adds:
+
+- an **Anthropic** key (optionally through an Anthropic-compatible relay), and/or
+- any **OpenAI-compatible** service — OpenRouter, OpenAI, Google Gemini, a local Ollama,
+  or a relay service — with its base URL and model (the model must accept images).
+
+Keys are encrypted at rest (Fernet, derived from `RECODE_SECRET_KEY`), shown only masked,
+checked with a test call, and used only for that user's projects; usage is billed by the
+provider to the user. Without a key of their own, users fall back to the server's
+`ANTHROPIC_API_KEY` if the operator allows it (`RECODE_ALLOW_SERVER_KEY`), otherwise to
+offline mode. User-supplied endpoints may not point at private addresses unless
+`RECODE_ALLOW_PRIVATE_LLM_URLS=true` (needed for Ollama on the same machine).
+
 Each role has its own provider, model and effort, set on the server
 (`RECODE_MODEL_VISION`, `RECODE_EFFORT_CODING`, …) and overridable per project in the
 workspace's Settings tab:

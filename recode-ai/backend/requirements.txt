@@ -16,3 +16,4 @@ boto3==1.44.5
 numpy==2.5.3
 opencv-python-headless==5.1.0.95
 playwright==1.65.2
+cryptography==50.0.2

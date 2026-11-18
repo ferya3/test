@@ -25,18 +25,36 @@ _LEGACY_PREFIXES = ("claude-haiku-4", "claude-sonnet-4-5", "claude-opus-4-5", "c
 class AnthropicProvider:
     name = "anthropic"
 
-    def __init__(self, server_fallback: bool = True, timeout: float = 900.0):
-        self.server_fallback = server_fallback
+    def __init__(
+        self,
+        server_fallback: bool = True,
+        timeout: float = 900.0,
+        api_key: str | None = None,
+        base_url: str | None = None,
+    ):
+        """api_key: a user's own key (otherwise the server's credentials from the environment).
+        base_url: an Anthropic-compatible relay instead of api.anthropic.com."""
+        self.api_key = api_key
+        self.base_url = base_url
+        # relays rarely implement beta features such as server-side fallbacks
+        self.server_fallback = server_fallback and not base_url
         self.timeout = timeout
         self._client: anthropic.Anthropic | None = None
 
     @property
     def client(self) -> anthropic.Anthropic:
         if self._client is None:
-            self._client = anthropic.Anthropic(timeout=self.timeout, max_retries=3)
+            kwargs: dict = {"timeout": self.timeout, "max_retries": 3}
+            if self.api_key:
+                kwargs["api_key"] = self.api_key
+            if self.base_url:
+                kwargs["base_url"] = self.base_url
+            self._client = anthropic.Anthropic(**kwargs)
         return self._client
 
     def available(self) -> bool:
+        if self.api_key:
+            return True
         if os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"):
             return True
         # `ant auth login` profile
@@ -124,3 +142,17 @@ class AnthropicProvider:
             latency_ms=int((time.monotonic() - started) * 1000),
             stop_reason=message.stop_reason or "",
         )
+
+    def list_models(self) -> list[str]:
+        """Checks the key (and relay) with a cheap call; returns the model ids it can use."""
+        try:
+            page = self.client.models.list(limit=50)
+        except anthropic.AuthenticationError as e:
+            raise ProviderError("The Anthropic API key was rejected") from e
+        except anthropic.PermissionDeniedError as e:
+            raise ProviderError("This key may not list models (permission denied)") from e
+        except anthropic.APIStatusError as e:
+            raise ProviderError(f"Anthropic API error {e.status_code}") from e
+        except anthropic.APIConnectionError as e:
+            raise ProviderError("Could not reach the Anthropic API from the server") from e
+        return sorted(m.id for m in page.data)

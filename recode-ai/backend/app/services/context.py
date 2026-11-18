@@ -14,6 +14,7 @@ from app.core.db import session_scope
 from app.core.events import emit
 from app.core.storage import Storage, get_storage
 from app.models import AITask, ModelUsage, Project
+from app.services.credentials import user_providers
 
 log = logging.getLogger(__name__)
 
@@ -27,8 +28,17 @@ class TaskContext:
         with session_scope() as db:
             project = db.get(Project, project_id)
             self.project_settings: dict[str, Any] = dict(project.settings or {}) if project else {}
+            owner = project.owner if project else None
+            # the project runs on its owner's keys (or the server's, when the operator allows it)
+            providers, preferred = user_providers(db, owner, self.settings)
+            account_models = dict((owner.settings or {}).get("models") or {}) if owner else {}
         self.router = ModelRouter(
-            self.settings, overrides=self.project_settings.get("models"), recorder=self._record_usage
+            self.settings,
+            overrides=self.project_settings.get("models"),
+            recorder=self._record_usage,
+            providers=providers,
+            user_defaults=account_models,
+            preferred_provider=preferred,
         )
         self._step = ""
 

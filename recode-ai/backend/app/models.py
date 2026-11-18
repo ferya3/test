@@ -44,6 +44,23 @@ class User(TimestampMixin, Base):
     projects: Mapped[list[Project]] = relationship(back_populates="owner", cascade="all, delete-orphan")
 
 
+class ProviderCredential(TimestampMixin, Base):
+    """A user's own key for a model provider (bring your own key). The key is encrypted."""
+
+    __tablename__ = "provider_credentials"
+    __table_args__ = (UniqueConstraint("user_id", "provider"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    provider: Mapped[str] = mapped_column(String(30))  # anthropic | openai
+    api_key_encrypted: Mapped[str] = mapped_column(Text, default="")
+    key_hint: Mapped[str] = mapped_column(String(40), default="")  # masked, for display
+    base_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    model: Mapped[str | None] = mapped_column(String(200), nullable=True)  # default model (openai)
+    last_check: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)  # {ok, message, at}
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+
 class Project(TimestampMixin, Base):
     __tablename__ = "projects"
 

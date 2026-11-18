@@ -1,4 +1,5 @@
 import type {
+  AccountSettings,
   Asset,
   FileEntry,
   Frame,
@@ -6,6 +7,9 @@ import type {
   Meta,
   Project,
   ProjectSettings,
+  ProviderCredential,
+  ProviderId,
+  ProviderTest,
   SpecRecord,
   Task,
   TestResult,
@@ -87,6 +91,16 @@ export const api = {
     request<{ access_token: string }>("/api/auth/login", { method: "POST", body: json({ email, password }) }),
   me: () => request<{ id: string; email: string; name: string }>("/api/auth/me"),
   meta: () => request<Meta>("/api/meta"),
+
+  providers: () => request<ProviderCredential[]>("/api/account/providers"),
+  saveProvider: (provider: ProviderId, body: { api_key?: string | null; base_url?: string | null; model?: string | null }) =>
+    request<ProviderCredential>(`/api/account/providers/${provider}`, { method: "PUT", body: json(body) }),
+  deleteProvider: (provider: ProviderId) => request<void>(`/api/account/providers/${provider}`, { method: "DELETE" }),
+  testProvider: (provider: ProviderId) =>
+    request<ProviderTest>(`/api/account/providers/${provider}/test`, { method: "POST" }),
+  accountSettings: () => request<AccountSettings>("/api/account/settings"),
+  saveAccountSettings: (body: AccountSettings) =>
+    request<AccountSettings>("/api/account/settings", { method: "PUT", body: json(body) }),
 
   projects: () => request<Project[]>("/api/projects"),
   project: (id: string) => request<Project>(`/api/projects/${id}`),

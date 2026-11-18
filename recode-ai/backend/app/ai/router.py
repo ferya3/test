@@ -46,20 +46,41 @@ class ModelRouter:
         overrides: dict[str, Any] | None = None,
         recorder: UsageRecorder | None = None,
         providers: dict[str, LLMProvider] | None = None,
+        user_defaults: dict[str, Any] | None = None,
+        preferred_provider: str | None = None,
     ):
+        """overrides: the project's per-role choices; user_defaults: the account's; then the
+        provider the user has a key for (preferred_provider); then the server defaults."""
         self.settings = settings
         self.overrides = overrides or {}
+        self.user_defaults = user_defaults or {}
+        self.preferred_provider = preferred_provider
         self.recorder = recorder
         self.providers: dict[str, LLMProvider] = providers or {
             "anthropic": AnthropicProvider(server_fallback=settings.anthropic_server_fallback)
         }
 
     def config(self, role: str) -> RoleConfig:
-        o = self.overrides.get(role) or {}
+        project = self.overrides.get(role) or {}
+        account = self.user_defaults.get(role) or {}
+
+        def pick(key: str):
+            return project.get(key) or account.get(key)
+
+        provider = pick("provider") or self.preferred_provider or self.settings.ai_provider
+        provider_obj = self.providers.get(provider)
+        # a model belongs to its provider: one chosen for another provider is not carried over;
+        # one chosen without a provider applies to whichever provider is in effect
+        chosen_model = project.get("model") if project.get("provider") in (None, provider) else None
+        chosen_model = chosen_model or (account.get("model") if account.get("provider") in (None, provider) else None)
+        if provider == "anthropic":
+            default_model = getattr(self.settings, f"model_{role}")
+        else:
+            default_model = getattr(provider_obj, "default_model", None) or ""
         return RoleConfig(
-            provider=o.get("provider") or self.settings.ai_provider,
-            model=o.get("model") or getattr(self.settings, f"model_{role}"),
-            effort=o.get("effort") or getattr(self.settings, f"effort_{role}"),
+            provider=provider,
+            model=chosen_model or default_model,
+            effort=pick("effort") or getattr(self.settings, f"effort_{role}"),
         )
 
     def offline(self, role: str) -> bool:
