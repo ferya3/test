@@ -56,7 +56,7 @@ def launch_kwargs(settings: Settings) -> dict:
     path = settings.chromium_path or os.environ.get("PLAYWRIGHT_CHROMIUM_PATH")
     if path:
         kwargs["executable_path"] = path
-    if hasattr(os, "geteuid") and os.geteuid() == 0:
+    if settings.chromium_no_sandbox or (hasattr(os, "geteuid") and os.geteuid() == 0):
         kwargs["args"] = ["--no-sandbox"]  # Chromium refuses its sandbox as root (dev containers)
     return kwargs
 

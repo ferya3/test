@@ -64,6 +64,10 @@ class Settings(BaseSettings):
     qa_threshold: float = 88.0
     max_fix_iterations: int = 3
     chromium_path: str | None = None
+    # Chromium's own sandbox needs user namespaces, which most containers do not
+    # grant; inside a locked-down, non-root worker container this is the usual
+    # Playwright setup (the container is then the isolation boundary).
+    chromium_no_sandbox: bool = False
     render_allowed_hosts: list[str] = [
         "fonts.googleapis.com",
         "fonts.gstatic.com",
