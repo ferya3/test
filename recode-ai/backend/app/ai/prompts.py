@@ -23,6 +23,11 @@ describe the subject in `text` instead of transcribing.
 "button": "label or empty"}.
 - columns: number of repeated columns.
 
+The draft lists text read by OCR and pictures already cut out of the reference \
+("extracted_images", with their boxes in the draft elements). Keep those image elements \
+(kind "image", same "src" and box in `style` x/y/w/h relative to the region) and correct \
+the OCR text where the image shows it was misread.
+
 Also report typography: the closest Google Font for headings and body, base body size in CSS px \
 (the reference is rendered at the given device pixel ratio), and sizes for h1/h2/h3/body/small.
 
@@ -104,8 +109,10 @@ Requirements:
 measures sections through these attributes.
 - Design tokens become CSS custom properties on :root; use them everywhere.
 - Load fonts from Google Fonts only. No other external requests, analytics or trackers.
-- Never hotlink images from the recorded site. Use CSS gradients, inline SVG or neutral \
-placeholders sized like the originals.
+- Pictures cut out of the reference are in the project already: every path in the spec's \
+`assets` (e.g. ./assets/page-1-img-1.jpg). Use them where their image elements are. Never \
+hotlink anything from the recorded site; other images become CSS / SVG placeholders sized \
+like the originals.
 - Use relative URLs (./styles.css, ./app.js, ./about.html) - the site is previewed under a \
 sub-path.
 - Accessible: landmarks, alt/aria-label, visible focus, buttons for toggles.
@@ -125,7 +132,9 @@ src/styles.css with design tokens as CSS custom properties.
 - Match the reference images as closely as possible: order, heights (height_px as min-height on \
 desktop), colours, spacing, typography.
 - Every section root has id="<section id>" and data-section="<section id>".
-- Fonts from Google Fonts only; never hotlink images from the recorded site; no trackers.
+- Fonts from Google Fonts only; no trackers. Pictures cut out of the reference are in \
+`public/assets/` under the paths listed in the spec's `assets` (reference them as \
+`./assets/...`); never hotlink images from the recorded site.
 - Accessible markup."""
     + _FILE_FORMAT
 )

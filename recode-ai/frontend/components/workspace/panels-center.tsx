@@ -120,6 +120,11 @@ export function CodeEditor({
           <div className="grid h-full place-items-center">
             <Spinner />
           </div>
+        ) : /\.(png|jpe?g|webp|gif|avif|ico)$/i.test(path) ? (
+          <div className="checker grid h-full place-items-center overflow-auto p-6">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={value} alt={path} className="max-h-full max-w-full shadow-lg" />
+          </div>
         ) : (
           <Editor
             path={path}

@@ -44,7 +44,9 @@ _COMPONENT = {
 _RTL = re.compile(r"[֐-ࣿ]")
 
 
-def _layout(kind: str, columns: int) -> str:
+def _layout(kind: str, columns: int, elements: list | None = None) -> str:
+    if any(e.kind == "image" and e.src and "x" in e.style for e in elements or []):
+        return "canvas"  # extracted pictures: keep the reference composition
     if kind in ("header", "nav", "footer"):
         return "row"  # side-by-side groups, not a grid of cards
     return "grid" if columns > 1 else "stack"
@@ -96,18 +98,22 @@ def heuristic_spec(
             kind = region.type
             component = _COMPONENT.get(kind, "Section")
             h = int(round(region.bbox[3] * scale))
+            padding = 0 if kind == "header" else max(24, min(96, h // 8))
+            tops = [e.style["y"] for e in region.elements if "y" in e.style]
+            if tops and kind != "header":  # measured: content starts where it does in the reference
+                padding = max(8, min(160, int(round(min(tops) * scale))))
             sections.append(
                 SectionSpec(
                     id=region.id,
                     kind=kind,
                     component=component,
-                    layout=_layout(kind, region.columns),
+                    layout=_layout(kind, region.columns, region.elements),
                     columns=max(1, region.columns),
                     height_px=h,
                     background=region.background,
                     background_image=region.background_image,
                     text_color=region.text_color,
-                    padding_y=0 if kind == "header" else max(24, min(96, h // 8)),
+                    padding_y=padding,
                     sticky=False,
                     elements=region.elements,
                     items=region.items,
@@ -135,6 +141,7 @@ def heuristic_spec(
             )
         )
     spec.components = list(components.values())
+    spec.assets = {path: key for page in ui.pages for path, key in page.assets.items()}
     spec.behaviors = list(ui.behaviors)
     for b in spec.behaviors:
         if b.effect == "sticky-header":
@@ -263,6 +270,7 @@ class Architect:
                     section.source = dsec.source
         if not spec.behaviors:
             spec.behaviors = [BehaviorSpec.model_validate(b.model_dump()) for b in draft.behaviors]
+        spec.assets = draft.assets  # storage keys are ours, never the model's
         return spec
 
     @staticmethod

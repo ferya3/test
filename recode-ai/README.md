@@ -134,7 +134,16 @@ means implementing `LLMProvider` (`backend/app/ai/providers/base.py`) and regist
 in the router; the engines only talk to roles.
 
 Without credentials every role falls back to the offline computer-vision path
-(`RECODE_AI_PROVIDER=heuristic` forces it).
+(`RECODE_AI_PROVIDER=heuristic` forces it). Offline, the platform still:
+
+- trims browser chrome (window frame, scrollbars) from screenshots and recordings,
+- reads the copy with Tesseract OCR (English and Persian, dark and light backgrounds),
+- cuts the pictures out of the reference (products, photos — not flat UI or text) and
+  places them where they are, scaled with the page width (`canvas` sections),
+- measures sections, colours, gradients, card columns and recorded behaviours.
+
+What it cannot do without a vision model: rebuild interactive widgets it only sees as
+pictures, name fonts, or understand what a section means.
 
 ## Tests
 

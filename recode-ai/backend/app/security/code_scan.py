@@ -7,6 +7,8 @@ import posixpath
 import re
 from dataclasses import dataclass, field
 
+from app.core.binary import is_binary
+
 MAX_FILES = 300
 MAX_FILE_BYTES = 2_000_000
 ALLOWED_EXT = {
@@ -113,6 +115,10 @@ def scan_files(files: dict[str, str]) -> ScanResult:
         except UnsafePath as e:
             issues.append({"severity": "high", "file": path, "message": str(e)})
             continue
+        if is_binary(path):
+            if len(content) > MAX_FILE_BYTES * 1.4:  # base64 overhead
+                issues.append({"severity": "medium", "file": path, "message": "file larger than 2 MB"})
+            continue  # pictures / fonts: no code inside to scan
         if _ext(path) not in ALLOWED_EXT:
             issues.append({"severity": "medium", "file": path, "message": "unexpected file type"})
         if len(content.encode()) > MAX_FILE_BYTES:

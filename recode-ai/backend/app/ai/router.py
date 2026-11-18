@@ -21,6 +21,7 @@ from pydantic import BaseModel, ValidationError
 
 from app.ai.providers.anthropic_provider import AnthropicProvider
 from app.ai.providers.base import ChatMessage, LLMProvider, LLMResult, ProviderError
+from app.core.binary import is_binary
 from app.core.config import Settings
 
 log = logging.getLogger(__name__)
@@ -165,6 +166,9 @@ def format_files(files: dict[str, str], limit_chars: int = 180_000) -> str:
     parts, used = [], 0
     for path in sorted(files):
         body = files[path]
+        if is_binary(path):  # pictures are listed, not inlined
+            parts.append(f'<file path="{path}" binary="image or font, already in the project"/>')
+            continue
         if used + len(body) > limit_chars:
             parts.append(f'<file path="{path}" omitted="too large ({len(body)} chars)"/>')
             continue

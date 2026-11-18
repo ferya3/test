@@ -10,6 +10,8 @@ import math
 import re
 from collections import Counter
 
+from app.core.binary import is_binary
+
 _SPLIT = re.compile(r"[A-Za-z][a-z]+|[A-Z]+(?![a-z])|\d+|[؀-ۿ]+")
 
 # Persian / English synonyms users type when editing a site
@@ -56,6 +58,9 @@ def tokenize(text: str) -> list[str]:
 
 
 def rank_files(query: str, files: dict[str, str], k: int = 6) -> list[tuple[str, float]]:
+    if not files:
+        return []
+    files = {p: b for p, b in files.items() if not is_binary(p)}
     if not files:
         return []
     docs = {path: tokenize(path + "\n" + body) for path, body in files.items()}

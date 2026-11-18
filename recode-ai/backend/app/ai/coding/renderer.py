@@ -69,29 +69,45 @@ def google_fonts_href(spec: DesignSpec) -> str | None:
 # ----------------------------------------------------------------- markup
 
 
-def _element(e: Element) -> str:
+def element_class(section_id: str, index: int) -> str:
+    return "e-" + re.sub(r"[^a-zA-Z0-9-]", "-", section_id) + f"-{index}"
+
+
+def _element(e: Element, cls: str = "") -> str:
     text = esc(e.text)
+    extra = f" {cls}" if cls else ""
     if e.kind == "heading":
         level = min(6, max(1, e.level or 2))
-        return f'<h{level} class="h{min(level, 3)}">{text}</h{level}>'
+        return f'<h{level} class="h{min(level, 3)}{extra}">{text}</h{level}>'
     if e.kind == "button":
-        return f'<a class="btn" href="{esc(e.href or "#")}">{text}</a>'
+        return f'<a class="btn{extra}" href="{esc(e.href or "#")}">{text}</a>'
     if e.kind == "link":
-        return f'<a class="link" href="{esc(e.href or "#")}">{text}</a>'
+        return f'<a class="link{extra}" href="{esc(e.href or "#")}">{text}</a>'
     if e.kind == "logo":
-        return f'<a class="logo" href="./index.html">{text}</a>'
+        return f'<a class="logo{extra}" href="./index.html">{text}</a>'
+    if e.kind == "image" and e.src:
+        return (
+            f'<img class="picture{extra}" src="./{esc(e.src)}" alt="{text or "Image"}" '
+            'loading="lazy" decoding="async" />'
+        )
     if e.kind in ("image", "video"):
-        return f'<div class="media" role="img" aria-label="{text or "Image"}"></div>'
+        return f'<div class="media{extra}" role="img" aria-label="{text or "Image"}"></div>'
     if e.kind == "icon":
-        return '<span class="icon" aria-hidden="true"></span>'
+        return f'<span class="icon{extra}" aria-hidden="true"></span>'
     if e.kind == "badge":
-        return f'<span class="badge">{text}</span>'
+        return f'<span class="badge{extra}">{text}</span>'
     if e.kind == "input":
-        return f'<input class="input" type="text" placeholder="{text}" aria-label="{text or "Input"}" />'
+        return f'<input class="input{extra}" type="text" placeholder="{text}" aria-label="{text or "Input"}" />'
     if e.kind == "list":
         items = "".join(f"<li>{esc(i)}</li>" for i in e.items)
-        return f'<ul class="list">{items}</ul>'
-    return f"<p>{text}</p>"
+        return f'<ul class="list{extra}">{items}</ul>'
+    return f'<p class="{cls}">{text}</p>' if cls else f"<p>{text}</p>"
+
+
+def _canvas_order(s: SectionSpec) -> list[tuple[int, Element]]:
+    """Elements in reading order (top to bottom, left to right): the mobile flow order."""
+    indexed = list(enumerate(s.elements))
+    return sorted(indexed, key=lambda ie: (round(ie[1].style.get("y", 0) / 24), ie[1].style.get("x", 0)))
 
 
 def _header(spec: DesignSpec, s: SectionSpec) -> str:
@@ -145,8 +161,14 @@ def section_markup(spec: DesignSpec, s: SectionSpec) -> str:
         return _header(spec, s)
     animate = _behavior(spec, "fade-in") is not None or _behavior(spec, "slide-up") is not None
     anim = ' data-animate="true"' if animate else ""
-    body = "".join(_element(e) for e in s.elements)
     tag = "footer" if s.kind == "footer" else "section"
+    if s.layout == "canvas":
+        body = "".join(_element(e, element_class(s.id, i)) for i, e in _canvas_order(s))
+        return (
+            f'<{tag} id="{s.id}" class="section section--{s.kind} section--canvas" data-section="{s.id}" '
+            f'data-component="{s.component}"><div class="canvas">{body}</div></{tag}>'
+        )
+    body = "".join(_element(e, element_class(s.id, i) if e.style else "") for i, e in enumerate(s.elements))
     row = " section-content--row" if s.layout == "row" else ""
     inner = f'<div class="section-content{row}"{anim}>{body}</div>' if body else ""
     if s.layout == "grid" or (s.items and s.layout != "row"):
@@ -164,6 +186,81 @@ def page_body(spec: DesignSpec, page: PageSpec) -> str:
 
 
 # --------------------------------------------------------------------- css
+
+
+def _type_rules(st: dict, css_w: int, fluid: bool) -> list[str]:
+    rules = []
+    if st.get("font_size"):
+        size = int(st["font_size"])
+        if fluid:  # canvas sections scale with the page width
+            rules.append(f"font-size: clamp(11px, {size / css_w * 100:.3f}vw, {round(size * 1.5)}px);")
+        else:
+            rules.append(f"font-size: {size}px;")
+    if st.get("color"):
+        rules.append(f"color: {st['color']};")
+    if st.get("weight"):
+        rules.append(f"font-weight: {int(st['weight'])};")
+    if st.get("uppercase"):
+        rules.append("text-transform: uppercase;")
+    if st.get("letter_spacing"):
+        rules.append(f"letter-spacing: {st['letter_spacing']};")
+    if st.get("background"):
+        rules.append(f"background: {st['background']};")
+    return rules
+
+
+def _element_rules(spec: DesignSpec, s: SectionSpec) -> str:
+    """Measured typography per element, and positions inside canvas sections."""
+    css_w = spec.viewport.get("width", 1280)
+    out = ""
+    if s.layout == "canvas":
+        ref_w = float(s.source.get("page_width") or css_w)
+        ref_h = float(s.source.get("h") or (s.height_px or 1) * ref_w / css_w)
+        out += f"#{s.id} .canvas {{ position: relative; width: 100%; aspect-ratio: {ref_w:.0f} / {ref_h:.0f}; }}\n"
+        for i, e in enumerate(s.elements):
+            st = e.style
+            if "x" not in st:
+                continue
+            x, y, w, h = (float(st.get(k, 0)) for k in ("x", "y", "w", "h"))
+            rules = ["position: absolute;", "margin: 0;"]
+            if e.kind == "image":
+                rules += [
+                    f"left: {x / ref_w * 100:.3f}%;",
+                    f"top: {y / ref_h * 100:.3f}%;",
+                    f"width: {w / ref_w * 100:.3f}%;",
+                    f"height: {h / ref_h * 100:.3f}%;",
+                    "object-fit: contain;",
+                ]
+                if st.get("cutout"):  # fade the bottom into the page so no crop edge shows
+                    fade = "linear-gradient(to bottom, #000 90%, transparent)"
+                    rules += [f"-webkit-mask-image: {fade};", f"mask-image: {fade};"]
+            else:  # text: anchored on its measured centre, a little wider so line breaks match
+                align = st.get("align", "left")
+                anchor_x = x + w / 2 if align == "center" else x
+                rules += [
+                    f"left: {anchor_x / ref_w * 100:.3f}%;",
+                    f"top: {(y + h / 2) / ref_h * 100:.3f}%;",
+                    "transform: translate(-50%, -50%);" if align == "center" else "transform: translateY(-50%);",
+                    # one measured line stays one line (fonts differ in width); paragraphs wrap
+                    "white-space: nowrap;"
+                    if st.get("lines", 1) == 1
+                    else f"width: {min(100.0, w / ref_w * 100 * 1.15):.3f}%; white-space: normal;",
+                    f"text-align: {align};",
+                    "line-height: 1.25;",
+                ]
+                rules += _type_rules(st, css_w, fluid=True)
+            out += f"#{s.id} .{element_class(s.id, i)} {{ {' '.join(r for r in rules if r)} }}\n"
+        return out
+    for i, e in enumerate(s.elements):
+        if not e.style:
+            continue
+        rules = _type_rules(e.style, css_w, fluid=False)
+        align = e.style.get("align")
+        if align in ("center", "right"):
+            rules.append(f"text-align: {align}; align-self: {'center' if align == 'center' else 'flex-end'};")
+        if rules:
+            out += f"#{s.id} .{element_class(s.id, i)} {{ {' '.join(rules)} }}\n"
+    return out
 
 
 def stylesheet(spec: DesignSpec) -> str:
@@ -215,6 +312,8 @@ p { margin: 0 0 var(--space-md); max-width: 70ch; }
 .section--hero .section-content, .section--cta .section-content { gap: var(--space-md); }
 .section-content--row { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-md); }
 .section-content--row > p { margin: 0; }
+.picture { display: block; max-width: 100%; }
+.section--canvas .canvas .btn { white-space: nowrap; }
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; padding: .8rem 1.6rem;
   border-radius: var(--radius-md); background: var(--color-primary); color: var(--color-on-primary);
   font-weight: 600; text-decoration: none; border: 0; cursor: pointer; transition: transform .2s ease, box-shadow .2s ease; }
@@ -297,9 +396,13 @@ p { margin: 0 0 var(--space-md); max-width: 70ch; }
                 if s.height_px:
                     rules.append(f"min-height: {s.height_px}px;")
                 rules.append(f"padding-block: {s.padding_y}px;")
+            if s.layout == "canvas":
+                rules = [r for r in rules if not r.startswith(("min-height", "padding-block"))]
+                rules.append("padding-block: 0;")
             css += f"#{s.id} {{ {' '.join(rules)} }}\n"
             if s.columns > 1:
                 css += f"#{s.id} .grid {{ --cols: {s.columns}; }}\n"
+            css += _element_rules(spec, s)
 
     css += """
 @media (max-width: 1024px) {
@@ -309,6 +412,16 @@ p { margin: 0 0 var(--space-md); max-width: 70ch; }
   :root { --text-h1: clamp(32px, 9vw, 44px); --text-h2: clamp(26px, 7vw, 32px); }
   .section:not(.site-header) { min-height: 0 !important; padding-block: 56px !important; }
   .grid { grid-template-columns: 1fr; }
+  /* canvas sections become a readable flow on small screens */
+  .section--canvas .canvas { aspect-ratio: auto !important; display: flex; flex-wrap: wrap; justify-content: center;
+    align-items: flex-end; gap: 16px; padding: 40px var(--gutter); }
+  .section--canvas .canvas > * { position: static !important; transform: none !important; width: auto !important;
+    height: auto !important; max-width: 100%; }
+  .section--canvas .canvas > :not(img) { flex-basis: 100%; text-align: center !important; }
+  .section--canvas .canvas > img { width: calc(33.333% - 11px) !important; max-height: 240px !important;
+    object-fit: contain; }
+  .section--canvas .canvas > :not(img) { white-space: normal !important; }
+  .section--canvas .canvas > h1, .section--canvas .canvas > h2 { font-size: clamp(24px, 7vw, 34px) !important; }
   .nav { display: none; }
   .menu-toggle { display: inline-flex; }
   .menu-panel { display: flex; flex-direction: column; position: absolute; top: 100%; inset-inline: 0; width: auto;

@@ -29,6 +29,7 @@ from app.qa.visual import QAOutcome, QAReport, VisualQAEngine
 from app.schemas.spec import DesignSpec, UIAnalysis, VideoAnalysis
 from app.security.code_scan import scan_files
 from app.services import versions
+from app.services.assets import asset_files
 from app.services.context import TaskContext
 from app.services.media import ingest_asset
 
@@ -211,6 +212,10 @@ class Pipeline:
             if out.files:
                 files = versions.apply_changes(files, out.files)
             ctx.log(f"{step}: {'skipped - ' if out.skipped else ''}{out.notes[:300]}")
+        pictures = asset_files(spec, ctx.storage)
+        if pictures:
+            files = versions.apply_changes(files, pictures)
+            ctx.log(f"added {len(pictures)} picture(s) cut out of the reference")
         with session_scope() as db:
             project = db.get(Project, ctx.project_id)
             version = versions.create_version(

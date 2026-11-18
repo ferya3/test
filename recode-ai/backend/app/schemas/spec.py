@@ -111,6 +111,9 @@ class Element(Loose):
     level: int | None = None
     href: str | None = None
     items: list[str] = Field(default_factory=list)
+    src: str | None = None  # project-relative path of an extracted image (assets/img-1.jpg)
+    # font_size / color / align / background / weight / uppercase / letter_spacing, and for
+    # canvas layouts the box in reference px relative to its section: x, y, w, h
     style: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -145,6 +148,7 @@ class PageAnalysis(Loose):
     regions: list[Region] = Field(default_factory=list)
     palette: list[PaletteColor] = Field(default_factory=list)
     typography: Typography = Field(default_factory=Typography)
+    assets: dict[str, str] = Field(default_factory=dict)  # project path -> storage key
 
 
 class BehaviorSpec(Loose):
@@ -211,7 +215,8 @@ class SectionSpec(Loose):
     id: str
     kind: str = "section"
     component: str = "Section"
-    layout: Literal["stack", "row", "grid", "split", "center"] = "stack"
+    # canvas: children placed where they are in the reference, scaled with the page width
+    layout: Literal["stack", "row", "grid", "split", "center", "canvas"] = "stack"
     columns: int = 1
     height_px: int | None = None  # observed height in CSS px
     background: str | None = None
@@ -254,6 +259,8 @@ class DesignSpec(Loose):
     behaviors: list[BehaviorSpec] = Field(default_factory=list)
     assumptions: list[str] = Field(default_factory=list)
     requires_backend: bool = False
+    # images cut out of the reference (project path -> storage key); copied into the project
+    assets: dict[str, str] = Field(default_factory=dict)
 
     def section(self, section_id: str) -> SectionSpec | None:
         for page in self.pages:

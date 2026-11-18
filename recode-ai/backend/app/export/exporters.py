@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import base64
 import io
 import zipfile
 
 import httpx
 
+from app.core.binary import file_bytes, is_binary
 from app.security.code_scan import normalize_path
 
 STATIC_DOCKERFILE = """FROM nginx:1.27-alpine
@@ -57,7 +59,7 @@ def build_zip(files: dict[str, str], root: str, framework: str, include_deploy: 
             payload.setdefault(path, content)
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for path in sorted(payload):
-            zf.writestr(f"{root}/{normalize_path(path)}", payload[path])
+            zf.writestr(f"{root}/{normalize_path(path)}", file_bytes(path, payload[path]))
     return buf.getvalue()
 
 
@@ -107,10 +109,18 @@ def push_to_github(
             default = gh.get(f"/repos/{full}").json().get("default_branch", "main")
             base = gh.get(f"/repos/{full}/git/ref/heads/{default}")
             parent = base.json()["object"]["sha"] if base.status_code == 200 else None
-        tree = [
-            {"path": normalize_path(p), "mode": "100644", "type": "blob", "content": c}
-            for p, c in sorted(files.items())
-        ]
+        tree = []
+        for p, c in sorted(files.items()):
+            if is_binary(p):  # pictures go up as base64 blobs; the tree API takes text only
+                blob = gh.post(
+                    f"/repos/{full}/git/blobs",
+                    json={"content": base64.b64encode(file_bytes(p, c)).decode(), "encoding": "base64"},
+                )
+                if blob.status_code != 201:
+                    raise GitHubExportError(f"Uploading {p} failed: {blob.text[:200]}")
+                tree.append({"path": normalize_path(p), "mode": "100644", "type": "blob", "sha": blob.json()["sha"]})
+            else:
+                tree.append({"path": normalize_path(p), "mode": "100644", "type": "blob", "content": c})
         tree_resp = gh.post(f"/repos/{full}/git/trees", json={"tree": tree})
         if tree_resp.status_code != 201:
             raise GitHubExportError(f"Tree creation failed: {tree_resp.text[:300]}")

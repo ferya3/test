@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 import numpy as np
 from playwright.sync_api import Route, sync_playwright
 
+from app.core.binary import file_bytes, is_binary
 from app.core.config import Settings
 from app.video.imaging import decode_image
 
@@ -75,6 +76,8 @@ class SiteRenderer:
                 if path.endswith("/"):
                     path += "index.html"
                 body = files.get(path)
+                if isinstance(body, str) and is_binary(path):
+                    body = file_bytes(path, body)
                 if body is None:
                     route.fulfill(status=404, body="not found")
                     return

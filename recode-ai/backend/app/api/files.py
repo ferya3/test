@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import owned_project
+from app.core.binary import file_bytes
 from app.core.config import get_settings
 from app.core.db import get_db
 from app.core.security import decode_token, preview_token
@@ -144,7 +145,7 @@ def serve_preview(token: str, path: str, db: Session = Depends(get_db)):
             row = db.scalar(select(CodeFile).where(CodeFile.version_id == version.id, CodeFile.path == f"{path}.html"))
         if row is None:
             raise HTTPException(404, "Not found")
-        body = row.content.encode()
+        body = file_bytes(path, row.content)
     media = "text/javascript" if path.endswith((".js", ".mjs")) else (mimetypes.guess_type(path)[0] or "text/plain")
     ancestors = " ".join(["'self'", *get_settings().cors_origins])
     return Response(

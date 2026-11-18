@@ -23,6 +23,7 @@ from app.core.config import Settings
 from app.core.storage import Storage
 from app.schemas.spec import Keyframe, StitchedPage, TimelineEvent, VideoAnalysis, VideoMeta
 from app.video import imaging
+from app.video.content import trim_frame
 from app.video.motion import STILL_RATIO, PairMetrics, compare_frames, interaction_hint
 from app.video.probe import VideoError, guess_dpr, probe_video
 
@@ -60,6 +61,11 @@ class VideoIntelligenceEngine:
         meta = probe_video(path)
         if meta.duration > self.settings.max_video_seconds:
             raise VideoError(f"Video is {meta.duration:.0f}s; the limit is {self.settings.max_video_seconds}s")
+        # recordings of a browser window carry its frame and scrollbars: keep only the page
+        self._crop = self._page_box(path, meta)
+        x0, y0, x1, y1 = self._crop
+        if (x1 - x0, y1 - y0) != (meta.width, meta.height):
+            meta = meta.model_copy(update={"width": x1 - x0, "height": y1 - y0})
         progress(0.05, f"{meta.width}x{meta.height} @ {meta.fps:g} fps, {meta.duration:.1f}s")
 
         samples = self._sample(path, meta, progress)
@@ -91,10 +97,27 @@ class VideoIntelligenceEngine:
         progress(0.95, f"Saved {len(analysis.keyframes)} keyframes and {len(analysis.pages)} page image(s)")
         return analysis
 
+    def _page_box(self, path: str, meta: VideoMeta) -> tuple[int, int, int, int]:
+        cap = cv2.VideoCapture(path)
+        try:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, max(0, meta.frame_count // 2))
+            ok, frame = cap.read()
+        finally:
+            cap.release()
+        if not ok or frame is None:
+            return 0, 0, meta.width, meta.height
+        return trim_frame(frame)
+
+    def _apply_crop(self, frame: np.ndarray) -> np.ndarray:
+        x0, y0, x1, y1 = getattr(self, "_crop", (0, 0, frame.shape[1], frame.shape[0]))
+        return frame[y0:y1, x0:x1]
+
     def analyze_image(self, path: str, key_prefix: str) -> VideoAnalysis:
         img = cv2.imread(path, cv2.IMREAD_COLOR)
         if img is None:
             raise VideoError("Unreadable image")
+        x0, y0, x1, y1 = trim_frame(img)  # screenshots of a window: drop its frame and scrollbars
+        img = img[y0:y1, x0:x1]
         h, w = img.shape[:2]
         dpr = guess_dpr(w, min(h, int(w * 0.75)) if h > w * 1.2 else h)
         if w >= 2400:
@@ -160,6 +183,8 @@ class VideoIntelligenceEngine:
                     break
                 if index % step == 0 or step > 1:
                     ok, frame = cap.retrieve()
+                    if ok:
+                        frame = self._apply_crop(frame)
                     if not ok:
                         break
                     small = imaging.resize_to_width(frame, width)
@@ -376,6 +401,8 @@ class VideoIntelligenceEngine:
                     break
                 if index in wanted_index:
                     ok, frame = cap.retrieve()
+                    if ok:
+                        frame = self._apply_crop(frame)
                     if not ok:
                         break
                     n = wanted_index.pop(index)
