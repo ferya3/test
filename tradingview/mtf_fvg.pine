@@ -1,0 +1,268 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+//@version=6
+indicator("MTF Fair Value Gap Pro", shorttitle = "MTF FVG", overlay = true, max_boxes_count = 500, max_lines_count = 500)
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  MTF FVG Pro
+//  - Detects Fair Value Gaps on 4H / 1H / 30m / 15m (non-repainting)
+//  - ATR size filter + displacement (body ratio) filter
+//  - CE (50%) line, first-touch detection (zone fades after touch)
+//  - Invalidation by Close or Wick, optional conversion to IFVG
+//  - Dashboard with active zones per TF + multi-TF confluence
+//  - Alerts via alert(): new FVG, first touch, IFVG, confluence
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ───────────────────────────── INPUTS ─────────────────────────────
+const string G_TF  = "Timeframes"
+const string G_FLT = "Filters"
+const string G_MIT = "Mitigation & Inversion"
+const string G_VIS = "Display"
+const string G_DSH = "Dashboard"
+const string G_ALR = "Alerts  (create alert → 'Any alert() function call')"
+
+bool  en4h   = input.bool(true, "4H ", inline = "4h", group = G_TF)
+color c4hBu  = input.color(color.new(#089981, 75), "Bull", inline = "4h", group = G_TF)
+color c4hBe  = input.color(color.new(#F23645, 75), "Bear", inline = "4h", group = G_TF)
+
+bool  en1h   = input.bool(true, "1H ", inline = "1h", group = G_TF)
+color c1hBu  = input.color(color.new(#26A69A, 80), "Bull", inline = "1h", group = G_TF)
+color c1hBe  = input.color(color.new(#EF5350, 80), "Bear", inline = "1h", group = G_TF)
+
+bool  en30   = input.bool(true, "30m", inline = "30", group = G_TF)
+color c30Bu  = input.color(color.new(#4DB6AC, 85), "Bull", inline = "30", group = G_TF)
+color c30Be  = input.color(color.new(#E57373, 85), "Bear", inline = "30", group = G_TF)
+
+bool  en15   = input.bool(true, "15m", inline = "15", group = G_TF)
+color c15Bu  = input.color(color.new(#80CBC4, 88), "Bull", inline = "15", group = G_TF)
+color c15Be  = input.color(color.new(#EF9A9A, 88), "Bear", inline = "15", group = G_TF)
+
+int   atrLen    = input.int(14, "ATR Length", minval = 1, group = G_FLT)
+float atrMult   = input.float(0.25, "Min Gap Size (x ATR)", minval = 0.0, step = 0.05, group = G_FLT,
+     tooltip = "Gap must be at least this multiple of the ATR of its own timeframe. 0 = no filter.")
+float bodyRatio = input.float(0.5, "Min Displacement Body Ratio", minval = 0.0, maxval = 1.0, step = 0.05, group = G_FLT,
+     tooltip = "Middle candle body / range must be >= this value, and its direction must match the gap. 0 = no filter.")
+
+string invSrc   = input.string("Close", "Invalidation Source", options = ["Close", "Wick"], group = G_MIT,
+     tooltip = "Close: zone breaks only when a candle CLOSES beyond it. Wick: any wick beyond it breaks the zone.")
+bool   useIFVG  = input.bool(true, "Convert broken FVG to IFVG", group = G_MIT)
+color  ifBuCol  = input.color(color.new(#2962FF, 80), "IFVG Bull", inline = "if", group = G_MIT)
+color  ifBeCol  = input.color(color.new(#FF9800, 80), "IFVG Bear", inline = "if", group = G_MIT)
+int    fadeAmt  = input.int(10, "Fade after first touch", minval = 0, maxval = 50, group = G_MIT)
+int    maxPerTF = input.int(10, "Max zones per TF", minval = 1, maxval = 100, group = G_MIT)
+
+bool   showCE   = input.bool(true, "Show CE (50%) line", group = G_VIS)
+string ceStyIn  = input.string("Dashed", "CE Line Style", options = ["Solid", "Dashed", "Dotted"], group = G_VIS)
+bool   showTxt  = input.bool(true, "Show zone labels", group = G_VIS)
+
+bool   showDash = input.bool(true, "Show Dashboard", group = G_DSH)
+string dashPos  = input.string("Top Right", "Position", options = ["Top Right", "Bottom Right", "Top Left", "Bottom Left"], group = G_DSH)
+
+bool   alNew    = input.bool(true, "New FVG formed", group = G_ALR)
+bool   alTouch  = input.bool(true, "Price touches FVG (first touch)", group = G_ALR)
+bool   alInv    = input.bool(true, "FVG inverted (IFVG)", group = G_ALR)
+bool   alConf   = input.bool(true, "Multi-TF confluence (price inside 2+ TF zones)", group = G_ALR)
+
+string ceStyle = switch ceStyIn
+    "Solid"  => line.style_solid
+    "Dotted" => line.style_dotted
+    => line.style_dashed
+
+// ───────────────────────────── TYPES ─────────────────────────────
+type FVG
+    float top
+    float bottom
+    bool  bull              // original direction
+    bool  inverted = false  // true once it became an IFVG
+    bool  touched  = false
+    int   t1                // open time of candle #1 (box left edge)
+    color col
+    box   bx
+    line  ce
+
+type TFState
+    string     tf
+    string     name
+    array<FVG> items
+    int        lastT3 = 0
+    color      buCol
+    color      beCol
+
+// ───────────────────────────── HTF DETECTION ─────────────────────────────
+// Evaluated inside request.security on the target TF.
+// All values are offset by [1] and requested with lookahead_on
+// => only CONFIRMED (closed) HTF candles are used => no repaint.
+//   candle #3 = [1], candle #2 (displacement) = [2], candle #1 = [3]
+f_detect(simple int len, simple float mult, simple float br) =>
+    float a     = ta.atr(len)
+    float rng2  = high[2] - low[2]
+    float body2 = math.abs(close[2] - open[2])
+    bool  disp  = br <= 0 or (rng2 > 0 and body2 / rng2 >= br)
+    bool  bull  = low[1] > high[3] and (low[1] - high[3]) >= a[1] * mult and disp and close[2] > open[2]
+    bool  bear  = high[1] < low[3] and (low[3] - high[1]) >= a[1] * mult and disp and close[2] < open[2]
+    // bullTop, bullBot, bearTop, bearBot
+    [bull, bear, low[1], high[3], low[3], high[1], time[3], time[1]]
+
+f_px(float v) => str.tostring(v, format.mintick)
+
+// ───────────────────────────── METHODS ─────────────────────────────
+method add(TFState s, bool isBull, float top, float bot, int t1) =>
+    color c   = isBull ? s.buCol : s.beCol
+    color txt = color.new(c, 0)
+    box b = box.new(left = t1, top = top, right = time, bottom = bot, xloc = xloc.bar_time,
+         bgcolor = c, border_color = color.new(c, 40), border_width = 1,
+         text = showTxt ? s.name + " FVG" : "", text_color = txt, text_size = size.small,
+         text_halign = text.align_right, text_valign = text.align_top)
+    float mid = (top + bot) / 2
+    line l = showCE ? line.new(t1, mid, time, mid, xloc = xloc.bar_time, color = color.new(c, 20), style = ceStyle, width = 1) : na
+    s.items.push(FVG.new(top = top, bottom = bot, bull = isBull, t1 = t1, col = c, bx = b, ce = l))
+    if s.items.size() > maxPerTF
+        FVG old = s.items.shift()
+        old.bx.delete()
+        if not na(old.ce)
+            old.ce.delete()
+    if alNew
+        alert(syminfo.ticker + " | " + s.name + (isBull ? " Bullish" : " Bearish") + " FVG formed: " + f_px(bot) + " - " + f_px(top), alert.freq_once_per_bar)
+
+// Register new FVGs coming from the HTF (once per closed HTF candle)
+method process(TFState s, bool active, bool isBu, bool isBe, float buT, float buB, float beT, float beB, int t1, int t3) =>
+    if active and not na(t3) and t3 != s.lastT3
+        s.lastT3 := t3
+        if isBu
+            s.add(true, buT, buB, t1)
+        if isBe
+            s.add(false, beT, beB, t1)
+
+// Track mitigation / inversion on the chart TF. Returns [#support, #resistance, priceInSupport, priceInResistance]
+method refresh(TFState s) =>
+    int  nSup = 0
+    int  nRes = 0
+    bool inSup = false
+    bool inRes = false
+    int  n = s.items.size()
+    if n > 0
+        for i = n - 1 to 0
+            FVG  f   = s.items.get(i)
+            bool sup = f.bull != f.inverted   // acts as support?
+            float dnSrc = invSrc == "Close" ? close : low
+            float upSrc = invSrc == "Close" ? close : high
+            bool broken = sup ? dnSrc < f.bottom : upSrc > f.top
+
+            if broken and (not useIFVG or f.inverted)
+                // fully invalidated → remove
+                f.bx.delete()
+                if not na(f.ce)
+                    f.ce.delete()
+                s.items.remove(i)
+                continue
+
+            if broken
+                // FVG → IFVG : role flips
+                f.inverted := true
+                f.touched  := false
+                f.col      := sup ? ifBeCol : ifBuCol
+                f.bx.set_bgcolor(f.col)
+                f.bx.set_border_color(color.new(f.col, 40))
+                f.bx.set_text(showTxt ? s.name + " IFVG" : "")
+                f.bx.set_text_color(color.new(f.col, 0))
+                if not na(f.ce)
+                    f.ce.set_color(color.new(f.col, 20))
+                if alInv
+                    alert(syminfo.ticker + " | " + s.name + (sup ? " Bullish FVG → Bearish IFVG: " : " Bearish FVG → Bullish IFVG: ") + f_px(f.bottom) + " - " + f_px(f.top), alert.freq_once_per_bar)
+                sup := not sup
+            else
+                bool touch = sup ? low <= f.top : high >= f.bottom
+                if touch and not f.touched
+                    f.touched := true
+                    f.bx.set_bgcolor(color.new(f.col, math.min(100, color.t(f.col) + fadeAmt)))
+                    if alTouch
+                        alert(syminfo.ticker + " | Price touched " + s.name + (sup ? " Bullish " : " Bearish ") + (f.inverted ? "IFVG" : "FVG") + ": " + f_px(f.bottom) + " - " + f_px(f.top) + "  (CE " + f_px((f.top + f.bottom) / 2) + ")", alert.freq_once_per_bar)
+
+            // extend zone to current bar
+            f.bx.set_right(time)
+            if not na(f.ce)
+                f.ce.set_x2(time)
+
+            bool inside = close <= f.top and close >= f.bottom
+            if sup
+                nSup += 1
+                inSup := inSup or inside
+            else
+                nRes += 1
+                inRes := inRes or inside
+    [nSup, nRes, inSup, inRes]
+
+// ───────────────────────────── STATE ─────────────────────────────
+var TFState s4h = TFState.new("240", "4H",  array.new<FVG>(), 0, c4hBu, c4hBe)
+var TFState s1h = TFState.new("60",  "1H",  array.new<FVG>(), 0, c1hBu, c1hBe)
+var TFState s30 = TFState.new("30",  "30m", array.new<FVG>(), 0, c30Bu, c30Be)
+var TFState s15 = TFState.new("15",  "15m", array.new<FVG>(), 0, c15Bu, c15Be)
+
+// A TF is usable only if it is >= chart TF (lower TFs cannot be drawn correctly)
+int  chartSec = timeframe.in_seconds()
+bool act4h = en4h and timeframe.in_seconds("240") >= chartSec
+bool act1h = en1h and timeframe.in_seconds("60")  >= chartSec
+bool act30 = en30 and timeframe.in_seconds("30")  >= chartSec
+bool act15 = en15 and timeframe.in_seconds("15")  >= chartSec
+
+// ───────────────────────────── REQUESTS ─────────────────────────────
+[bu4, be4, buT4, buB4, beT4, beB4, t1_4, t3_4] = request.security(syminfo.tickerid, "240", f_detect(atrLen, atrMult, bodyRatio), lookahead = barmerge.lookahead_on)
+[bu1, be1, buT1, buB1, beT1, beB1, t1_1, t3_1] = request.security(syminfo.tickerid, "60",  f_detect(atrLen, atrMult, bodyRatio), lookahead = barmerge.lookahead_on)
+[bu3, be3, buT3, buB3, beT3, beB3, t1_3, t3_3] = request.security(syminfo.tickerid, "30",  f_detect(atrLen, atrMult, bodyRatio), lookahead = barmerge.lookahead_on)
+[buQ, beQ, buTQ, buBQ, beTQ, beBQ, t1_Q, t3_Q] = request.security(syminfo.tickerid, "15",  f_detect(atrLen, atrMult, bodyRatio), lookahead = barmerge.lookahead_on)
+
+s4h.process(act4h, bu4, be4, buT4, buB4, beT4, beB4, t1_4, t3_4)
+s1h.process(act1h, bu1, be1, buT1, buB1, beT1, beB1, t1_1, t3_1)
+s30.process(act30, bu3, be3, buT3, buB3, beT3, beB3, t1_3, t3_3)
+s15.process(act15, buQ, beQ, buTQ, buBQ, beTQ, beBQ, t1_Q, t3_Q)
+
+[ns4, nr4, is4, ir4] = s4h.refresh()
+[ns1, nr1, is1, ir1] = s1h.refresh()
+[ns3, nr3, is3, ir3] = s30.refresh()
+[nsQ, nrQ, isQ, irQ] = s15.refresh()
+
+// ───────────────────────────── CONFLUENCE ─────────────────────────────
+int confSup = (is4 ? 1 : 0) + (is1 ? 1 : 0) + (is3 ? 1 : 0) + (isQ ? 1 : 0)
+int confRes = (ir4 ? 1 : 0) + (ir1 ? 1 : 0) + (ir3 ? 1 : 0) + (irQ ? 1 : 0)
+
+if alConf and confSup >= 2 and confSup[1] < 2
+    alert(syminfo.ticker + " | Bullish confluence: price inside " + str.tostring(confSup) + " TF support zones @ " + f_px(close), alert.freq_once_per_bar)
+if alConf and confRes >= 2 and confRes[1] < 2
+    alert(syminfo.ticker + " | Bearish confluence: price inside " + str.tostring(confRes) + " TF resistance zones @ " + f_px(close), alert.freq_once_per_bar)
+
+// ───────────────────────────── DASHBOARD ─────────────────────────────
+string tPos = switch dashPos
+    "Bottom Right" => position.bottom_right
+    "Top Left"     => position.top_left
+    "Bottom Left"  => position.bottom_left
+    => position.top_right
+
+var table dash = table.new(tPos, 4, 6, bgcolor = color.new(#131722, 10), frame_color = color.new(#434651, 0), frame_width = 1, border_color = color.new(#2A2E39, 0), border_width = 1)
+
+color TXT = color.new(#D1D4DC, 0)
+color BUC = color.new(#089981, 0)
+color BEC = color.new(#F23645, 0)
+
+f_row(table t, int r, string name, bool active, int nS, int nR, bool iS, bool iR) =>
+    string st  = not active ? "Off" : iS and iR ? "Inside both" : iS ? "In Bull zone" : iR ? "In Bear zone" : "—"
+    color  stC = not active ? color.gray : iS ? BUC : iR ? BEC : TXT
+    t.cell(0, r, name, text_color = TXT, text_size = size.small)
+    t.cell(1, r, active ? str.tostring(nS) : "-", text_color = BUC, text_size = size.small)
+    t.cell(2, r, active ? str.tostring(nR) : "-", text_color = BEC, text_size = size.small)
+    t.cell(3, r, st, text_color = stC, text_size = size.small)
+
+if showDash and barstate.isfirst
+    dash.merge_cells(1, 5, 3, 5)
+
+if showDash and barstate.islast
+    dash.cell(0, 0, "TF",     text_color = TXT, text_size = size.small, bgcolor = color.new(#2A2E39, 0))
+    dash.cell(1, 0, "▲ Sup",  text_color = BUC, text_size = size.small, bgcolor = color.new(#2A2E39, 0))
+    dash.cell(2, 0, "▼ Res",  text_color = BEC, text_size = size.small, bgcolor = color.new(#2A2E39, 0))
+    dash.cell(3, 0, "Status", text_color = TXT, text_size = size.small, bgcolor = color.new(#2A2E39, 0))
+    f_row(dash, 1, "4H",  act4h, ns4, nr4, is4, ir4)
+    f_row(dash, 2, "1H",  act1h, ns1, nr1, is1, ir1)
+    f_row(dash, 3, "30m", act30, ns3, nr3, is3, ir3)
+    f_row(dash, 4, "15m", act15, nsQ, nrQ, isQ, irQ)
+    string cTxt = confSup >= 2 ? "Bull x" + str.tostring(confSup) : confRes >= 2 ? "Bear x" + str.tostring(confRes) : "—"
+    color  cCol = confSup >= 2 ? BUC : confRes >= 2 ? BEC : TXT
+    dash.cell(0, 5, "Confluence", text_color = TXT, text_size = size.small)
+    dash.cell(1, 5, cTxt, text_color = cCol, text_size = size.small)
